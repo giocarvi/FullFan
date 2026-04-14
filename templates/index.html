@@ -696,6 +696,10 @@ async function openModal(username) {
       <h3>💳 Registrar pago</h3>
       <div class="form-row">
         <div class="form-group">
+          <label>Mes del pago</label>
+          <input type="month" id="pago-mes" value="${new Date().toISOString().substring(0,7)}">
+        </div>
+        <div class="form-group">
           <label>Monto (Q)</label>
           <input type="number" id="pago-monto" placeholder="90" min="1">
         </div>
@@ -717,11 +721,12 @@ async function registrarPago(username) {
   const vencimiento = document.getElementById('pago-vencimiento').value;
   if (!monto || monto <= 0) { alert('Ingresa un monto válido'); return; }
 
-  const today = new Date().toISOString().substring(0,8) + '01';
+  const mesVal = document.getElementById('pago-mes').value || new Date().toISOString().substring(0,7);
+  const mes = mesVal + '-01';
   const r = await fetch('/api/pagos', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ username, monto, vencimiento, mes: today })
+    body: JSON.stringify({ username, monto, vencimiento, mes })
   });
   const d = await r.json();
   if (d.ok) {
