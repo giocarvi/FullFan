@@ -346,10 +346,15 @@ def actualizar_cliente(username):
     data = request.json
     db = get_db()
     c = db.cursor()
-    c.execute(qmark("UPDATE clientes SET nombre=?, contacto=?, vencimiento=?, referido=?, notas=? WHERE username=?"),
-              (data.get('nombre'), data.get('contacto'), data.get('vencimiento'),
-               data.get('referido'), data.get('notas'), username))
-    db.commit()
+    fields, params = [], []
+    for field in ['nombre', 'contacto', 'vencimiento', 'referido', 'notas']:
+        if field in data:
+            fields.append(f"{field}=?")
+            params.append(data[field])
+    if fields:
+        params.append(username)
+        c.execute(qmark(f"UPDATE clientes SET {', '.join(fields)} WHERE username=?"), params)
+        db.commit()
     db.close()
     return jsonify({'ok': True})
 
