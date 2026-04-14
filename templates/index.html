@@ -656,25 +656,14 @@ async function openModal(username) {
 
   const esAtencion = d.rol === 'atencion';
   let pagosHtml = '';
-  if (esAtencion) {
-    const p = d.pagos[0];
-    pagosHtml = p
-      ? `<div style="margin:16px 20px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:14px;padding:16px;">
-           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Último pago</div>
-           <div style="font-size:24px;font-weight:800;color:var(--green);">Q${parseFloat(p.monto).toLocaleString()}</div>
-           <div style="font-size:13px;color:var(--muted);margin-top:4px;">${p.mes ? p.mes.substring(0,7) : '—'}</div>
-         </div>`
-      : `<div style="margin:16px 20px;text-align:center;color:var(--muted);font-size:14px;">Sin pagos registrados</div>`;
-  } else {
-    pagosHtml = d.pagos.length
-      ? d.pagos.map(p => `<div class="pay-row">
-          <div class="pay-month">${p.mes ? p.mes.substring(0,7) : '—'}</div>
-          <div class="pay-amount">Q${parseFloat(p.monto).toLocaleString()}</div>
-        </div>`).join('')
-      : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
-  }
+  pagosHtml = d.pagos.length
+    ? d.pagos.map(p => `<div class="pay-row">
+        <div class="pay-month">${p.mes ? p.mes.substring(0,7) : '—'}</div>
+        <div class="pay-amount">Q${parseFloat(p.monto).toLocaleString()}</div>
+      </div>`).join('')
+    : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
 
-  inner.innerHTML = `
+  inner.innerHTML = `  inner.innerHTML = `
     <div class="modal-header">
       <div class="modal-avatar">${initial}</div>
       <div style="flex:1;min-width:0;">
@@ -693,7 +682,6 @@ async function openModal(username) {
       ${c.notas ? `<div class="info-row"><div class="info-icon">📝</div><div class="info-data"><div class="lbl">Notas</div><div class="val">${c.notas}</div></div></div>` : ''}
     </div>
 
-    ${!esAtencion ? `
     <div class="pago-form" id="pago-form-${username}">
       <h3>💳 Registrar pago</h3>
       <div class="form-row">
@@ -711,13 +699,6 @@ async function openModal(username) {
     </div>
     <div class="section-divider">Historial de pagos</div>
     ${pagosHtml}
-    ` : `
-    <div class="section-divider">Último pago</div>
-    ${pagosHtml}
-    <div style="padding:0 20px 20px;">
-      <button class="btn-secondary" onclick="closeModal()">Cerrar</button>
-    </div>
-    `}
   `;
 }
 
