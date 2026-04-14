@@ -6,7 +6,12 @@ from functools import wraps
 
 app = Flask(__name__)
 app.secret_key = 'iptv_secret_key_2026'
-DB = os.path.join(os.path.dirname(__file__), 'database.db')
+
+# En producción (Railway), la DB vive en /app/data/ que es un volumen persistente.
+# En desarrollo local, vive junto al app.py.
+DATA_DIR = os.environ.get('DATA_DIR', os.path.dirname(__file__))
+os.makedirs(DATA_DIR, exist_ok=True)
+DB = os.path.join(DATA_DIR, 'database.db')
 
 def get_db():
     conn = sqlite3.connect(DB)
