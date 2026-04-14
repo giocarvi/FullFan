@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>IPTV Panel</title>
+<style>
+/* ── RESET & BASE ─────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #0d0d1a;
+  --card: #1a1a2e;
+  --card2: #16213e;
+  --accent: #6c63ff;
+  --accent2: #a855f7;
+  --green: #10b981;
+  --yellow: #f59e0b;
+  --red: #ef4444;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --border: rgba(255,255,255,0.08);
+  --radius: 16px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: 80px;
+  font-size: 15px;
+}
+
+/* ── TOPBAR ───────────────────────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(13,13,26,0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.topbar-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.topbar-title span { font-size: 20px; }
+.avatar {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.logout-btn {
+  background: none; border: none; color: var(--muted);
+  font-size: 13px; cursor: pointer; padding: 6px 10px;
+  border-radius: 8px;
+}
+.logout-btn:hover { color: var(--red); background: rgba(239,68,68,0.1); }
+
+/* ── BOTTOM NAV ───────────────────────────────────────────────────── */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(26,26,46,0.98);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  display: flex; justify-content: space-around;
+  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+}
+.nav-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: none; border: none; color: var(--muted);
+  font-size: 10px; font-weight: 500;
+  padding: 6px 20px; border-radius: 12px; cursor: pointer;
+  transition: color 0.15s;
+}
+.nav-btn .icon { font-size: 22px; line-height: 1; }
+.nav-btn.active { color: var(--accent); }
+.nav-btn.active .icon { filter: drop-shadow(0 0 6px var(--accent)); }
+
+/* ── VIEWS ────────────────────────────────────────────────────────── */
+.view { display: none; padding: 16px; }
+.view.active { display: block; }
+
+/* ── STAT CARDS ───────────────────────────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+}
+.stat-card .val { font-size: 28px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.stat-card .lbl { font-size: 12px; color: var(--muted); font-weight: 500; }
+.stat-card.green .val { color: var(--green); }
+.stat-card.red .val { color: var(--red); }
+.stat-card.yellow .val { color: var(--yellow); }
+.stat-card.purple .val { color: var(--accent2); }
+
+/* ── SECTION HEADER ───────────────────────────────────────────────── */
+.sec-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.sec-title { font-size: 15px; font-weight: 700; }
+.sec-link { font-size: 13px; color: var(--accent); cursor: pointer; background: none; border: none; }
+
+/* ── REVENUE CHART ────────────────────────────────────────────────── */
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.chart-card h3 { font-size: 14px; color: var(--muted); margin-bottom: 16px; }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 80px; }
+.bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+.bar {
+  width: 100%; border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  min-height: 4px; transition: height 0.3s ease;
+}
+.bar-label { font-size: 9px; color: var(--muted); white-space: nowrap; }
+
+/* ── LIST ITEMS ───────────────────────────────────────────────────── */
+.list-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.list-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.list-item:last-child { border-bottom: none; }
+.list-item:active { background: rgba(255,255,255,0.04); }
+.item-avatar {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+.item-info { flex: 1; min-width: 0; }
+.item-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.badge {
+  font-size: 11px; font-weight: 600; padding: 3px 8px;
+  border-radius: 20px; flex-shrink: 0;
+}
+.badge.green { background: rgba(16,185,129,0.15); color: var(--green); }
+.badge.red { background: rgba(239,68,68,0.15); color: var(--red); }
+.badge.yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+.badge.gray { background: rgba(148,163,184,0.15); color: var(--muted); }
+
+/* ── SEARCH ───────────────────────────────────────────────────────── */
+.search-wrap {
+  position: relative; margin-bottom: 14px;
+}
+.search-input {
+  width: 100%; padding: 13px 16px 13px 44px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text); font-size: 15px; outline: none;
+  transition: border-color 0.2s;
+}
+.search-input::placeholder { color: var(--muted); }
+.search-input:focus { border-color: var(--accent); }
+.search-icon {
+  position: absolute; left: 14px; top: 50%;
+  transform: translateY(-50%); font-size: 18px; pointer-events: none;
+}
+.filter-tabs {
+  display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto;
+  padding-bottom: 4px; scrollbar-width: none;
+}
+.filter-tabs::-webkit-scrollbar { display: none; }
+.filter-tab {
+  padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--muted); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: all 0.15s;
+}
+.filter-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ── CLIENT DETAIL MODAL ──────────────────────────────────────────── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  align-items: flex-end; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--card);
+  border-radius: 24px 24px 0 0;
+  width: 100%; max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 0 0 40px;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.modal-handle {
+  width: 36px; height: 4px; background: rgba(255,255,255,0.2);
+  border-radius: 2px; margin: 12px auto 0;
+}
+.modal-header {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px;
+}
+.modal-avatar {
+  width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 800;
+}
+.modal-name { font-size: 18px; font-weight: 700; }
+.modal-username { font-size: 13px; color: var(--muted); font-family: monospace; }
+.modal-body { padding: 16px 20px; }
+.info-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.info-row:last-child { border-bottom: none; }
+.info-icon { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+.info-data .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.info-data .val { font-size: 15px; font-weight: 500; margin-top: 2px; }
+.section-divider {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px;
+  padding: 16px 20px 8px;
+}
+.pay-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.pay-row:last-child { border-bottom: none; }
+.pay-month { font-size: 14px; }
+.pay-amount { font-size: 15px; font-weight: 600; color: var(--green); }
+
+/* ── PAGO FORM ────────────────────────────────────────────────────── */
+.pago-form {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin: 16px 20px 0;
+}
+.pago-form h3 { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+.form-group input, .form-group select {
+  width: 100%; padding: 12px 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 15px; outline: none;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn-primary {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; border-radius: 12px; color: #fff;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+.btn-primary:active { transform: scale(0.98); opacity: 0.9; }
+.btn-secondary {
+  width: 100%; padding: 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  border-radius: 12px; color: var(--muted);
+  font-size: 14px; font-weight: 500; cursor: pointer; margin-top: 8px;
+}
+.success-toast {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+  background: var(--green); color: #fff;
+  padding: 12px 24px; border-radius: 30px;
+  font-size: 14px; font-weight: 600; z-index: 300;
+  animation: fadeInOut 3s ease forwards;
+  pointer-events: none; white-space: nowrap;
+}
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── EMPTY STATE ──────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center; padding: 40px 20px; color: var(--muted);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+.loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+
+/* ── RESPONSIVE (tablet+) ─────────────────────────────────────────── */
+@media(min-width: 600px) {
+  .stats-grid { grid-template-columns: repeat(4, 1fr); }
+  .modal { border-radius: 24px; margin-bottom: 20px; }
+  .modal-overlay { align-items: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-title"><span>📡</span> IPTV Panel</div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="font-size:13px;color:var(--muted)">{{ user }}</span>
+    <a href="/logout" class="logout-btn">Salir</a>
+  </div>
+</div>
+
+<!-- VIEWS -->
+<div id="view-dashboard" class="view active">
+  <div id="stats-grid" class="stats-grid">
+    <div class="stat-card green"><div class="val" id="stat-activos">—</div><div class="lbl">Activos</div></div>
+    <div class="stat-card yellow"><div class="val" id="stat-por-vencer">—</div><div class="lbl">Por vencer</div></div>
+    <div class="stat-card red"><div class="val" id="stat-vencidos">—</div><div class="lbl">Vencidos</div></div>
+    <div class="stat-card purple"><div class="val" id="stat-ingresos">—</div><div class="lbl">Ingresos mes</div></div>
+  </div>
+
+  <div class="chart-card">
+    <h3>💰 Ingresos últimos 6 meses</h3>
+    <div class="bars" id="chart-bars"></div>
+  </div>
+
+  <div class="sec-header">
+    <div class="sec-title">⚠️ Próximos a vencer</div>
+    <button class="sec-link" onclick="switchView('clientes', 'por_vencer')">Ver todos</button>
+  </div>
+  <div class="list-card" id="vencer-list">
+    <div class="loading">Cargando...</div>
+  </div>
+</div>
+
+<div id="view-clientes" class="view">
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="search" class="search-input" id="search-input" placeholder="Nombre, usuario o teléfono...">
+  </div>
+  <div class="filter-tabs">
+    <button class="filter-tab active" data-estado="">Todos</button>
+    <button class="filter-tab" data-estado="activo">✅ Activos</button>
+    <button class="filter-tab" data-estado="por_vencer">⚠️ Por vencer</button>
+    <button class="filter-tab" data-estado="vencido">❌ Vencidos</button>
+  </div>
+  <div id="clientes-list">
+    <div class="loading">Cargando...</div>
+  </div>
+  <div style="text-align:center;padding:10px 0;" id="load-more-wrap" style="display:none">
+    <button class="btn-secondary" id="load-more-btn" style="width:auto;padding:10px 32px;">Cargar más</button>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-view="dashboard">
+    <span class="icon">📊</span>Dashboard
+  </button>
+  <button class="nav-btn" data-view="clientes">
+    <span class="icon">👥</span>Clientes
+  </button>
+</nav>
+
+<!-- CLIENT DETAIL MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal-content">
+    <div class="modal-handle"></div>
+    <div id="modal-body-inner"></div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let currentPage = 1, currentEstado = '', currentQ = '', loadingClientes = false, totalClientes = 0;
+let searchTimeout;
+
+// ── NAVIGATION ─────────────────────────────────────────────────────────────
+function switchView(view, estado) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`view-${view}`).classList.add('active');
+  document.querySelector(`[data-view="${view}"]`)?.classList.add('active');
+
+  if (view === 'clientes') {
+    if (estado) {
+      currentEstado = estado;
+      document.querySelectorAll('.filter-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.estado === estado);
+      });
+    }
+    currentPage = 1;
+    loadClientes(true);
+  }
+  if (view === 'dashboard') loadDashboard();
+}
+
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchView(btn.dataset.view));
+});
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  const r = await fetch('/api/dashboard');
+  const d = await r.json();
+
+  document.getElementById('stat-activos').textContent = d.activos.toLocaleString();
+  document.getElementById('stat-por-vencer').textContent = d.por_vencer.toLocaleString();
+  document.getElementById('stat-vencidos').textContent = d.vencidos.toLocaleString();
+  document.getElementById('stat-ingresos').textContent = 'Q' + Math.round(d.ingresos_mes).toLocaleString();
+
+  // Chart
+  const bars = document.getElementById('chart-bars');
+  const max = Math.max(...d.ultimos_meses.map(m => m.total), 1);
+  bars.innerHTML = d.ultimos_meses.map(m => {
+    const h = Math.max(Math.round((m.total / max) * 80), 4);
+    const label = m.m.substring(5); // MM
+    return `<div class="bar-wrap">
+      <div class="bar" style="height:${h}px" title="Q${Math.round(m.total).toLocaleString()}"></div>
+      <div class="bar-label">${label}</div>
+    </div>`;
+  }).join('');
+
+  // Vencer list
+  const list = document.getElementById('vencer-list');
+  if (!d.por_vencer_lista.length) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">🎉</div><p>Ningún cliente próximo a vencer</p></div>';
+    return;
+  }
+  list.innerHTML = d.por_vencer_lista.map(c => clienteItem(c, true)).join('');
+  list.querySelectorAll('.list-item').forEach(el => {
+    el.addEventListener('click', () => openModal(el.dataset.username));
+  });
+}
+
+// ── CLIENTES ────────────────────────────────────────────────────────────────
+async function loadClientes(reset = false) {
+  if (loadingClientes) return;
+  loadingClientes = true;
+  if (reset) {
+    currentPage = 1;
+    document.getElementById('clientes-list').innerHTML = '<div class="loading">Cargando...</div>';
+  }
+
+  const r = await fetch(`/api/clientes?q=${encodeURIComponent(currentQ)}&estado=${currentEstado}&page=${currentPage}`);
+  const d = await r.json();
+  totalClientes = d.total;
+
+  const list = document.getElementById('clientes-list');
+  const html = d.clientes.map(c => clienteItem(c, false)).join('');
+
+  if (reset) {
+    list.innerHTML = d.clientes.length ? html : '<div class="empty-state"><div class="icon">🔍</div><p>No se encontraron clientes</p></div>';
+  } else {
+    list.insertAdjacentHTML('beforeend', html);
+  }
+
+  list.querySelectorAll('.list-item:not([data-bound])').forEach(el => {
+    el.dataset.bound = '1';
+    el.addEventListener('click', () => openModal(el.dataset.username));
+  });
+
+  const shown = document.querySelectorAll('.list-item').length;
+  const moreWrap = document.getElementById('load-more-wrap');
+  if (shown < totalClientes) {
+    moreWrap.style.display = 'block';
+  } else {
+    moreWrap.style.display = 'none';
+  }
+  loadingClientes = false;
+}
+
+document.getElementById('load-more-btn').addEventListener('click', () => {
+  currentPage++;
+  loadClientes(false);
+});
+
+document.getElementById('search-input').addEventListener('input', e => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    currentQ = e.target.value;
+    loadClientes(true);
+  }, 350);
+});
+
+document.querySelectorAll('.filter-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentEstado = tab.dataset.estado;
+    loadClientes(true);
+  });
+});
+
+// ── CLIENT CARD HTML ────────────────────────────────────────────────────────
+function clienteItem(c, showDays) {
+  const initial = (c.nombre || c.username || '?')[0].toUpperCase();
+  const status = clienteStatus(c.vencimiento);
+  let sub = c.contacto ? `📞 ${c.contacto}` : c.username;
+  if (showDays && c.vencimiento) {
+    const days = Math.ceil((new Date(c.vencimiento) - new Date()) / 86400000);
+    sub += ` · Vence en ${days} días`;
+  }
+  return `<div class="list-item" data-username="${c.username}">
+    <div class="item-avatar">${initial}</div>
+    <div class="item-info">
+      <div class="item-name">${c.nombre || c.username}</div>
+      <div class="item-sub">${sub}</div>
+    </div>
+    <span class="badge ${status.cls}">${status.label}</span>
+  </div>`;
+}
+
+function clienteStatus(vencimiento) {
+  if (!vencimiento) return { cls: 'gray', label: 'Sin fecha' };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const exp = new Date(vencimiento);
+  const diff = Math.ceil((exp - today) / 86400000);
+  if (diff < 0) return { cls: 'red', label: 'Vencido' };
+  if (diff <= 7) return { cls: 'yellow', label: `${diff}d` };
+  if (diff <= 30) return { cls: 'yellow', label: 'Por vencer' };
+  return { cls: 'green', label: 'Activo' };
+}
+
+// ── MODAL ───────────────────────────────────────────────────────────────────
+async function openModal(username) {
+  const overlay = document.getElementById('modal-overlay');
+  const inner = document.getElementById('modal-body-inner');
+  inner.innerHTML = '<div class="loading">Cargando...</div>';
+  overlay.classList.add('open');
+
+  const r = await fetch(`/api/clientes/${username}`);
+  const d = await r.json();
+  if (d.error) { inner.innerHTML = '<div class="loading">Error al cargar</div>'; return; }
+
+  const c = d.cliente;
+  const status = clienteStatus(c.vencimiento);
+  const initial = (c.nombre || c.username || '?')[0].toUpperCase();
+
+  const pagosHtml = d.pagos.length
+    ? d.pagos.map(p => `<div class="pay-row">
+        <div class="pay-month">${p.mes ? p.mes.substring(0,7) : '—'}</div>
+        <div class="pay-amount">Q${parseFloat(p.monto).toLocaleString()}</div>
+      </div>`).join('')
+    : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
+
+  inner.innerHTML = `
+    <div class="modal-header">
+      <div class="modal-avatar">${initial}</div>
+      <div>
+        <div class="modal-name">${c.nombre || '—'}</div>
+        <div class="modal-username">${c.username}</div>
+      </div>
+      <span class="badge ${status.cls}" style="margin-left:auto">${status.label}</span>
+    </div>
+    <div class="modal-body">
+      <div class="info-row"><div class="info-icon">📞</div><div class="info-data"><div class="lbl">Contacto</div><div class="val">${c.contacto || 'N/A'}</div></div></div>
+      <div class="info-row"><div class="info-icon">📅</div><div class="info-data"><div class="lbl">Vencimiento</div><div class="val">${c.vencimiento || 'Sin fecha'}</div></div></div>
+      <div class="info-row"><div class="info-icon">💰</div><div class="info-data"><div class="lbl">Total pagado histórico</div><div class="val">Q${parseFloat(c.total_pagado||0).toLocaleString()}</div></div></div>
+      <div class="info-row"><div class="info-icon">👥</div><div class="info-data"><div class="lbl">Referido</div><div class="val">${c.referido || 'NO'}</div></div></div>
+      ${c.notas ? `<div class="info-row"><div class="info-icon">📝</div><div class="info-data"><div class="lbl">Notas</div><div class="val">${c.notas}</div></div></div>` : ''}
+    </div>
+
+    <div class="pago-form" id="pago-form-${username}">
+      <h3>💳 Registrar pago</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Monto (Q)</label>
+          <input type="number" id="pago-monto" placeholder="90" min="1">
+        </div>
+        <div class="form-group">
+          <label>Nuevo vencimiento</label>
+          <input type="date" id="pago-vencimiento" value="${c.vencimiento || ''}">
+        </div>
+      </div>
+      <button class="btn-primary" onclick="registrarPago('${username}')">✅ Registrar pago</button>
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+    </div>
+
+    <div class="section-divider">Historial de pagos</div>
+    ${pagosHtml}
+  `;
+}
+
+async function registrarPago(username) {
+  const monto = parseFloat(document.getElementById('pago-monto').value);
+  const vencimiento = document.getElementById('pago-vencimiento').value;
+  if (!monto || monto <= 0) { alert('Ingresa un monto válido'); return; }
+
+  const today = new Date().toISOString().substring(0,8) + '01';
+  const r = await fetch('/api/pagos', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ username, monto, vencimiento, mes: today })
+  });
+  const d = await r.json();
+  if (d.ok) {
+    closeModal();
+    showToast('✅ Pago registrado correctamente');
+    loadDashboard();
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+document.getElementById('modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'success-toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3100);
+}
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+loadDashboard();
+</script>
+</body>
+</html>
