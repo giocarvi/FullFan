@@ -331,18 +331,11 @@ def cliente_detalle(username):
         return jsonify({'error': 'No encontrado'}), 404
 
     rol = session.get('rol', 'atencion')
-    if rol == 'atencion':
-        # Solo muestra el último pago
-        c.execute(qmark("SELECT mes, monto FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 1"), (username,))
-        ultimo_pago = fetchone(c)
-        db.close()
-        return jsonify({'cliente': cliente, 'pagos': [ultimo_pago] if ultimo_pago else [], 'rol': 'atencion'})
-    else:
-        # Admin ve historial completo
-        c.execute(qmark("SELECT mes, monto, fecha_registro FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 24"), (username,))
-        pagos = fetchall(c)
-        db.close()
-        return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': 'admin'})
+    # Ambos roles ven el historial de pagos reciente
+    c.execute(qmark("SELECT mes, monto, fecha_registro FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 24"), (username,))
+    pagos = fetchall(c)
+    db.close()
+    return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol})
 
 @app.route('/api/clientes/<username>', methods=['PUT'])
 @login_required
