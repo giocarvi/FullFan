@@ -266,6 +266,7 @@ def dashboard():
 def clientes():
     q = request.args.get('q', '').strip()
     estado = request.args.get('estado', '')
+    fecha = request.args.get('fecha', '').strip()
     page = int(request.args.get('page', 1))
     per_page = 20
     offset = (page - 1) * per_page
@@ -276,7 +277,9 @@ def clientes():
         where.append("(nombre ILIKE ? OR username ILIKE ? OR contacto ILIKE ?)" if PG else
                      "(nombre LIKE ? OR username LIKE ? OR contacto LIKE ?)")
         params += [f'%{q}%', f'%{q}%', f'%{q}%']
-    if estado == 'activo':
+    if fecha:
+        where.append("vencimiento = ?"); params.append(fecha)
+    elif estado == 'activo':
         where.append("vencimiento >= ?"); params.append(today)
     elif estado == 'vencido':
         where.append("(vencimiento < ? OR vencimiento IS NULL)"); params.append(today)
