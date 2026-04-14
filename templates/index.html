@@ -692,12 +692,28 @@ async function openModal(username) {
       ${c.notas ? `<div class="info-row"><div class="info-icon">📝</div><div class="info-data"><div class="lbl">Notas</div><div class="val">${c.notas}</div></div></div>` : ''}
     </div>
 
+    <div class="pago-form" id="edit-form-${username}">
+      <h3>✏️ Editar datos</h3>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input type="text" id="edit-nombre" value="${c.nombre || ''}" placeholder="Nombre completo">
+        </div>
+        <div class="form-group">
+          <label>Teléfono / Contacto</label>
+          <input type="text" id="edit-contacto" value="${c.contacto || ''}" placeholder="ej: 55551234">
+        </div>
+      </div>
+      <button class="btn-primary" onclick="guardarEdicion('${username}')">💾 Guardar cambios</button>
+      <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+    </div>
+
     <div class="pago-form" id="pago-form-${username}">
       <h3>💳 Registrar pago</h3>
       <div class="form-row">
         <div class="form-group">
-          <label>Mes del pago</label>
-          <input type="month" id="pago-mes" value="${new Date().toISOString().substring(0,7)}">
+          <label>Fecha del pago</label>
+          <input type="date" id="pago-mes" value="${new Date().toISOString().substring(0,10)}">
         </div>
         <div class="form-group">
           <label>Monto (Q)</label>
@@ -716,13 +732,30 @@ async function openModal(username) {
   `;
 }
 
+async function guardarEdicion(username) {
+  const nombre = document.getElementById('edit-nombre').value.trim();
+  const contacto = document.getElementById('edit-contacto').value.trim();
+  const r = await fetch(`/api/clientes/${username}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ nombre, contacto })
+  });
+  const d = await r.json();
+  if (d.ok) {
+    closeModal();
+    showToast('✅ Datos actualizados');
+    loadClientes(true);
+  } else {
+    showToast('❌ Error al guardar');
+  }
+}
+
 async function registrarPago(username) {
   const monto = parseFloat(document.getElementById('pago-monto').value);
   const vencimiento = document.getElementById('pago-vencimiento').value;
   if (!monto || monto <= 0) { alert('Ingresa un monto válido'); return; }
 
-  const mesVal = document.getElementById('pago-mes').value || new Date().toISOString().substring(0,7);
-  const mes = mesVal + '-01';
+  const mes = document.getElementById('pago-mes').value || new Date().toISOString().substring(0,10);
   const r = await fetch('/api/pagos', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
