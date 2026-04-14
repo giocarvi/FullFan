@@ -390,6 +390,11 @@ body {
     <button class="filter-tab" data-estado="por_vencer">⚠️ Por vencer</button>
     <button class="filter-tab" data-estado="vencido">❌ Vencidos</button>
   </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+    <span style="font-size:13px;color:var(--muted);white-space:nowrap;">📅 Vence el:</span>
+    <input type="date" id="fecha-filter" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:7px 12px;font-size:13px;">
+    <button onclick="document.getElementById('fecha-filter').value='';currentFecha='';loadClientes(true);" style="background:none;border:1px solid var(--border);border-radius:10px;color:var(--muted);padding:7px 10px;font-size:13px;cursor:pointer;">✕</button>
+  </div>
   <div id="clientes-list">
     <div class="loading">Cargando...</div>
   </div>
@@ -485,7 +490,7 @@ body {
 
 <script>
 // ── STATE ──────────────────────────────────────────────────────────────────
-let currentPage = 1, currentEstado = '', currentQ = '', loadingClientes = false, totalClientes = 0;
+let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', loadingClientes = false, totalClientes = 0;
 let searchTimeout;
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────────
@@ -555,7 +560,7 @@ async function loadClientes(reset = false) {
     document.getElementById('clientes-list').innerHTML = '<div class="loading">Cargando...</div>';
   }
 
-  const r = await fetch(`/api/clientes?q=${encodeURIComponent(currentQ)}&estado=${currentEstado}&page=${currentPage}`);
+  const r = await fetch(`/api/clientes?q=${encodeURIComponent(currentQ)}&estado=${currentEstado}&fecha=${currentFecha}&page=${currentPage}`);
   const d = await r.json();
   totalClientes = d.total;
 
@@ -586,6 +591,11 @@ async function loadClientes(reset = false) {
 document.getElementById('load-more-btn').addEventListener('click', () => {
   currentPage++;
   loadClientes(false);
+});
+
+document.getElementById('fecha-filter').addEventListener('change', e => {
+  currentFecha = e.target.value;
+  loadClientes(true);
 });
 
 document.getElementById('search-input').addEventListener('input', e => {
