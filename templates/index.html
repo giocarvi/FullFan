@@ -379,7 +379,74 @@ body {
   <button class="nav-btn" data-view="clientes">
     <span class="icon">👥</span>Clientes
   </button>
+  <button class="nav-btn" onclick="openNuevoCliente()">
+    <span class="icon">➕</span>Nuevo
+  </button>
 </nav>
+
+<!-- NUEVO CLIENTE MODAL -->
+<div class="modal-overlay" id="nuevo-modal-overlay">
+  <div class="modal" id="nuevo-modal">
+    <div class="modal-handle"></div>
+    <div style="padding:20px 20px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+      <div style="font-size:28px;">➕</div>
+      <div>
+        <div style="font-size:18px;font-weight:700;">Nuevo Cliente</div>
+        <div style="font-size:13px;color:var(--muted);">Completa los datos del cliente</div>
+      </div>
+    </div>
+    <div style="padding:16px 20px 0;">
+
+      <div class="form-group">
+        <label>Username <span style="color:var(--red)">*</span></label>
+        <input type="text" id="nc-username" placeholder="ej: juanperez01" autocomplete="off">
+        <div id="nc-username-error" style="color:var(--red);font-size:12px;margin-top:4px;display:none;"></div>
+      </div>
+
+      <div class="form-group">
+        <label>Nombre completo</label>
+        <input type="text" id="nc-nombre" placeholder="ej: Juan Pérez">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Teléfono / Contacto</label>
+          <input type="text" id="nc-contacto" placeholder="ej: 55551234">
+        </div>
+        <div class="form-group">
+          <label>Referido</label>
+          <select id="nc-referido">
+            <option value="SI">✅ SI</option>
+            <option value="NO" selected>❌ NO</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Fecha de vencimiento</label>
+          <input type="date" id="nc-vencimiento">
+        </div>
+        <div class="form-group">
+          <label>Primer pago (Q)</label>
+          <input type="number" id="nc-pago" placeholder="90" min="0">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Notas</label>
+        <input type="text" id="nc-notas" placeholder="Plan, observaciones...">
+      </div>
+
+      <button class="btn-primary" onclick="guardarNuevoCliente()" style="margin-bottom:8px;">
+        ✅ Guardar cliente
+      </button>
+      <button class="btn-secondary" onclick="closeNuevoModal()" style="margin-bottom:20px;">
+        Cancelar
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- CLIENT DETAIL MODAL -->
 <div class="modal-overlay" id="modal-overlay">
@@ -639,6 +706,71 @@ function showToast(msg) {
   t.className = 'success-toast'; t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3100);
+}
+
+// ── NUEVO CLIENTE ────────────────────────────────────────────────────────────
+function openNuevoCliente() {
+  document.getElementById('nc-username').value = '';
+  document.getElementById('nc-nombre').value = '';
+  document.getElementById('nc-contacto').value = '';
+  document.getElementById('nc-referido').value = 'NO';
+  document.getElementById('nc-vencimiento').value = '';
+  document.getElementById('nc-pago').value = '';
+  document.getElementById('nc-notas').value = '';
+  document.getElementById('nc-username-error').style.display = 'none';
+  document.getElementById('nuevo-modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('nc-username').focus(), 300);
+}
+
+function closeNuevoModal() {
+  document.getElementById('nuevo-modal-overlay').classList.remove('open');
+}
+
+document.getElementById('nuevo-modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('nuevo-modal-overlay')) closeNuevoModal();
+});
+
+async function guardarNuevoCliente() {
+  const username = document.getElementById('nc-username').value.trim();
+  const nombre   = document.getElementById('nc-nombre').value.trim();
+  const contacto = document.getElementById('nc-contacto').value.trim();
+  const referido = document.getElementById('nc-referido').value;
+  const vencimiento = document.getElementById('nc-vencimiento').value;
+  const pago     = parseFloat(document.getElementById('nc-pago').value) || 0;
+  const notas    = document.getElementById('nc-notas').value.trim();
+  const errEl    = document.getElementById('nc-username-error');
+
+  if (!username) { errEl.textContent = 'El username es obligatorio'; errEl.style.display = 'block'; return; }
+
+  const r = await fetch('/api/clientes', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ username, nombre, contacto, referido, vencimiento, notas })
+  });
+  const d = await r.json();
+
+  if (!r.ok) {
+    errEl.textContent = d.error || 'Error al guardar';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Registrar primer pago si se indicó
+  if (pago > 0) {
+    const today = new Date().toISOString().substring(0,8) + '01';
+    await fetch('/api/pagos', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ username, monto: pago, vencimiento, mes: today })
+    });
+  }
+
+  closeNuevoModal();
+  showToast('✅ Cliente creado correctamente');
+  loadDashboard();
+  if (document.getElementById('view-clientes').classList.contains('active')) {
+    loadClientes(true);
+  }
 }
 
 // ── INIT ────────────────────────────────────────────────────────────────────
