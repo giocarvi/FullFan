@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>IPTV Panel</title>
+<title>Full Fan Digital TV</title>
 <style>
 /* ── RESET & BASE ─────────────────────────────────────────────────── */
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -319,7 +319,10 @@ body {
 
 <!-- TOP BAR -->
 <div class="topbar">
-  <div class="topbar-title"><span>📡</span> IPTV Panel</div>
+  <div class="topbar-title">
+    <img src="/static/logo.png" alt="Full Fan Digital TV" style="height:36px;object-fit:contain;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <span style="display:none;align-items:center;gap:6px;"><span>📡</span> Full Fan</span>
+  </div>
   <div style="display:flex;align-items:center;gap:10px;">
     <span style="font-size:13px;color:var(--muted)">{{ user }}</span>
     <a href="/logout" class="logout-btn">Salir</a>
@@ -512,16 +515,20 @@ document.querySelectorAll('.filter-tab').forEach(tab => {
 function clienteItem(c, showDays) {
   const initial = (c.nombre || c.username || '?')[0].toUpperCase();
   const status = clienteStatus(c.vencimiento);
-  let sub = c.contacto ? `📞 ${c.contacto}` : c.username;
+  let daysNote = '';
   if (showDays && c.vencimiento) {
     const days = Math.ceil((new Date(c.vencimiento) - new Date()) / 86400000);
-    sub += ` · Vence en ${days} días`;
+    daysNote = `<span style="color:var(--yellow);font-size:11px;margin-left:6px;">· vence en ${days}d</span>`;
   }
+  const contacto = c.contacto ? `<span style="color:var(--muted)">📞 ${c.contacto}</span>` : '';
   return `<div class="list-item" data-username="${c.username}">
     <div class="item-avatar">${initial}</div>
     <div class="item-info">
-      <div class="item-name">${c.nombre || c.username}</div>
-      <div class="item-sub">${sub}</div>
+      <div class="item-name">${c.nombre || '—'} ${daysNote}</div>
+      <div class="item-sub" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <span style="font-family:monospace;background:rgba(108,99,255,0.15);color:#a5b4fc;padding:1px 6px;border-radius:4px;font-size:11px;">${c.username}</span>
+        ${contacto}
+      </div>
     </div>
     <span class="badge ${status.cls}">${status.label}</span>
   </div>`;
@@ -563,11 +570,13 @@ async function openModal(username) {
   inner.innerHTML = `
     <div class="modal-header">
       <div class="modal-avatar">${initial}</div>
-      <div>
+      <div style="flex:1;min-width:0;">
         <div class="modal-name">${c.nombre || '—'}</div>
-        <div class="modal-username">${c.username}</div>
+        <div class="modal-username" style="display:inline-flex;align-items:center;gap:6px;margin-top:4px;">
+          <span style="background:rgba(108,99,255,0.2);color:#a5b4fc;padding:2px 8px;border-radius:6px;font-size:12px;font-family:monospace;">${c.username}</span>
+        </div>
       </div>
-      <span class="badge ${status.cls}" style="margin-left:auto">${status.label}</span>
+      <span class="badge ${status.cls}" style="margin-left:auto;flex-shrink:0;">${status.label}</span>
     </div>
     <div class="modal-body">
       <div class="info-row"><div class="info-icon">📞</div><div class="info-data"><div class="lbl">Contacto</div><div class="val">${c.contacto || 'N/A'}</div></div></div>
