@@ -331,18 +331,17 @@ body {
 
 <!-- VIEWS -->
 <div id="view-dashboard" class="view active">
+  {% if rol == 'admin' %}
   <div id="stats-grid" class="stats-grid">
     <div class="stat-card green"><div class="val" id="stat-activos">—</div><div class="lbl">Activos</div></div>
     <div class="stat-card yellow"><div class="val" id="stat-por-vencer">—</div><div class="lbl">Por vencer</div></div>
     <div class="stat-card red"><div class="val" id="stat-vencidos">—</div><div class="lbl">Vencidos</div></div>
     <div class="stat-card purple"><div class="val" id="stat-ingresos">—</div><div class="lbl">Ingresos mes</div></div>
   </div>
-
   <div class="chart-card">
     <h3>💰 Ingresos últimos 6 meses</h3>
     <div class="bars" id="chart-bars"></div>
   </div>
-
   <div class="sec-header">
     <div class="sec-title">⚠️ Próximos a vencer</div>
     <button class="sec-link" onclick="switchView('clientes', 'por_vencer')">Ver todos</button>
@@ -350,6 +349,34 @@ body {
   <div class="list-card" id="vencer-list">
     <div class="loading">Cargando...</div>
   </div>
+  {% else %}
+  <!-- Vista de atención al cliente -->
+  <div style="text-align:center;padding:32px 16px 20px;">
+    <img src="/static/logo.png" alt="Full Fan Digital TV" style="height:80px;object-fit:contain;margin-bottom:16px;"
+         onerror="this.style.display='none'">
+    <div style="font-size:16px;font-weight:600;color:var(--text);">Bienvenido, {{ user }}</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:4px;">Panel de Atención al Cliente</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+    <button onclick="switchView('clientes')"
+      style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 12px;cursor:pointer;text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">🔍</div>
+      <div style="font-weight:600;color:var(--text);font-size:14px;">Buscar cliente</div>
+    </button>
+    <button onclick="openNuevoCliente()"
+      style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 12px;cursor:pointer;text-align:center;">
+      <div style="font-size:32px;margin-bottom:8px;">➕</div>
+      <div style="font-weight:600;color:var(--text);font-size:14px;">Nuevo cliente</div>
+    </button>
+  </div>
+  <div class="sec-header">
+    <div class="sec-title">⚠️ Próximos a vencer</div>
+    <button class="sec-link" onclick="switchView('clientes', 'por_vencer')">Ver todos</button>
+  </div>
+  <div class="list-card" id="vencer-list">
+    <div class="loading">Cargando...</div>
+  </div>
+  {% endif %}
 </div>
 
 <div id="view-clientes" class="view">
@@ -627,12 +654,25 @@ async function openModal(username) {
   const status = clienteStatus(c.vencimiento);
   const initial = (c.nombre || c.username || '?')[0].toUpperCase();
 
-  const pagosHtml = d.pagos.length
-    ? d.pagos.map(p => `<div class="pay-row">
-        <div class="pay-month">${p.mes ? p.mes.substring(0,7) : '—'}</div>
-        <div class="pay-amount">Q${parseFloat(p.monto).toLocaleString()}</div>
-      </div>`).join('')
-    : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
+  const esAtencion = d.rol === 'atencion';
+  let pagosHtml = '';
+  if (esAtencion) {
+    const p = d.pagos[0];
+    pagosHtml = p
+      ? `<div style="margin:16px 20px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:14px;padding:16px;">
+           <div style="font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Último pago</div>
+           <div style="font-size:24px;font-weight:800;color:var(--green);">Q${parseFloat(p.monto).toLocaleString()}</div>
+           <div style="font-size:13px;color:var(--muted);margin-top:4px;">${p.mes ? p.mes.substring(0,7) : '—'}</div>
+         </div>`
+      : `<div style="margin:16px 20px;text-align:center;color:var(--muted);font-size:14px;">Sin pagos registrados</div>`;
+  } else {
+    pagosHtml = d.pagos.length
+      ? d.pagos.map(p => `<div class="pay-row">
+          <div class="pay-month">${p.mes ? p.mes.substring(0,7) : '—'}</div>
+          <div class="pay-amount">Q${parseFloat(p.monto).toLocaleString()}</div>
+        </div>`).join('')
+      : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
+  }
 
   inner.innerHTML = `
     <div class="modal-header">
@@ -653,6 +693,7 @@ async function openModal(username) {
       ${c.notas ? `<div class="info-row"><div class="info-icon">📝</div><div class="info-data"><div class="lbl">Notas</div><div class="val">${c.notas}</div></div></div>` : ''}
     </div>
 
+    ${!esAtencion ? `
     <div class="pago-form" id="pago-form-${username}">
       <h3>💳 Registrar pago</h3>
       <div class="form-row">
@@ -668,9 +709,15 @@ async function openModal(username) {
       <button class="btn-primary" onclick="registrarPago('${username}')">✅ Registrar pago</button>
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
     </div>
-
     <div class="section-divider">Historial de pagos</div>
     ${pagosHtml}
+    ` : `
+    <div class="section-divider">Último pago</div>
+    ${pagosHtml}
+    <div style="padding:0 20px 20px;">
+      <button class="btn-secondary" onclick="closeModal()">Cerrar</button>
+    </div>
+    `}
   `;
 }
 
