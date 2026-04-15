@@ -388,6 +388,26 @@ def registrar_pago():
     db.close()
     return jsonify({'ok': True})
 
+@app.route('/api/pagos/<int:pago_id>', methods=['DELETE'])
+@login_required
+def eliminar_pago(pago_id):
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username, monto FROM pagos WHERE id=?"), (pago_id,))
+    pago = fetchone(c)
+    if not pago:
+        db.close()
+        return jsonify({'error': 'Pago no encontrado'}), 404
+    c.execute(qmark("DELETE FROM pagos WHERE id=?"), (pago_id,))
+    c.execute(qmark("""UPDATE clientes SET total_pagado =
+        CASE WHEN total_pagado - ? < 0 THEN 0 ELSE total_pagado - ? END
+        WHERE username=?"""), (pago['monto'], pago['monto'], pago['username']))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'username': pago['username'], 'monto': pago['monto']})
+
 @app.route('/api/pagos/<int:pago_id>/comprobante')
 @login_required
 def get_comprobante(pago_id):
