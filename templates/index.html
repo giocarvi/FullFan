@@ -330,6 +330,47 @@ body {
 .analytics-table td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); text-align: right; }
 .analytics-table td:first-child { text-align: left; color: var(--text); font-weight: 500; }
 .analytics-table .total-row td { font-weight: 700; color: var(--accent2); border-top: 1px solid var(--border); }
+
+/* ── WHATSAPP ─────────────────────────────────────────────────────── */
+.wa-section { padding: 10px 20px 14px; border-bottom: 1px solid var(--border); }
+.wa-section-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin-bottom: 10px; }
+.wa-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.wa-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(37,211,102,0.15); color: #25D366;
+  border: 1px solid rgba(37,211,102,0.35);
+  border-radius: 10px; padding: 8px 13px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  text-decoration: none; transition: background 0.15s;
+}
+.wa-btn:hover { background: rgba(37,211,102,0.28); }
+.wa-btn.primary { background: #25D366; color: #fff; border-color: #25D366; }
+.wa-btn.primary:hover { background: #1ebe5a; }
+
+/* ── COMPROBANTE / LIGHTBOX ───────────────────────────────────────── */
+.comprobante-icon { cursor: pointer; font-size: 18px; padding: 0 4px; background: none; border: none; color: var(--accent); }
+.comprobante-icon:hover { color: var(--accent2); }
+.lightbox-overlay {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.93); align-items: center; justify-content: center;
+}
+.lightbox-overlay.open { display: flex; }
+.lightbox-img { max-width: 94vw; max-height: 86vh; border-radius: 12px; object-fit: contain; }
+.lightbox-close {
+  position: absolute; top: 14px; right: 14px;
+  background: rgba(255,255,255,0.12); border: none; color: #fff;
+  font-size: 22px; width: 44px; height: 44px;
+  border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.file-upload-label {
+  display: block; padding: 10px 14px;
+  background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.2);
+  border-radius: 10px; color: var(--muted); font-size: 13px; cursor: pointer;
+  text-align: center; transition: border-color 0.2s;
+}
+.file-upload-label:hover { border-color: var(--accent); color: var(--accent); }
+.file-upload-label.has-file { border-color: var(--green); color: var(--green); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
@@ -528,6 +569,12 @@ body {
   </div>
 </div>
 
+<!-- LIGHTBOX -->
+<div class="lightbox-overlay" id="lightbox-overlay" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img class="lightbox-img" id="lightbox-img" src="" alt="Comprobante">
+</div>
+
 <script>
 // ── STATE ──────────────────────────────────────────────────────────────────
 let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', loadingClientes = false, totalClientes = 0;
@@ -710,9 +757,31 @@ async function openModal(username) {
   pagosHtml = d.pagos.length
     ? d.pagos.map(p => `<div class="pay-row">
         <div class="pay-month">${p.mes ? p.mes.substring(0,7) : '—'}</div>
-        <div class="pay-amount">Q${parseFloat(p.monto).toLocaleString()}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="pay-amount">Q${parseFloat(p.monto).toLocaleString()}</span>
+          ${p.has_comprobante ? `<button class="comprobante-icon" title="Ver comprobante" onclick="openComprobante(${p.id})">🧾</button>` : ''}
+        </div>
       </div>`).join('')
     : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
+
+  // WhatsApp section
+  const phone = (c.contacto || '').replace(/\D/g, '');
+  const waPhone = phone.length >= 8 ? '502' + phone.slice(-8) : '';
+  const waBase = waPhone ? `https://wa.me/${waPhone}` : '';
+  const encMsg = t => encodeURIComponent(t);
+  const nombreCliente = c.nombre || c.username;
+  const expDate = c.vencimiento || '';
+  const waSection = waBase ? `
+    <div class="wa-section">
+      <div class="wa-section-title">💬 WhatsApp</div>
+      <div class="wa-buttons">
+        <a class="wa-btn primary" href="${waBase}" target="_blank" rel="noopener">📞 Abrir chat</a>
+        <a class="wa-btn" href="${waBase}?text=${encMsg(`Hola ${nombreCliente}, te saludamos de Full Fan Digital TV 👋`)}" target="_blank" rel="noopener">👋 Saludo</a>
+        <a class="wa-btn" href="${waBase}?text=${encMsg(`Hola ${nombreCliente}, tu servicio de Full Fan Digital TV vence el ${expDate}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺`)}" target="_blank" rel="noopener">⚠️ Recordatorio</a>
+        <a class="wa-btn" href="${waBase}?text=${encMsg(`Hola ${nombreCliente}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el ${expDate}. ¡Gracias por preferirnos! 📺`)}" target="_blank" rel="noopener">✅ Confirmar pago</a>
+        <a class="wa-btn" href="${waBase}?text=${encMsg(`Hola ${nombreCliente}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜`)}" target="_blank" rel="noopener">❌ Servicio vencido</a>
+      </div>
+    </div>` : '';
 
   inner.innerHTML = `
     <div class="modal-header">
@@ -732,6 +801,8 @@ async function openModal(username) {
       <div class="info-row"><div class="info-icon">👥</div><div class="info-data"><div class="lbl">Referido</div><div class="val">${c.referido || 'NO'}</div></div></div>
       ${c.notas ? `<div class="info-row"><div class="info-icon">📝</div><div class="info-data"><div class="lbl">Notas</div><div class="val">${c.notas}</div></div></div>` : ''}
     </div>
+
+    ${waSection}
 
     <div class="pago-form" id="edit-form-${username}">
       <h3>✏️ Editar datos</h3>
@@ -765,6 +836,11 @@ async function openModal(username) {
           <input type="date" id="pago-vencimiento" value="${c.vencimiento || ''}">
         </div>
       </div>
+      <div class="form-group">
+        <label>Comprobante (imagen)</label>
+        <input type="file" id="pago-comprobante" accept="image/*" style="display:none" onchange="onComprobanteSelected(this)">
+        <label for="pago-comprobante" class="file-upload-label" id="comprobante-label">📎 Adjuntar imagen de pago</label>
+      </div>
       <button class="btn-primary" onclick="registrarPago('${username}')">✅ Registrar pago</button>
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
     </div>
@@ -791,16 +867,42 @@ async function guardarEdicion(username) {
   }
 }
 
+function onComprobanteSelected(input) {
+  const label = document.getElementById('comprobante-label');
+  if (input.files && input.files[0]) {
+    label.textContent = '✅ ' + input.files[0].name;
+    label.classList.add('has-file');
+  } else {
+    label.textContent = '📎 Adjuntar imagen de pago';
+    label.classList.remove('has-file');
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 async function registrarPago(username) {
   const monto = parseFloat(document.getElementById('pago-monto').value);
   const vencimiento = document.getElementById('pago-vencimiento').value;
   if (!monto || monto <= 0) { alert('Ingresa un monto válido'); return; }
 
   const mes = document.getElementById('pago-mes').value || new Date().toISOString().substring(0,10);
+  let comprobante = null;
+  const fileInput = document.getElementById('pago-comprobante');
+  if (fileInput && fileInput.files && fileInput.files[0]) {
+    try { comprobante = await fileToBase64(fileInput.files[0]); } catch(e) {}
+  }
+
   const r = await fetch('/api/pagos', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ username, monto, vencimiento, mes })
+    body: JSON.stringify({ username, monto, vencimiento, mes, comprobante })
   });
   const d = await r.json();
   if (d.ok) {
@@ -808,6 +910,20 @@ async function registrarPago(username) {
     showToast('✅ Pago registrado correctamente');
     loadDashboard();
   }
+}
+
+async function openComprobante(pagoId) {
+  const r = await fetch(`/api/pagos/${pagoId}/comprobante`);
+  const d = await r.json();
+  if (d.comprobante) {
+    document.getElementById('lightbox-img').src = d.comprobante;
+    document.getElementById('lightbox-overlay').classList.add('open');
+  }
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox-overlay').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
 }
 
 function closeModal() {
