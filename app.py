@@ -109,6 +109,15 @@ def init_db():
         c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('admin','admin123','admin')")
         c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('atencion','atencion123','atencion')")
 
+    # Migrar: agregar columna comprobante a pagos si no existe
+    if PG:
+        c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS comprobante TEXT DEFAULT NULL")
+    else:
+        try:
+            c.execute("ALTER TABLE pagos ADD COLUMN comprobante TEXT DEFAULT NULL")
+        except Exception:
+            pass
+
     conn.commit()
 
     # Migrar Excel si DB está vacía
@@ -335,7 +344,7 @@ def cliente_detalle(username):
 
     rol = session.get('rol', 'atencion')
     # Ambos roles ven el historial de pagos reciente
-    c.execute(qmark("SELECT mes, monto, fecha_registro FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 24"), (username,))
+    c.execute(qmark("SELECT id, mes, monto, fecha_registro, (comprobante IS NOT NULL) as has_comprobante FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 24"), (username,))
     pagos = fetchall(c)
     db.close()
     return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol})
@@ -367,16 +376,29 @@ def registrar_pago():
     monto = float(data.get('monto', 0))
     vencimiento_nuevo = data.get('vencimiento')
     mes = data.get('mes', date.today().strftime('%Y-%m-01'))
+    comprobante = data.get('comprobante')  # base64 data URL, optional
     if not username or monto <= 0:
         return jsonify({'error': 'Datos inválidos'}), 400
     db = get_db()
     c = db.cursor()
-    c.execute(qmark("INSERT INTO pagos (username, mes, monto) VALUES (?,?,?)"), (username, mes, monto))
+    c.execute(qmark("INSERT INTO pagos (username, mes, monto, comprobante) VALUES (?,?,?,?)"), (username, mes, monto, comprobante))
     c.execute(qmark("UPDATE clientes SET total_pagado = total_pagado + ?, vencimiento=? WHERE username=?"),
               (monto, vencimiento_nuevo, username))
     db.commit()
     db.close()
     return jsonify({'ok': True})
+
+@app.route('/api/pagos/<int:pago_id>/comprobante')
+@login_required
+def get_comprobante(pago_id):
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT comprobante FROM pagos WHERE id=?"), (pago_id,))
+    row = fetchone(c)
+    db.close()
+    if not row or not row['comprobante']:
+        return jsonify({'error': 'No encontrado'}), 404
+    return jsonify({'comprobante': row['comprobante']})
 
 # ── API: ANALYTICS ────────────────────────────────────────────────────────────
 @app.route('/api/analytics')
@@ -384,40 +406,129 @@ def registrar_pago():
 def analytics():
     if session.get('rol') != 'admin':
         return jsonify({'error': 'Acceso denegado'}), 403
+
     db = get_db()
     c = db.cursor()
+
+    # Ventas mensuales (todo el tiempo)
     if PG:
-        c.execute("SELECT TO_CHAR(mes::date, 'YYYY-MM') as m, SUM(monto) as total, COUNT(*) as n_pagos, COUNT(DISTINCT username) as clientes FROM pagos GROUP BY m ORDER BY m")
+        c.execute("""
+            SELECT TO_CHAR(mes::date, 'YYYY-MM') as m,
+                   SUM(monto) as total, COUNT(*) as n_pagos,
+                   COUNT(DISTINCT username) as clientes
+            FROM pagos GROUP BY m ORDER BY m
+        """)
     else:
-        c.execute("SELECT strftime('%Y-%m', mes) as m, SUM(monto) as total, COUNT(*) as n_pagos, COUNT(DISTINCT username) as clientes FROM pagos GROUP BY m ORDER BY m")
+        c.execute("""
+            SELECT strftime('%Y-%m', mes) as m,
+                   SUM(monto) as total, COUNT(*) as n_pagos,
+                   COUNT(DISTINCT username) as clientes
+            FROM pagos GROUP BY m ORDER BY m
+        """)
     ventas_mensuales = fetchall(c)
+
+    # Ventas anuales
     if PG:
-        c.execute("SELECT TO_CHAR(mes::date, 'YYYY') as y, SUM(monto) as total, COUNT(DISTINCT username) as clientes FROM pagos GROUP BY y ORDER BY y")
+        c.execute("""
+            SELECT TO_CHAR(mes::date, 'YYYY') as y,
+                   SUM(monto) as total, COUNT(DISTINCT username) as clientes
+            FROM pagos GROUP BY y ORDER BY y
+        """)
     else:
-        c.execute("SELECT strftime('%Y', mes) as y, SUM(monto) as total, COUNT(DISTINCT username) as clientes FROM pagos GROUP BY y ORDER BY y")
+        c.execute("""
+            SELECT strftime('%Y', mes) as y,
+                   SUM(monto) as total, COUNT(DISTINCT username) as clientes
+            FROM pagos GROUP BY y ORDER BY y
+        """)
     ventas_anuales = fetchall(c)
-    plan_sql = "SELECT CASE WHEN monto <= 120 THEN 'Mensual' WHEN monto <= 320 THEN 'Trimestral' WHEN monto <= 650 THEN 'Semestral' WHEN monto <= 1300 THEN 'Anual' ELSE 'Mas de 1 anio' END as plan, COUNT(*) as n, SUM(monto) as total FROM pagos GROUP BY plan ORDER BY n DESC"
-    c.execute(plan_sql)
+
+    # Distribución por tipo de plan (según monto del pago)
+    if PG:
+        c.execute("""
+            SELECT
+                CASE
+                    WHEN monto <= 120  THEN 'Mensual'
+                    WHEN monto <= 320  THEN 'Trimestral'
+                    WHEN monto <= 650  THEN 'Semestral'
+                    WHEN monto <= 1300 THEN 'Anual'
+                    ELSE 'Más de 1 año'
+                END as plan,
+                COUNT(*) as n, SUM(monto) as total
+            FROM pagos GROUP BY plan ORDER BY n DESC
+        """)
+    else:
+        c.execute("""
+            SELECT
+                CASE
+                    WHEN monto <= 120  THEN 'Mensual'
+                    WHEN monto <= 320  THEN 'Trimestral'
+                    WHEN monto <= 650  THEN 'Semestral'
+                    WHEN monto <= 1300 THEN 'Anual'
+                    ELSE 'Más de 1 año'
+                END as plan,
+                COUNT(*) as n, SUM(monto) as total
+            FROM pagos GROUP BY plan ORDER BY n DESC
+        """)
     planes = fetchall(c)
+
+    # Clientes nuevos por mes (primer pago de cada usuario)
     if PG:
-        c.execute("SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as nuevos FROM pagos p WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username) GROUP BY m ORDER BY m")
+        c.execute("""
+            SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as nuevos
+            FROM pagos p
+            WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            GROUP BY m ORDER BY m
+        """)
     else:
-        c.execute("SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as nuevos FROM pagos p WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username) GROUP BY m ORDER BY m")
+        c.execute("""
+            SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as nuevos
+            FROM pagos p
+            WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            GROUP BY m ORDER BY m
+        """)
     nuevos_por_mes = fetchall(c)
+
+    # Renovaciones por mes (pagos que NO son el primero del usuario)
     if PG:
-        c.execute("SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as renovaciones FROM pagos p WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username) GROUP BY m ORDER BY m")
+        c.execute("""
+            SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as renovaciones
+            FROM pagos p
+            WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            GROUP BY m ORDER BY m
+        """)
     else:
-        c.execute("SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as renovaciones FROM pagos p WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username) GROUP BY m ORDER BY m")
+        c.execute("""
+            SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as renovaciones
+            FROM pagos p
+            WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            GROUP BY m ORDER BY m
+        """)
     renovaciones_por_mes = fetchall(c)
+
+    # Clientes que no renovaron (vencidos con pagos históricos)
     today = date.today().isoformat()
     c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE (vencimiento < ? OR vencimiento IS NULL) AND total_pagado > 0"), (today,))
     no_renovaron = fetchone(c)['c']
+
+    # Total histórico
     c.execute("SELECT COALESCE(SUM(monto),0) as t FROM pagos")
     total_historico = round(float(fetchone(c)['t']), 2)
+
     c.execute("SELECT COUNT(*) as c FROM clientes")
     total_clientes = fetchone(c)['c']
+
     db.close()
-    return jsonify({'ventas_mensuales': ventas_mensuales, 'ventas_anuales': ventas_anuales, 'planes': planes, 'nuevos_por_mes': nuevos_por_mes, 'renovaciones_por_mes': renovaciones_por_mes, 'no_renovaron': no_renovaron, 'total_historico': total_historico, 'total_clientes': total_clientes})
+
+    return jsonify({
+        'ventas_mensuales': ventas_mensuales,
+        'ventas_anuales': ventas_anuales,
+        'planes': planes,
+        'nuevos_por_mes': nuevos_por_mes,
+        'renovaciones_por_mes': renovaciones_por_mes,
+        'no_renovaron': no_renovaron,
+        'total_historico': total_historico,
+        'total_clientes': total_clientes
+    })
 
 
 if __name__ == '__main__':
