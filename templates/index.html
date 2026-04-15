@@ -376,6 +376,34 @@ body {
   opacity: 0.4; padding: 0 2px; transition: opacity 0.15s;
 }
 .delete-pago-btn:hover { opacity: 1; }
+
+/* ── CONFIG SCREEN ──────────────────────────────────────────── */
+.config-form { padding: 16px; display: flex; flex-direction: column; gap: 16px; max-width: 600px; margin: 0 auto; }
+.config-section { background: var(--card); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.config-section h3 { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 2px; }
+.config-group { display: flex; flex-direction: column; gap: 6px; }
+.config-group label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+.config-group textarea {
+  width: 100%; background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-size: 14px; padding: 10px 12px;
+  resize: vertical; min-height: 70px; line-height: 1.5; font-family: inherit;
+}
+.config-group textarea:focus { outline: none; border-color: var(--accent); }
+.config-group input[type="text"] {
+  width: 100%; background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); font-size: 14px; padding: 10px 12px;
+}
+.config-group input[type="text"]:focus { outline: none; border-color: var(--accent); }
+.config-hint { font-size: 11px; color: var(--muted); opacity: .75; }
+.config-save-btn {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; border: none; border-radius: 12px;
+  padding: 14px; font-size: 16px; font-weight: 700;
+  cursor: pointer; width: 100%; margin-top: 4px;
+}
+.config-save-btn:hover { opacity: .9; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
@@ -484,6 +512,43 @@ body {
 </div>
 {% endif %}
 
+{% if rol == 'admin' %}
+<!-- CONFIG VIEW -->
+<div id="view-config" class="view">
+  <div class="config-form">
+    <div class="config-section">
+      <h3>📞 Prefijo de teléfono</h3>
+      <div class="config-group">
+        <label>Prefijo de país (sin +)</label>
+        <input type="text" id="cfg-wa-prefijo" placeholder="502" maxlength="5">
+        <span class="config-hint">Guatemala = 502. Se antepone a los últimos 8 dígitos del contacto.</span>
+      </div>
+    </div>
+    <div class="config-section">
+      <h3>💬 Mensajes de WhatsApp</h3>
+      <p class="config-hint" style="margin-bottom:6px;">Usa <code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;">{nombre}</code> y <code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;">{fecha}</code> como variables.</p>
+      <div class="config-group">
+        <label>👋 Saludo</label>
+        <textarea id="cfg-wa-saludo"></textarea>
+      </div>
+      <div class="config-group">
+        <label>⚠️ Recordatorio de vencimiento</label>
+        <textarea id="cfg-wa-recordatorio"></textarea>
+      </div>
+      <div class="config-group">
+        <label>✅ Confirmación de pago</label>
+        <textarea id="cfg-wa-confirmar-pago"></textarea>
+      </div>
+      <div class="config-group">
+        <label>❌ Servicio vencido</label>
+        <textarea id="cfg-wa-vencido"></textarea>
+      </div>
+    </div>
+    <button class="config-save-btn" onclick="saveConfig()">💾 Guardar cambios</button>
+  </div>
+</div>
+{% endif %}
+
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
   <button class="nav-btn active" data-view="dashboard">
@@ -495,6 +560,9 @@ body {
   {% if rol == 'admin' %}
   <button class="nav-btn" data-view="analytics">
     <span class="icon">📈</span>Análisis
+  </button>
+  <button class="nav-btn" data-view="config">
+    <span class="icon">⚙️</span>Config
   </button>
   {% endif %}
   <button class="nav-btn" onclick="openNuevoCliente()">
@@ -584,6 +652,7 @@ body {
 // ── STATE ──────────────────────────────────────────────────────────────────
 let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', loadingClientes = false, totalClientes = 0;
 let searchTimeout;
+window._appConfig = {};
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────────
 function switchView(view, estado) {
@@ -604,6 +673,7 @@ function switchView(view, estado) {
   }
   if (view === 'dashboard') loadDashboard();
   if (view === 'analytics') loadAnalytics();
+  if (view === 'config') loadConfigView();
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -771,24 +841,28 @@ async function openModal(username) {
       </div>`).join('')
     : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
 
-  // WhatsApp section
+    // WhatsApp section
+  const cfg = window._appConfig;
+  const prefijo = cfg.wa_prefijo || '502';
   const phone = (c.contacto || '').replace(/\D/g, '');
-  const waPhone = phone.length >= 8 ? '502' + phone.slice(-8) : '';
+  const waPhone = phone.length >= 8 ? prefijo + phone.slice(-8) : '';
   const waBase = waPhone ? `https://wa.me/${waPhone}` : '';
   const encMsg = t => encodeURIComponent(t);
   const nombreCliente = c.nombre || c.username;
   const expDate = c.vencimiento || '';
+  const waFill = (tpl) => (tpl || '').replace(/\{nombre\}/g, nombreCliente).replace(/\{fecha\}/g, expDate);
   const waSection = waBase ? `
     <div class="wa-section">
       <div class="wa-section-title">💬 WhatsApp</div>
       <div class="wa-buttons">
         <a class="wa-btn primary" href="${waBase}" target="_blank" rel="noopener">📞 Abrir chat</a>
-        <a class="wa-btn" href="${waBase}?text=${encMsg(`Hola ${nombreCliente}, te saludamos de Full Fan Digital TV 👋`)}" target="_blank" rel="noopener">👋 Saludo</a>
-        <a class="wa-btn" href="${waBase}?text=${encMsg(`Hola ${nombreCliente}, tu servicio de Full Fan Digital TV vence el ${expDate}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺`)}" target="_blank" rel="noopener">⚠️ Recordatorio</a>
-        <a class="wa-btn" href="${waBase}?text=${encMsg(`Hola ${nombreCliente}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el ${expDate}. ¡Gracias por preferirnos! 📺`)}" target="_blank" rel="noopener">✅ Confirmar pago</a>
-        <a class="wa-btn" href="${waBase}?text=${encMsg(`Hola ${nombreCliente}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜`)}" target="_blank" rel="noopener">❌ Servicio vencido</a>
+        <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_saludo || 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋'))}" target="_blank" rel="noopener">👋 Saludo</a>
+        <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_recordatorio || 'Hola {nombre}, tu servicio vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'))}" target="_blank" rel="noopener">⚠️ Recordatorio</a>
+        <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺'))}" target="_blank" rel="noopener">✅ Confirmar pago</a>
+        <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_vencido || 'Hola {nombre}, tu servicio ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'))}" target="_blank" rel="noopener">❌ Servicio vencido</a>
       </div>
     </div>` : '';
+
 
   inner.innerHTML = `
     <div class="modal-header">
@@ -1027,8 +1101,52 @@ async function guardarNuevoCliente() {
   }
 }
 
-// ── INIT ────────────────────────────────────────────────────────────────────
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    if (r.ok) window._appConfig = await r.json();
+  } catch(e) {}
+}
+
+function loadConfigView() {
+  const cfg = window._appConfig;
+  const set = (id, key, def) => {
+    const el = document.getElementById(id);
+    if (el) el.value = cfg[key] !== undefined ? cfg[key] : def;
+  };
+  set('cfg-wa-prefijo', 'wa_prefijo', '502');
+  set('cfg-wa-saludo', 'wa_saludo', 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋');
+  set('cfg-wa-recordatorio', 'wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺');
+  set('cfg-wa-confirmar-pago', 'wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺');
+  set('cfg-wa-vencido', 'wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜');
+}
+
+async function saveConfig() {
+  const get = id => (document.getElementById(id)?.value || '').trim();
+  const data = {
+    wa_prefijo: get('cfg-wa-prefijo'),
+    wa_saludo: get('cfg-wa-saludo'),
+    wa_recordatorio: get('cfg-wa-recordatorio'),
+    wa_confirmar_pago: get('cfg-wa-confirmar-pago'),
+    wa_vencido: get('cfg-wa-vencido'),
+  };
+  const r = await fetch('/api/config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+  if (r.ok) {
+    Object.assign(window._appConfig, data);
+    showToast('✅ Configuración guardada');
+  } else {
+    showToast('❌ Error al guardar');
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
 loadDashboard();
+loadConfig();
 
 // ── ANALYTICS ────────────────────────────────────────────────────────────
 let analyticsData = null, chartAnual = null, chartMensual = null, chartNR = null, chartPlanes = null;
