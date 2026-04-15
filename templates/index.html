@@ -371,6 +371,11 @@ body {
 }
 .file-upload-label:hover { border-color: var(--accent); color: var(--accent); }
 .file-upload-label.has-file { border-color: var(--green); color: var(--green); }
+.delete-pago-btn {
+  background: none; border: none; cursor: pointer; font-size: 16px;
+  opacity: 0.4; padding: 0 2px; transition: opacity 0.15s;
+}
+.delete-pago-btn:hover { opacity: 1; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
@@ -753,13 +758,15 @@ async function openModal(username) {
   const initial = (c.nombre || c.username || '?')[0].toUpperCase();
 
   const esAtencion = d.rol === 'atencion';
+  const esAdmin = d.rol === 'admin';
   let pagosHtml = '';
   pagosHtml = d.pagos.length
-    ? d.pagos.map(p => `<div class="pay-row">
+    ? d.pagos.map(p => `<div class="pay-row" id="pay-row-${p.id}">
         <div class="pay-month">${p.mes ? p.mes.substring(0,7) : '—'}</div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="pay-amount">Q${parseFloat(p.monto).toLocaleString()}</span>
           ${p.has_comprobante ? `<button class="comprobante-icon" title="Ver comprobante" onclick="openComprobante(${p.id})">🧾</button>` : ''}
+          ${esAdmin ? `<button class="delete-pago-btn" title="Eliminar pago" onclick="eliminarPago(${p.id}, ${p.monto}, '${username}')">🗑️</button>` : ''}
         </div>
       </div>`).join('')
     : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
@@ -924,6 +931,20 @@ async function openComprobante(pagoId) {
 function closeLightbox() {
   document.getElementById('lightbox-overlay').classList.remove('open');
   document.getElementById('lightbox-img').src = '';
+}
+
+async function eliminarPago(pagoId, monto, username) {
+  if (!confirm(`¿Eliminar este pago de Q${parseFloat(monto).toLocaleString()}? Esta acción no se puede deshacer.`)) return;
+  const r = await fetch(`/api/pagos/${pagoId}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.ok) {
+    const row = document.getElementById(`pay-row-${pagoId}`);
+    if (row) row.remove();
+    showToast(`🗑️ Pago de Q${parseFloat(monto).toLocaleString()} eliminado`);
+    loadDashboard();
+  } else {
+    showToast('❌ Error al eliminar el pago');
+  }
 }
 
 function closeModal() {
