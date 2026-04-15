@@ -378,6 +378,48 @@ def registrar_pago():
     db.close()
     return jsonify({'ok': True})
 
+# ── API: ANALYTICS ────────────────────────────────────────────────────────────
+@app.route('/api/analytics')
+@login_required
+def analytics():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    if PG:
+        c.execute("SELECT TO_CHAR(mes::date, 'YYYY-MM') as m, SUM(monto) as total, COUNT(*) as n_pagos, COUNT(DISTINCT username) as clientes FROM pagos GROUP BY m ORDER BY m")
+    else:
+        c.execute("SELECT strftime('%Y-%m', mes) as m, SUM(monto) as total, COUNT(*) as n_pagos, COUNT(DISTINCT username) as clientes FROM pagos GROUP BY m ORDER BY m")
+    ventas_mensuales = fetchall(c)
+    if PG:
+        c.execute("SELECT TO_CHAR(mes::date, 'YYYY') as y, SUM(monto) as total, COUNT(DISTINCT username) as clientes FROM pagos GROUP BY y ORDER BY y")
+    else:
+        c.execute("SELECT strftime('%Y', mes) as y, SUM(monto) as total, COUNT(DISTINCT username) as clientes FROM pagos GROUP BY y ORDER BY y")
+    ventas_anuales = fetchall(c)
+    plan_sql = "SELECT CASE WHEN monto <= 120 THEN 'Mensual' WHEN monto <= 320 THEN 'Trimestral' WHEN monto <= 650 THEN 'Semestral' WHEN monto <= 1300 THEN 'Anual' ELSE 'Mas de 1 anio' END as plan, COUNT(*) as n, SUM(monto) as total FROM pagos GROUP BY plan ORDER BY n DESC"
+    c.execute(plan_sql)
+    planes = fetchall(c)
+    if PG:
+        c.execute("SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as nuevos FROM pagos p WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username) GROUP BY m ORDER BY m")
+    else:
+        c.execute("SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as nuevos FROM pagos p WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username) GROUP BY m ORDER BY m")
+    nuevos_por_mes = fetchall(c)
+    if PG:
+        c.execute("SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as renovaciones FROM pagos p WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username) GROUP BY m ORDER BY m")
+    else:
+        c.execute("SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as renovaciones FROM pagos p WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username) GROUP BY m ORDER BY m")
+    renovaciones_por_mes = fetchall(c)
+    today = date.today().isoformat()
+    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE (vencimiento < ? OR vencimiento IS NULL) AND total_pagado > 0"), (today,))
+    no_renovaron = fetchone(c)['c']
+    c.execute("SELECT COALESCE(SUM(monto),0) as t FROM pagos")
+    total_historico = round(float(fetchone(c)['t']), 2)
+    c.execute("SELECT COUNT(*) as c FROM clientes")
+    total_clientes = fetchone(c)['c']
+    db.close()
+    return jsonify({'ventas_mensuales': ventas_mensuales, 'ventas_anuales': ventas_anuales, 'planes': planes, 'nuevos_por_mes': nuevos_por_mes, 'renovaciones_por_mes': renovaciones_por_mes, 'no_renovaron': no_renovaron, 'total_historico': total_historico, 'total_clientes': total_clientes})
+
+
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
