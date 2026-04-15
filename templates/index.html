@@ -313,7 +313,25 @@ body {
   .modal { border-radius: 24px; margin-bottom: 20px; }
   .modal-overlay { align-items: center; }
 }
+
+/* ── ANALYTICS ─────────────────────────────────────────────── */
+.analytics-kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+.kpi-card .kpi-val { font-size: 22px; font-weight: 800; line-height: 1; margin-bottom: 4px; color: var(--accent2); }
+.kpi-card .kpi-lbl { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+.analytics-chart-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+.analytics-chart-card h3 { font-size: 14px; color: var(--muted); margin-bottom: 14px; font-weight: 600; }
+.year-tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.year-tab { padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; background: var(--card2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; }
+.year-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.analytics-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.analytics-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--border); }
+.analytics-table th:first-child { text-align: left; }
+.analytics-table td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); text-align: right; }
+.analytics-table td:first-child { text-align: left; color: var(--text); font-weight: 500; }
+.analytics-table .total-row td { font-weight: 700; color: var(--accent2); border-top: 1px solid var(--border); }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -403,6 +421,23 @@ body {
   </div>
 </div>
 
+{% if rol == 'admin' %}
+<!-- ANALYTICS VIEW -->
+<div id="view-analytics" class="view">
+  <div class="analytics-kpi-grid">
+    <div class="kpi-card"><div class="kpi-val" id="kpi-historico">—</div><div class="kpi-lbl">Total histórico</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="kpi-promedio">—</div><div class="kpi-lbl">Promedio mensual</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="kpi-clientes">—</div><div class="kpi-lbl">Total clientes</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="kpi-no-renov">—</div><div class="kpi-lbl">No renovaron</div></div>
+  </div>
+  <div class="analytics-chart-card"><h3>📅 Ventas anuales</h3><canvas id="chart-anual" height="180"></canvas></div>
+  <div class="analytics-chart-card"><h3>📈 Ventas mensuales</h3><div class="year-tabs" id="year-tabs"></div><canvas id="chart-mensual" height="200"></canvas></div>
+  <div class="analytics-chart-card"><h3>🆕 Nuevos vs 🔄 Renovaciones</h3><div class="year-tabs" id="year-tabs-nr"></div><canvas id="chart-nuevos-renov" height="200"></canvas></div>
+  <div class="analytics-chart-card"><h3>📦 Distribución por plan</h3><canvas id="chart-planes" height="220"></canvas></div>
+  <div class="analytics-chart-card"><h3>📊 Resumen por trimestre</h3><div id="tabla-trimestral"></div></div>
+</div>
+{% endif %}
+
 <!-- BOTTOM NAV -->
 <nav class="bottom-nav">
   <button class="nav-btn active" data-view="dashboard">
@@ -411,6 +446,11 @@ body {
   <button class="nav-btn" data-view="clientes">
     <span class="icon">👥</span>Clientes
   </button>
+  {% if rol == 'admin' %}
+  <button class="nav-btn" data-view="analytics">
+    <span class="icon">📈</span>Análisis
+  </button>
+  {% endif %}
   <button class="nav-btn" onclick="openNuevoCliente()">
     <span class="icon">➕</span>Nuevo
   </button>
@@ -511,6 +551,7 @@ function switchView(view, estado) {
     loadClientes(true);
   }
   if (view === 'dashboard') loadDashboard();
+  if (view === 'analytics') loadAnalytics();
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -851,6 +892,101 @@ async function guardarNuevoCliente() {
 
 // ── INIT ────────────────────────────────────────────────────────────────────
 loadDashboard();
+
+// ── ANALYTICS ────────────────────────────────────────────────────────────
+let analyticsData = null, chartAnual = null, chartMensual = null, chartNR = null, chartPlanes = null;
+let selYear = null, selYearNR = null;
+
+async function loadAnalytics() {
+  if (analyticsData) { renderAnalytics(analyticsData); return; }
+  const r = await fetch('/api/analytics');
+  analyticsData = await r.json();
+  renderAnalytics(analyticsData);
+}
+
+function renderAnalytics(d) {
+  document.getElementById('kpi-historico').textContent = 'Q' + Math.round(d.total_historico).toLocaleString();
+  document.getElementById('kpi-promedio').textContent = 'Q' + Math.round(d.total_historico / (d.ventas_mensuales.length||1)).toLocaleString();
+  document.getElementById('kpi-clientes').textContent = d.total_clientes.toLocaleString();
+  document.getElementById('kpi-no-renov').textContent = d.no_renovaron.toLocaleString();
+
+  const years = d.ventas_anuales.map(r=>r.y);
+  if (chartAnual) chartAnual.destroy();
+  chartAnual = new Chart(document.getElementById('chart-anual'), {
+    type:'bar', data:{ labels:years, datasets:[{ label:'Ingresos (Q)', data:d.ventas_anuales.map(r=>parseFloat(r.total)), backgroundColor:'rgba(108,99,255,0.75)', borderRadius:8 }] },
+    options:{ plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,0.05)'}}, y:{ticks:{color:'#94a3b8',callback:v=>'Q'+v.toLocaleString()},grid:{color:'rgba(255,255,255,0.05)'}} } }
+  });
+
+  const allYears = [...new Set(d.ventas_mensuales.map(r=>r.m.substring(0,4)))];
+  if (!selYear || !allYears.includes(selYear)) selYear = allYears[allYears.length-1];
+  if (!selYearNR || !allYears.includes(selYearNR)) selYearNR = allYears[allYears.length-1];
+
+  renderYearTabs('year-tabs', allYears, selYear, y=>{ selYear=y; document.querySelectorAll('#year-tabs .year-tab').forEach(b=>b.classList.toggle('active',b.dataset.year===y)); renderMensual(d); });
+  renderMensual(d);
+  renderYearTabs('year-tabs-nr', allYears, selYearNR, y=>{ selYearNR=y; document.querySelectorAll('#year-tabs-nr .year-tab').forEach(b=>b.classList.toggle('active',b.dataset.year===y)); renderNR(d); });
+  renderNR(d);
+  renderPlanes(d.planes);
+  renderTrimestral(d.ventas_mensuales);
+}
+
+function renderYearTabs(id, years, active, fn) {
+  const c = document.getElementById(id);
+  c.innerHTML = years.map(y=>'<button class="year-tab'+(y===active?' active':'')+'" data-year="'+y+'">'+y+'</button>').join('');
+  c.querySelectorAll('.year-tab').forEach(b=>b.addEventListener('click',()=>fn(b.dataset.year)));
+}
+
+function renderMensual(d) {
+  const MONTHS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const months = d.ventas_mensuales.filter(r=>r.m.startsWith(selYear));
+  if (chartMensual) chartMensual.destroy();
+  chartMensual = new Chart(document.getElementById('chart-mensual'), {
+    type:'bar',
+    data:{ labels:months.map(r=>MONTHS[parseInt(r.m.substring(5,7))-1]),
+      datasets:[
+        {label:'Ingresos (Q)',data:months.map(r=>parseFloat(r.total)),backgroundColor:'rgba(108,99,255,0.75)',borderRadius:6,yAxisID:'y'},
+        {label:'Clientes',data:months.map(r=>parseInt(r.clientes)),type:'line',borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.15)',pointRadius:4,yAxisID:'y2'}
+      ]},
+    options:{plugins:{legend:{labels:{color:'#94a3b8',font:{size:12}}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,0.05)'}},y:{position:'left',ticks:{color:'#94a3b8',callback:v=>'Q'+v.toLocaleString()},grid:{color:'rgba(255,255,255,0.05)'}},y2:{position:'right',ticks:{color:'#10b981'},grid:{display:false}}}}
+  });
+}
+
+function renderNR(d) {
+  const MONTHS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const allM = Array.from({length:12},(_,i)=>selYearNR+'-'+String(i+1).padStart(2,'0'));
+  const nm = Object.fromEntries((d.nuevos_por_mes||[]).map(r=>[r.m,parseInt(r.nuevos)]));
+  const rm = Object.fromEntries((d.renovaciones_por_mes||[]).map(r=>[r.m,parseInt(r.renovaciones)]));
+  if (chartNR) chartNR.destroy();
+  chartNR = new Chart(document.getElementById('chart-nuevos-renov'), {
+    type:'bar',
+    data:{ labels:allM.map(m=>MONTHS[parseInt(m.substring(5))-1]),
+      datasets:[{label:'Nuevos',data:allM.map(m=>nm[m]||0),backgroundColor:'rgba(16,185,129,0.7)',borderRadius:5},{label:'Renovaciones',data:allM.map(m=>rm[m]||0),backgroundColor:'rgba(108,99,255,0.7)',borderRadius:5}]},
+    options:{plugins:{legend:{labels:{color:'#94a3b8',font:{size:12}}}},scales:{x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,0.05)'}},y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(255,255,255,0.05)'}}}}
+  });
+}
+
+function renderPlanes(planes) {
+  const colors=['#6c63ff','#10b981','#f59e0b','#ef4444','#a855f7'];
+  if (chartPlanes) chartPlanes.destroy();
+  chartPlanes = new Chart(document.getElementById('chart-planes'), {
+    type:'doughnut',
+    data:{ labels:planes.map(p=>p.plan+' ('+p.n+')'), datasets:[{data:planes.map(p=>parseInt(p.n)),backgroundColor:colors,borderWidth:0}] },
+    options:{plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:12},padding:16}}},cutout:'60%'}
+  });
+}
+
+function renderTrimestral(ventas) {
+  const byQ={};
+  ventas.forEach(r=>{
+    const y=r.m.substring(0,4), mo=parseInt(r.m.substring(5,7)), q=y+' Q'+Math.ceil(mo/3);
+    if(!byQ[q]) byQ[q]={total:0,pagos:0};
+    byQ[q].total+=parseFloat(r.total); byQ[q].pagos+=parseInt(r.n_pagos);
+  });
+  const rows=Object.entries(byQ).slice(-12);
+  const grand=rows.reduce((s,[,v])=>s+v.total,0);
+  document.getElementById('tabla-trimestral').innerHTML='<table class="analytics-table"><thead><tr><th>Trimestre</th><th>Ingresos</th><th>Pagos</th></tr></thead><tbody>'+
+    rows.map(([q,v])=>'<tr><td>'+q+'</td><td>Q'+Math.round(v.total).toLocaleString()+'</td><td>'+v.pagos+'</td></tr>').join('')+
+    '<tr class="total-row"><td>TOTAL</td><td>Q'+Math.round(grand).toLocaleString()+'</td><td></td></tr></tbody></table>';
+}
 </script>
 </body>
 </html>
