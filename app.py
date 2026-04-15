@@ -118,6 +118,36 @@ def init_db():
         except Exception:
             pass
 
+    # Tabla de configuración
+    if PG:
+        c.execute('''CREATE TABLE IF NOT EXISTS configuracion (
+            clave TEXT PRIMARY KEY,
+            valor TEXT
+        )''')
+        defaults = [
+            ('wa_prefijo', '502'),
+            ('wa_saludo', 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋'),
+            ('wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'),
+            ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺'),
+            ('wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'),
+        ]
+        for clave, valor in defaults:
+            c.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT DO NOTHING", (clave, valor))
+    else:
+        c.execute('''CREATE TABLE IF NOT EXISTS configuracion (
+            clave TEXT PRIMARY KEY,
+            valor TEXT
+        )''')
+        defaults = [
+            ('wa_prefijo', '502'),
+            ('wa_saludo', 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋'),
+            ('wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'),
+            ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺'),
+            ('wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'),
+        ]
+        for clave, valor in defaults:
+            c.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
+
     conn.commit()
 
     # Migrar Excel si DB está vacía
@@ -126,7 +156,6 @@ def init_db():
     conn.close()
     if total == 0:
         _migrate_from_excel()
-
 
 def _migrate_from_excel():
     excel_path = os.path.join(os.path.dirname(__file__), 'IPTV Nuevo (2).xlsx')
@@ -549,6 +578,39 @@ def analytics():
         'total_historico': total_historico,
         'total_clientes': total_clientes
     })
+
+
+# ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
+@app.route('/api/config', methods=['GET'])
+@login_required
+def get_config():
+    db = get_db()
+    c = db.cursor()
+    c.execute("SELECT clave, valor FROM configuracion")
+    rows = fetchall(c)
+    db.close()
+    return jsonify({r['clave']: r['valor'] for r in rows})
+
+
+@app.route('/api/config', methods=['POST'])
+@login_required
+def save_config():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    data = request.get_json()
+    db = get_db()
+    c = db.cursor()
+    for clave, valor in data.items():
+        if PG:
+            c.execute(
+                "INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor",
+                (clave, valor)
+            )
+        else:
+            c.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
 
 
 if __name__ == '__main__':
