@@ -160,7 +160,12 @@ def init_db():
 
 def _parse_excel_rows(excel_path):
     """Lee el Excel con openpyxl y devuelve (headers_row, data_rows) como listas."""
-    from openpyxl import load_workbook
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        import subprocess, sys
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'openpyxl'])
+        from openpyxl import load_workbook
     from datetime import datetime
     wb = load_workbook(excel_path, read_only=True, data_only=True)
     ws = wb.active
