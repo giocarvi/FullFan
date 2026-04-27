@@ -158,10 +158,10 @@ def init_db():
         _migrate_from_excel()
 
 
-def _migrate_from_excel():
+def _migrate_from_excel(update_existing=False):
     excel_path = os.path.join(os.path.dirname(__file__), 'IPTV Nuevo (2).xlsx')
     if not os.path.exists(excel_path):
-        return
+        return 0, 0
     try:
         import pandas as pd
         df = pd.read_excel(excel_path, sheet_name='Sheet1', header=None)
@@ -170,6 +170,8 @@ def _migrate_from_excel():
         data.columns = range(len(headers))
         conn = get_db()
         c = conn.cursor()
+        clients_ok = 0
+        pagos_ok = 0
         for _, row in data.iterrows():
             username = str(row[0]).strip() if pd.notna(row[0]) else None
             if not username or username == 'nan':
@@ -186,11 +188,21 @@ def _migrate_from_excel():
                 except:
                     pass
             if PG:
-                c.execute("INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
-                          (username, nombre, contact, exp_str, referido, total))
+                if update_existing:
+                    c.execute("""INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado)
+                                 VALUES (%s,%s,%s,%s,%s,%s)
+                                 ON CONFLICT (username) DO UPDATE SET
+                                   nombre=EXCLUDED.nombre, contacto=EXCLUDED.contacto,
+                                   vencimiento=EXCLUDED.vencimiento, referido=EXCLUDED.referido,
+                                   total_pagado=EXCLUDED.total_pagado""",
+                              (username, nombre, contact, exp_str, referido, total))
+                else:
+                    c.execute("INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                              (username, nombre, contact, exp_str, referido, total))
             else:
                 c.execute("INSERT OR IGNORE INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (?,?,?,?,?,?)",
                           (username, nombre, contact, exp_str, referido, total))
+            clients_ok += 1
             for col in range(5, 82):
                 val = row[col]
                 if pd.notna(val) and isinstance(val, (int, float)) and val > 0:
@@ -204,11 +216,14 @@ def _migrate_from_excel():
                             ex = c.execute("SELECT 1 FROM pagos WHERE username=? AND mes=?", (username, month_str)).fetchone()
                             if not ex:
                                 c.execute("INSERT INTO pagos (username,mes,monto) VALUES (?,?,?)", (username, month_str, float(val)))
+                        pagos_ok += 1
         conn.commit()
         conn.close()
-        print("Migración desde Excel completada.")
+        print(f"Migración desde Excel completada: {clients_ok} clientes, {pagos_ok} pagos.")
+        return clients_ok, pagos_ok
     except Exception as e:
         print(f"Error migrando Excel: {e}")
+        return 0, 0
 
 
 def login_required(f):
@@ -612,6 +627,15 @@ def save_config():
     db.commit()
     db.close()
     return jsonify({'ok': True})
+
+
+@app.route('/api/admin/reimportar-excel', methods=['POST'])
+@login_required
+def reimportar_excel():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    clientes, pagos = _migrate_from_excel(update_existing=True)
+    return jsonify({'ok': True, 'clientes_actualizados': clientes, 'pagos_procesados': pagos})
 
 
 @app.route('/api/diagnostico')
