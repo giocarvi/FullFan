@@ -586,7 +586,8 @@ body {
     </div>
 
     <button class="config-save-btn" onclick="saveConfig()">💾 Guardar cambios</button>
-    <button class="config-save-btn" style="background:#6c3483;margin-top:8px" onclick="reimportarExcel()">🔄 Reimportar desde Excel</button>
+    <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display:none" onchange="reimportarExcel(this)">
+    <button class="config-save-btn" style="background:#6c3483;margin-top:8px" onclick="document.getElementById('excel-upload').click()">🔄 Reimportar desde Excel</button>
   </div>
 </div>
 {% endif %}
@@ -1164,12 +1165,18 @@ function loadConfigView() {
   set('cfg-wa-vencido', 'wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜');
 }
 
-async function reimportarExcel() {
-  if (!confirm('¿Reimportar datos desde el Excel? Esto actualizará vencimientos, montos y agregará pagos nuevos del Excel. Los pagos registrados manualmente en la app NO se borran.')) return;
-  const btn = document.querySelector('[onclick="reimportarExcel()"]');
+async function reimportarExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!confirm(`¿Reimportar datos desde "${file.name}"? Esto actualizará vencimientos, montos y agregará pagos nuevos. Los pagos manuales en la app NO se borran.`)) {
+    input.value = ''; return;
+  }
+  const btn = document.querySelector('[onclick="document.getElementById(\'excel-upload\').click()"]');
   btn.disabled = true; btn.textContent = '⏳ Procesando...';
   try {
-    const r = await fetch('/api/admin/reimportar-excel', {method:'POST'});
+    const fd = new FormData();
+    fd.append('archivo', file);
+    const r = await fetch('/api/admin/reimportar-excel', {method:'POST', body: fd});
     const d = await r.json();
     if (d.ok) {
       alert(`✅ Reimportación completada\n${d.clientes_actualizados} clientes actualizados\n${d.pagos_procesados} pagos procesados`);
@@ -1180,6 +1187,7 @@ async function reimportarExcel() {
     alert('Error de conexión: ' + e);
   } finally {
     btn.disabled = false; btn.textContent = '🔄 Reimportar desde Excel';
+    input.value = '';
   }
 }
 
