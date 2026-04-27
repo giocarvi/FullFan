@@ -614,6 +614,29 @@ def save_config():
     return jsonify({'ok': True})
 
 
+@app.route('/api/diagnostico')
+@login_required
+def diagnostico():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    # Total pagos
+    c.execute("SELECT COUNT(*) as total FROM pagos")
+    total = fetchone(c)['total']
+    # Últimos 10 pagos registrados
+    c.execute(qmark("SELECT id, username, mes, monto, fecha_registro FROM pagos ORDER BY id DESC LIMIT 10"))
+    ultimos = fetchall(c)
+    # Tablas existentes
+    if PG:
+        c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+    else:
+        c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    tablas = [r[0] for r in c.fetchall()]
+    db.close()
+    return jsonify({'total_pagos': total, 'ultimos_pagos': ultimos, 'tablas': tablas})
+
+
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
