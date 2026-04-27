@@ -27,7 +27,8 @@
         </div>
         
         <div style="display:flex; gap:10px; margin-top:20px;">
-            <a href="{{ url_for('list_clients') }}" class="btn-action" style="flex:1; background:white; color:black; border:1px solid #ddd; text-align:center; padding:15px; border-radius:8px; text-decoration:none; font-weight:bold;">🔍 Buscar Cliente</a>
+            <a href="{{ url_for('list_clients') }}" class="btn-action" style="flex:1; background:white; color:black; border:1px solid #ddd; text-align:center; padding:15px; border-radius:8px; text-decoration:none; font-weight:bold;">🔍 Buscar Cliente (Ver Todos)</a>
+            <a href="{{ url_for('add_client') }}" class="btn-action" style="flex:1; background:#e63946; color:white; border:none; text-align:center; padding:15px; border-radius:8px; text-decoration:none; font-weight:bold;">➕ Nuevo Cliente</a>
         </div>
 
         <h3 style="margin-top:40px;">Historial de Últimos Pagos</h3>
@@ -56,7 +57,7 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="4" style="padding:20px; text-align:center; color:#666;">No hay pagos recientes registrados.</td></tr>
+                    <tr><td colspan="4" style="padding:20px; text-align:center; color:#666;">Aún no se han registrado nuevos pagos en esta versión del sistema.<br><strong>Para ver a tus clientes migrados, usa el botón "Buscar Cliente" de arriba.</strong></td></tr>
                     {% endfor %}
                 </tbody>
             </table>
