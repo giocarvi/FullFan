@@ -634,6 +634,11 @@ def save_config():
 def reimportar_excel():
     if session.get('rol') != 'admin':
         return jsonify({'error': 'Acceso denegado'}), 403
+    base_dir = os.path.dirname(__file__)
+    excel_path = os.path.join(base_dir, 'IPTV Nuevo (2).xlsx')
+    archivos = os.listdir(base_dir)
+    if not os.path.exists(excel_path):
+        return jsonify({'ok': False, 'error': 'Excel no encontrado', 'buscado': excel_path, 'archivos_disponibles': archivos})
     clientes, pagos = _migrate_from_excel(update_existing=True)
     return jsonify({'ok': True, 'clientes_actualizados': clientes, 'pagos_procesados': pagos})
 
