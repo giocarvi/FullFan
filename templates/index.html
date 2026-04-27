@@ -586,6 +586,7 @@ body {
     </div>
 
     <button class="config-save-btn" onclick="saveConfig()">💾 Guardar cambios</button>
+    <button class="config-save-btn" style="background:#6c3483;margin-top:8px" onclick="reimportarExcel()">🔄 Reimportar desde Excel</button>
   </div>
 </div>
 {% endif %}
@@ -1161,6 +1162,25 @@ function loadConfigView() {
   set('cfg-wa-recordatorio', 'wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺');
   set('cfg-wa-confirmar-pago', 'wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺');
   set('cfg-wa-vencido', 'wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜');
+}
+
+async function reimportarExcel() {
+  if (!confirm('¿Reimportar datos desde el Excel? Esto actualizará vencimientos, montos y agregará pagos nuevos del Excel. Los pagos registrados manualmente en la app NO se borran.')) return;
+  const btn = document.querySelector('[onclick="reimportarExcel()"]');
+  btn.disabled = true; btn.textContent = '⏳ Procesando...';
+  try {
+    const r = await fetch('/api/admin/reimportar-excel', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      alert(`✅ Reimportación completada\n${d.clientes_actualizados} clientes actualizados\n${d.pagos_procesados} pagos procesados`);
+    } else {
+      alert('Error: ' + (d.error || 'desconocido'));
+    }
+  } catch(e) {
+    alert('Error de conexión: ' + e);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔄 Reimportar desde Excel';
+  }
 }
 
 async function saveConfig() {
