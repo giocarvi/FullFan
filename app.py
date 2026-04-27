@@ -3,12 +3,11 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
-from sqlalchemy import func, and_, or_, text
+from sqlalchemy import func, text
 
 app = Flask(__name__)
 app.secret_key = 'full_fan_secret_key'
 
-# Database Configuration
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -18,7 +17,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -40,7 +38,7 @@ class Payment(db.Model):
     amount = db.Column(db.Float, nullable=False)
     payment_date = db.Column(db.DateTime, default=datetime.utcnow)
     expiry_date = db.Column(db.DateTime, nullable=False)
-    is_renewal = db.Column(db.Boolean, default=False) # New field
+    is_renewal = db.Column(db.Boolean, default=False)
 
 def get_dashboard_stats():
     now = datetime.utcnow()
@@ -56,18 +54,11 @@ def get_dashboard_stats():
         monto_nuevos = sum(p.amount for p in payments if not p.is_renewal)
         monto_renovaciones = sum(p.amount for p in payments if p.is_renewal)
         return {
-            'monto': monto,
-            'clientes': clientes,
-            'nuevos': nuevos,
-            'renovaciones': renovaciones,
-            'monto_nuevos': monto_nuevos,
-            'monto_renovaciones': monto_renovaciones
+            'monto': monto, 'clientes': clientes, 'nuevos': nuevos, 'renovaciones': renovaciones,
+            'monto_nuevos': monto_nuevos, 'monto_renovaciones': monto_renovaciones
         }
 
-    return {
-        'hoy': calculate_period(today_start),
-        'mes': calculate_period(month_start)
-    }
+    return {'hoy': calculate_period(today_start), 'mes': calculate_period(month_start)}
 
 @app.route('/')
 def index():
@@ -75,13 +66,10 @@ def index():
     user = User.query.get(session['user_id'])
     
     if user.role == 'admin':
-        try:
-            stats = get_dashboard_stats()
-            recent_clients = Client.query.order_by(Client.created_at.desc()).limit(5).all()
-            return render_template('index.html', user=user, stats=stats, recent_clients=recent_clients)
-        except Exception as e:
-            # Fallback if there's still a DB error
-            return f"Error cargando dashboard: {str(e)}"
+        stats = get_dashboard_stats()
+        # Fetch recent history safely
+        recent_history = db.session.query(Payment, Client).join(Client, Payment.client_id == Client.id).order_by(Payment.payment_date.desc()).limit(15).all()
+        return render_template('index.html', user=user, stats=stats, recent_history=recent_history)
     else:
         return render_template('index_staff.html', user=user)
 
@@ -104,13 +92,11 @@ def logout():
 @app.route('/register-payment/<int:client_id>', methods=['POST'])
 def register_payment(client_id):
     if 'user_id' not in session: return redirect(url_for('login'))
-    
     existing_payment = Payment.query.filter_by(client_id=client_id).first()
     is_renewal = True if existing_payment else False
     
     new_payment = Payment(
-        client_id=client_id,
-        amount=float(request.form['amount']),
+        client_id=client_id, amount=float(request.form['amount']),
         expiry_date=datetime.strptime(request.form['expiry_date'], '%Y-%m-%d'),
         is_renewal=is_renewal
     )
@@ -124,7 +110,7 @@ def list_clients():
     if 'user_id' not in session: return redirect(url_for('login'))
     search = request.args.get('search', '')
     if search:
-        clients = Client.query.filter((Client.name.ilike(f'%{search}%')) | (Client.username.ilike(f'%{search}%'))).all()
+        clients = Client.query.filter((Client.name.ilike(f'%{search}%')) | (Client.username.ilike(f'%{search}%'))).limit(100).all()
     else:
         clients = Client.query.limit(50).all()
     return render_template('clients.html', clients=clients)
@@ -139,23 +125,15 @@ def client_detail(id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        
-        # MIGRATION: Add is_renewal column to existing SQLite or Postgres database
         try:
-            # For SQLite, ALTER TABLE ADD COLUMN is supported.
-            # For PostgreSQL, same syntax works.
             db.session.execute(text('ALTER TABLE payment ADD COLUMN is_renewal BOOLEAN DEFAULT FALSE;'))
             db.session.commit()
-        except Exception as e:
-            # If it fails, it means the column already exists, so we just rollback and continue.
+        except:
             db.session.rollback()
             
-        # Ensure default users exist
         if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', password=generate_password_hash('admin123'), role='admin')
-            staff = User(username='atencion', password=generate_password_hash('atencion123'), role='atencion')
-            db.session.add(admin)
-            db.session.add(staff)
+            db.session.add(User(username='admin', password=generate_password_hash('admin123'), role='admin'))
+            db.session.add(User(username='atencion', password=generate_password_hash('atencion123'), role='atencion'))
             db.session.commit()
 
     port = int(os.environ.get('PORT', 5000))

@@ -1,9 +1,8 @@
 
 body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; }
-nav { background: #1c1e21; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
-.logo-nav { height: 40px; margin-right: 10px; }
+nav { background: #1c1e21; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
 .container { max-width: 1000px; margin: 20px auto; padding: 0 15px; }
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 30px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
 .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
 .stat-card { display: flex; flex-direction: column; border-left: 5px solid #e63946; }
 .stat-card.blue { border-left-color: #4361ee; }
@@ -11,6 +10,3 @@ nav { background: #1c1e21; color: white; padding: 10px 20px; display: flex; just
 .stat-card .label { color: #65676b; font-size: 0.9rem; font-weight: bold; }
 .stat-card .value { font-size: 1.8rem; font-weight: 800; margin: 5px 0; color: #1c1e21; }
 .stat-card .subtext { font-size: 0.8rem; color: #90949c; }
-.actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
-.btn-action { text-decoration: none; padding: 15px; text-align: center; border-radius: 8px; font-weight: bold; background: white; color: #1c1e21; border: 1px solid #ddd; }
-.btn-action.primary { background: #e63946; color: white; border: none; }

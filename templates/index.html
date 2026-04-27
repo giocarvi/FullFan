@@ -1,69 +1,66 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dashboard - Full Fan Digital TV</title>
+    <title>Dashboard - Full Fan</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://kit.fontawesome.com/your-code.js" crossorigin="anonymous"></script>
 </head>
 <body>
     <nav>
-        <div class="nav-left">
-            <img src="{{ url_for('static', filename='logo.png') }}" class="logo-nav">
-            <span>Admin Panel</span>
-        </div>
-        <div class="nav-right">
-            <a href="{{ url_for('logout') }}">Cerrar Sesión</a>
-        </div>
+        <div class="nav-left"><span>📡 Admin Panel</span></div>
+        <div class="nav-right"><a href="{{ url_for('logout') }}" style="color:white; text-decoration:none;">Cerrar Sesión</a></div>
     </nav>
-
     <div class="container">
         <h2>Bienvenido, {{ user.username }}</h2>
-        
-        <!-- Stats Row: TODAY -->
         <h3>Resumen de Hoy</h3>
         <div class="stats-grid">
-            <div class="card stat-card">
-                <span class="label">Ventas Hoy</span>
-                <span class="value">Q {{ stats.hoy.monto }}</span>
-                <span class="subtext">{{ stats.hoy.clientes }} Clientes</span>
-            </div>
-            <div class="card stat-card blue">
-                <span class="label">Nuevos Clientes</span>
-                <span class="value">{{ stats.hoy.nuevos }}</span>
-                <span class="subtext">Monto: Q {{ stats.hoy.monto_nuevos }}</span>
-            </div>
-            <div class="card stat-card green">
-                <span class="label">Renovaciones</span>
-                <span class="value">{{ stats.hoy.renovaciones }}</span>
-                <span class="subtext">Monto: Q {{ stats.hoy.monto_renovaciones }}</span>
-            </div>
+            <div class="card stat-card"><span class="label">Ventas Hoy</span><span class="value">Q {{ stats.hoy.monto }}</span><span class="subtext">{{ stats.hoy.clientes }} Clientes</span></div>
+            <div class="card stat-card blue"><span class="label">Nuevos Clientes</span><span class="value">{{ stats.hoy.nuevos }}</span><span class="subtext">Monto: Q {{ stats.hoy.monto_nuevos }}</span></div>
+            <div class="card stat-card green"><span class="label">Renovaciones</span><span class="value">{{ stats.hoy.renovaciones }}</span><span class="subtext">Monto: Q {{ stats.hoy.monto_renovaciones }}</span></div>
         </div>
-
-        <!-- Stats Row: MONTH -->
+        
         <h3>Resumen del Mes</h3>
         <div class="stats-grid">
-            <div class="card stat-card">
-                <span class="label">Total Mes</span>
-                <span class="value">Q {{ stats.mes.monto }}</span>
-                <span class="subtext">{{ stats.mes.clientes }} Clientes únicos</span>
-            </div>
-            <div class="card stat-card blue">
-                <span class="label">Nuevos (Mes)</span>
-                <span class="value">{{ stats.mes.nuevos }}</span>
-            </div>
-            <div class="card stat-card green">
-                <span class="label">Renovaciones (Mes)</span>
-                <span class="value">{{ stats.mes.renovaciones }}</span>
-            </div>
+            <div class="card stat-card"><span class="label">Total Mes</span><span class="value">Q {{ stats.mes.monto }}</span><span class="subtext">{{ stats.mes.clientes }} Clientes únicos</span></div>
+            <div class="card stat-card blue"><span class="label">Nuevos (Mes)</span><span class="value">{{ stats.mes.nuevos }}</span></div>
+            <div class="card stat-card green"><span class="label">Renovaciones (Mes)</span><span class="value">{{ stats.mes.renovaciones }}</span></div>
+        </div>
+        
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <a href="{{ url_for('list_clients') }}" class="btn-action" style="flex:1; background:white; color:black; border:1px solid #ddd; text-align:center; padding:15px; border-radius:8px; text-decoration:none; font-weight:bold;">🔍 Buscar Cliente</a>
         </div>
 
-        <div class="actions-grid">
-            <a href="{{ url_for('list_clients') }}" class="btn-action">🔍 Buscar Cliente</a>
-            <button onclick="document.getElementById('modalAdd').style.display='block'" class="btn-action primary">➕ Nuevo Cliente</button>
+        <h3 style="margin-top:40px;">Historial de Últimos Pagos</h3>
+        <div class="card" style="padding:0; overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead style="background:#f4f4f9;">
+                    <tr>
+                        <th style="padding:15px; border-bottom:2px solid #ddd;">Cliente</th>
+                        <th style="padding:15px; border-bottom:2px solid #ddd;">Fecha</th>
+                        <th style="padding:15px; border-bottom:2px solid #ddd;">Monto</th>
+                        <th style="padding:15px; border-bottom:2px solid #ddd;">Tipo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment, client in recent_history %}
+                    <tr>
+                        <td style="padding:15px; border-bottom:1px solid #eee;"><strong>{{ client.name }}</strong><br><small style="color:#666;">{{ client.username }}</small></td>
+                        <td style="padding:15px; border-bottom:1px solid #eee;">{{ payment.payment_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td style="padding:15px; border-bottom:1px solid #eee; font-weight:bold;">Q {{ payment.amount }}</td>
+                        <td style="padding:15px; border-bottom:1px solid #eee;">
+                            {% if payment.is_renewal %}
+                            <span style="background:#2ec4b6; color:white; padding:4px 10px; border-radius:12px; font-size:0.8rem;">Renovación</span>
+                            {% else %}
+                            <span style="background:#4361ee; color:white; padding:4px 10px; border-radius:12px; font-size:0.8rem;">Nuevo</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" style="padding:20px; text-align:center; color:#666;">No hay pagos recientes registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
-
-    <!-- Modal logic and Styles omitted for brevity but included in zip -->
 </body>
 </html>
