@@ -1,1 +1,20 @@
-<!DOCTYPE html><html><head><title>Panel Staff</title><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head><body><nav><span>Panel de Atención</span><a href="{{ url_for('logout') }}" style="color:white; text-decoration:none;">Salir</a></nav><div class="container"><h2>Hola, {{ user.username }}</h2><a href="{{ url_for('list_clients') }}" class="btn-action" style="display:block; text-align:center; background:#1c1e21; color:white; padding:20px; border-radius:8px; text-decoration:none; font-size:1.2rem; font-weight:bold;">🔍 Ir al Buscador de Clientes</a></div></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Panel Staff</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav>
+        <span>📡 Panel de Atención</span>
+        <a href="{{ url_for('logout') }}" style="color:white; text-decoration:none;">Salir</a>
+    </nav>
+    <div class="container">
+        <h2>Hola, {{ user.username }}</h2>
+        <div style="display:flex; flex-direction:column; gap:15px; margin-top:20px;">
+            <a href="{{ url_for('list_clients') }}" style="background:#1c1e21; color:white; padding:20px; text-align:center; border-radius:8px; font-weight:bold; text-decoration:none; font-size: 1.1rem;">🔍 Buscar Cliente</a>
+        </div>
+    </div>
+</body>
+</html>
