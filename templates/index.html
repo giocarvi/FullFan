@@ -428,7 +428,26 @@ body {
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
     <span style="font-size:13px;color:var(--muted)">{{ user }}</span>
+    <button class="logout-btn" onclick="document.getElementById('modal-password').style.display='flex'" style="background:none;border:none;cursor:pointer;font-size:13px;padding:4px 8px;">🔑</button>
     <a href="/logout" class="logout-btn">Salir</a>
+  </div>
+</div>
+
+<!-- MODAL CAMBIAR CONTRASEÑA -->
+<div id="modal-password" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border-radius:16px;padding:28px;width:90%;max-width:360px;">
+    <h3 style="margin:0 0 18px;font-size:16px;">🔑 Cambiar contraseña</h3>
+    <label style="font-size:13px;color:var(--muted)">Contraseña actual</label>
+    <input id="pwd-actual" type="password" style="width:100%;margin:6px 0 14px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+    <label style="font-size:13px;color:var(--muted)">Nueva contraseña</label>
+    <input id="pwd-nueva" type="password" style="width:100%;margin:6px 0 6px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+    <label style="font-size:13px;color:var(--muted)">Confirmar nueva contraseña</label>
+    <input id="pwd-confirmar" type="password" style="width:100%;margin:6px 0 18px;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);box-sizing:border-box;">
+    <div id="pwd-error" style="color:#ef4444;font-size:13px;margin-bottom:12px;display:none;"></div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="cerrarModalPassword()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:none;color:var(--text);cursor:pointer;">Cancelar</button>
+      <button onclick="guardarPassword()" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--purple);color:#fff;cursor:pointer;font-weight:600;">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -1165,6 +1184,43 @@ function loadConfigView() {
   set('cfg-wa-vencido', 'wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜');
 }
 
+function cerrarModalPassword() {
+  document.getElementById('modal-password').style.display = 'none';
+  document.getElementById('pwd-actual').value = '';
+  document.getElementById('pwd-nueva').value = '';
+  document.getElementById('pwd-confirmar').value = '';
+  document.getElementById('pwd-error').style.display = 'none';
+}
+
+async function guardarPassword() {
+  const actual = document.getElementById('pwd-actual').value;
+  const nueva = document.getElementById('pwd-nueva').value;
+  const confirmar = document.getElementById('pwd-confirmar').value;
+  const errEl = document.getElementById('pwd-error');
+  errEl.style.display = 'none';
+  if (!actual || !nueva) { errEl.textContent = 'Completa todos los campos.'; errEl.style.display = 'block'; return; }
+  if (nueva.length < 4) { errEl.textContent = 'La nueva contraseña debe tener al menos 4 caracteres.'; errEl.style.display = 'block'; return; }
+  if (nueva !== confirmar) { errEl.textContent = 'Las contraseñas nuevas no coinciden.'; errEl.style.display = 'block'; return; }
+  try {
+    const r = await fetch('/api/cambiar-password', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password_actual: actual, password_nueva: nueva})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      cerrarModalPassword();
+      alert('✅ Contraseña actualizada correctamente.');
+    } else {
+      errEl.textContent = d.error || 'Error desconocido.';
+      errEl.style.display = 'block';
+    }
+  } catch(e) {
+    errEl.textContent = 'Error de conexión.';
+    errEl.style.display = 'block';
+  }
+}
+
 async function reimportarExcel(input) {
   const file = input.files[0];
   if (!file) return;
@@ -1415,3 +1471,4 @@ function renderTablaTrimestral(ventas) {
 </script>
 </body>
 </html>
+
