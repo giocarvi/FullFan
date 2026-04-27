@@ -88,6 +88,8 @@ def init_db():
         )''')
         c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('admin','admin123','admin') ON CONFLICT DO NOTHING")
         c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('atencion','atencion123','atencion') ON CONFLICT DO NOTHING")
+        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('jackye','jackye123','atencion') ON CONFLICT DO NOTHING")
+        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('ingrid','ingrid123','atencion') ON CONFLICT DO NOTHING")
     else:
         c.executescript('''
             CREATE TABLE IF NOT EXISTS clientes (
@@ -108,6 +110,8 @@ def init_db():
         ''')
         c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('admin','admin123','admin')")
         c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('atencion','atencion123','atencion')")
+        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('jackye','jackye123','atencion')")
+        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('ingrid','ingrid123','atencion')")
 
     # Migrar: agregar columna comprobante a pagos si no existe
     if PG:
@@ -654,6 +658,28 @@ def save_config():
             )
         else:
             c.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/cambiar-password', methods=['POST'])
+@login_required
+def cambiar_password():
+    data = request.json
+    password_actual = data.get('password_actual', '')
+    password_nueva = data.get('password_nueva', '')
+    if not password_actual or not password_nueva or len(password_nueva) < 4:
+        return jsonify({'error': 'Datos inválidos. La nueva contraseña debe tener al menos 4 caracteres.'}), 400
+    username = session['user']
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT id FROM usuarios WHERE username=? AND password=?"), (username, password_actual))
+    user = fetchone(c)
+    if not user:
+        db.close()
+        return jsonify({'error': 'La contraseña actual es incorrecta.'}), 403
+    c.execute(qmark("UPDATE usuarios SET password=? WHERE username=?"), (password_nueva, username))
     db.commit()
     db.close()
     return jsonify({'ok': True})
