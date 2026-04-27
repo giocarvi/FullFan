@@ -158,72 +158,97 @@ def init_db():
         _migrate_from_excel()
 
 
+def _parse_excel_rows(excel_path):
+    """Lee el Excel con openpyxl y devuelve (headers_row, data_rows) como listas."""
+    from openpyxl import load_workbook
+    from datetime import datetime
+    wb = load_workbook(excel_path, read_only=True, data_only=True)
+    ws = wb.active
+    all_rows = list(ws.iter_rows(values_only=True))
+    wb.close()
+    headers = list(all_rows[1])   # fila 2 = índice 1
+    data = all_rows[2:]           # desde fila 3
+    return headers, data
+
+
+def _cell_val(v):
+    return v if v is not None else None
+
+
 def _migrate_from_excel(update_existing=False):
     excel_path = os.path.join(os.path.dirname(__file__), 'IPTV Nuevo (2).xlsx')
     if not os.path.exists(excel_path):
         return 0, 0
     try:
-        import pandas as pd
-        df = pd.read_excel(excel_path, sheet_name='Sheet1', header=None)
-        headers = df.iloc[1].tolist()
-        data = df.iloc[2:].copy()
-        data.columns = range(len(headers))
-        conn = get_db()
-        c = conn.cursor()
-        clients_ok = 0
-        pagos_ok = 0
-        for _, row in data.iterrows():
-            username = str(row[0]).strip() if pd.notna(row[0]) else None
-            if not username or username == 'nan':
-                continue
-            nombre = str(row[1]).strip() if pd.notna(row[1]) else ''
-            contact = str(row[3]).strip() if pd.notna(row[3]) else ''
-            referido_raw = str(row[4]).strip().upper() if pd.notna(row[4]) else 'NO'
-            referido = 'SI' if referido_raw in ('SI', 'S') else 'NO'
-            total = float(row[82]) if pd.notna(row[82]) else 0
-            exp_str = None
-            if pd.notna(row[2]):
-                try:
-                    exp_str = pd.Timestamp(row[2]).strftime('%Y-%m-%d')
-                except:
-                    pass
-            if PG:
-                if update_existing:
-                    c.execute("""INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado)
-                                 VALUES (%s,%s,%s,%s,%s,%s)
-                                 ON CONFLICT (username) DO UPDATE SET
-                                   nombre=EXCLUDED.nombre, contacto=EXCLUDED.contacto,
-                                   vencimiento=EXCLUDED.vencimiento, referido=EXCLUDED.referido,
-                                   total_pagado=EXCLUDED.total_pagado""",
-                              (username, nombre, contact, exp_str, referido, total))
-                else:
-                    c.execute("INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
-                              (username, nombre, contact, exp_str, referido, total))
-            else:
-                c.execute("INSERT OR IGNORE INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (?,?,?,?,?,?)",
-                          (username, nombre, contact, exp_str, referido, total))
-            clients_ok += 1
-            for col in range(5, 82):
-                val = row[col]
-                if pd.notna(val) and isinstance(val, (int, float)) and val > 0:
-                    month_date = headers[col]
-                    if hasattr(month_date, 'strftime'):
-                        month_str = month_date.strftime('%Y-%m-%d')
-                        if PG:
-                            c.execute("INSERT INTO pagos (username,mes,monto) SELECT %s,%s,%s WHERE NOT EXISTS (SELECT 1 FROM pagos WHERE username=%s AND mes=%s)",
-                                      (username, month_str, float(val), username, month_str))
-                        else:
-                            ex = c.execute("SELECT 1 FROM pagos WHERE username=? AND mes=?", (username, month_str)).fetchone()
-                            if not ex:
-                                c.execute("INSERT INTO pagos (username,mes,monto) VALUES (?,?,?)", (username, month_str, float(val)))
-                        pagos_ok += 1
-        conn.commit()
-        conn.close()
-        print(f"Migración desde Excel completada: {clients_ok} clientes, {pagos_ok} pagos.")
-        return clients_ok, pagos_ok
+        return _import_excel_rows(excel_path, update_existing)
     except Exception as e:
         print(f"Error migrando Excel: {e}")
         return 0, 0
+
+
+def _import_excel_rows(excel_path, update_existing=False):
+    from datetime import datetime as dt
+    headers, data = _parse_excel_rows(excel_path)
+    conn = get_db()
+    c = conn.cursor()
+    clients_ok = 0
+    pagos_ok = 0
+    for row in data:
+        if not row or len(row) < 5:
+            continue
+        username = str(row[0]).strip() if row[0] is not None else None
+        if not username or username.lower() == 'nan' or username == '':
+            continue
+        nombre = str(row[1]).strip() if row[1] is not None else ''
+        exp_val = row[2]
+        contact = str(row[3]).strip() if row[3] is not None else ''
+        referido_raw = str(row[4]).strip().upper() if row[4] is not None else 'NO'
+        referido = 'SI' if referido_raw in ('SI', 'S') else 'NO'
+        total = float(row[82]) if len(row) > 82 and row[82] is not None else 0
+        exp_str = None
+        if exp_val is not None:
+            try:
+                if isinstance(exp_val, (dt,)):
+                    exp_str = exp_val.strftime('%Y-%m-%d')
+                else:
+                    from datetime import datetime
+                    exp_str = datetime.strptime(str(exp_val)[:10], '%Y-%m-%d').strftime('%Y-%m-%d')
+            except:
+                pass
+        if PG:
+            if update_existing:
+                c.execute("""INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado)
+                             VALUES (%s,%s,%s,%s,%s,%s)
+                             ON CONFLICT (username) DO UPDATE SET
+                               nombre=EXCLUDED.nombre, contacto=EXCLUDED.contacto,
+                               vencimiento=EXCLUDED.vencimiento, referido=EXCLUDED.referido,
+                               total_pagado=EXCLUDED.total_pagado""",
+                          (username, nombre, contact, exp_str, referido, total))
+            else:
+                c.execute("INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                          (username, nombre, contact, exp_str, referido, total))
+        else:
+            c.execute("INSERT OR IGNORE INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (?,?,?,?,?,?)",
+                      (username, nombre, contact, exp_str, referido, total))
+        clients_ok += 1
+        for col in range(5, min(82, len(row))):
+            val = row[col]
+            if val is not None and isinstance(val, (int, float)) and val > 0:
+                month_date = headers[col] if col < len(headers) else None
+                if month_date is not None and hasattr(month_date, 'strftime'):
+                    month_str = month_date.strftime('%Y-%m-%d')
+                    if PG:
+                        c.execute("INSERT INTO pagos (username,mes,monto) SELECT %s,%s,%s WHERE NOT EXISTS (SELECT 1 FROM pagos WHERE username=%s AND mes=%s)",
+                                  (username, month_str, float(val), username, month_str))
+                    else:
+                        ex = c.execute("SELECT 1 FROM pagos WHERE username=? AND mes=?", (username, month_str)).fetchone()
+                        if not ex:
+                            c.execute("INSERT INTO pagos (username,mes,monto) VALUES (?,?,?)", (username, month_str, float(val)))
+                    pagos_ok += 1
+    conn.commit()
+    conn.close()
+    print(f"Migración desde Excel completada: {clients_ok} clientes, {pagos_ok} pagos.")
+    return clients_ok, pagos_ok
 
 
 def login_required(f):
@@ -635,77 +660,26 @@ def reimportar_excel():
     if session.get('rol') != 'admin':
         return jsonify({'error': 'Acceso denegado'}), 403
     import tempfile
-    # Si viene un archivo en el request, úsalo; si no, busca el del repo
+    usar_tmp = False
     if 'archivo' in request.files:
         f = request.files['archivo']
-        suffix = '.xlsx' if f.filename.endswith('.xlsx') else '.xls'
+        suffix = '.xlsx' if f.filename.lower().endswith('.xlsx') else '.xls'
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
         f.save(tmp.name)
         excel_path = tmp.name
         usar_tmp = True
     else:
         excel_path = os.path.join(os.path.dirname(__file__), 'IPTV Nuevo (2).xlsx')
-        usar_tmp = False
     if not os.path.exists(excel_path):
         return jsonify({'ok': False, 'error': 'Excel no encontrado. Sube el archivo directamente.'})
     try:
-        import pandas as pd
-        df = pd.read_excel(excel_path, sheet_name='Sheet1', header=None)
-        headers = df.iloc[1].tolist()
-        data = df.iloc[2:].copy()
-        data.columns = range(len(headers))
-        conn = get_db()
-        c = conn.cursor()
-        clients_ok = 0
-        pagos_ok = 0
-        for _, row in data.iterrows():
-            username = str(row[0]).strip() if pd.notna(row[0]) else None
-            if not username or username == 'nan':
-                continue
-            nombre = str(row[1]).strip() if pd.notna(row[1]) else ''
-            contact = str(row[3]).strip() if pd.notna(row[3]) else ''
-            referido_raw = str(row[4]).strip().upper() if pd.notna(row[4]) else 'NO'
-            referido = 'SI' if referido_raw in ('SI', 'S') else 'NO'
-            total = float(row[82]) if pd.notna(row[82]) else 0
-            exp_str = None
-            if pd.notna(row[2]):
-                try:
-                    exp_str = pd.Timestamp(row[2]).strftime('%Y-%m-%d')
-                except:
-                    pass
-            if PG:
-                c.execute("""INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado)
-                             VALUES (%s,%s,%s,%s,%s,%s)
-                             ON CONFLICT (username) DO UPDATE SET
-                               nombre=EXCLUDED.nombre, contacto=EXCLUDED.contacto,
-                               vencimiento=EXCLUDED.vencimiento, referido=EXCLUDED.referido,
-                               total_pagado=EXCLUDED.total_pagado""",
-                          (username, nombre, contact, exp_str, referido, total))
-            else:
-                c.execute("INSERT OR REPLACE INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (?,?,?,?,?,?)",
-                          (username, nombre, contact, exp_str, referido, total))
-            clients_ok += 1
-            for col in range(5, 82):
-                val = row[col]
-                if pd.notna(val) and isinstance(val, (int, float)) and val > 0:
-                    month_date = headers[col]
-                    if hasattr(month_date, 'strftime'):
-                        month_str = month_date.strftime('%Y-%m-%d')
-                        if PG:
-                            c.execute("INSERT INTO pagos (username,mes,monto) SELECT %s,%s,%s WHERE NOT EXISTS (SELECT 1 FROM pagos WHERE username=%s AND mes=%s)",
-                                      (username, month_str, float(val), username, month_str))
-                        else:
-                            ex = c.execute("SELECT 1 FROM pagos WHERE username=? AND mes=?", (username, month_str)).fetchone()
-                            if not ex:
-                                c.execute("INSERT INTO pagos (username,mes,monto) VALUES (?,?,?)", (username, month_str, float(val)))
-                        pagos_ok += 1
-        conn.commit()
-        conn.close()
-        if usar_tmp:
-            os.unlink(excel_path)
-        return jsonify({'ok': True, 'clientes_actualizados': clients_ok, 'pagos_procesados': pagos_ok})
+        clientes, pagos = _import_excel_rows(excel_path, update_existing=True)
+        return jsonify({'ok': True, 'clientes_actualizados': clientes, 'pagos_procesados': pagos})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
+    finally:
+        if usar_tmp and os.path.exists(excel_path):
+            os.unlink(excel_path)
 
 
 @app.route('/api/diagnostico')
