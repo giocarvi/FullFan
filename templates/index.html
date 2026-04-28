@@ -912,7 +912,8 @@ async function openModal(username) {
   const waBase = waPhone ? `https://wa.me/${waPhone}` : '';
   const encMsg = t => encodeURIComponent(t);
   const nombreCliente = c.nombre || c.username;
-  const expDate = c.vencimiento || '';
+  const _meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const expDate = c.vencimiento ? (d => `${String(d.getUTCDate()).padStart(2,'0')}-${_meses[d.getUTCMonth()]}-${d.getUTCFullYear()}`)(new Date(c.vencimiento)) : '';
   const waFill = (tpl) => (tpl || '').replace(/\{nombre\}/g, nombreCliente).replace(/\{fecha\}/g, expDate);
   const waSection = waBase ? `
     <div class="wa-section">
@@ -1471,4 +1472,3 @@ function renderTablaTrimestral(ventas) {
 </script>
 </body>
 </html>
-
