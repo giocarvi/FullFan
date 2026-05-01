@@ -1,7 +1,14 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import os
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 from functools import wraps
+
+# Zona horaria Guatemala (UTC-6)
+GT_TZ = timezone(timedelta(hours=-6))
+
+def today_gt():
+    """Fecha actual en hora Guatemala."""
+    return datetime.now(GT_TZ).date()
 
 app = Flask(__name__)
 app.secret_key = 'fullfan_secret_2026'
@@ -88,6 +95,8 @@ def init_db():
         )''')
         c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('admin','admin123','admin') ON CONFLICT DO NOTHING")
         c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('atencion','atencion123','atencion') ON CONFLICT DO NOTHING")
+        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('jackye','jackye123','atencion') ON CONFLICT DO NOTHING")
+        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('ingrid','ingrid123','atencion') ON CONFLICT DO NOTHING")
     else:
         c.executescript('''
             CREATE TABLE IF NOT EXISTS clientes (
@@ -108,6 +117,47 @@ def init_db():
         ''')
         c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('admin','admin123','admin')")
         c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('atencion','atencion123','atencion')")
+        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('jackye','jackye123','atencion')")
+        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('ingrid','ingrid123','atencion')")
+
+    # Migrar: agregar columna comprobante a pagos si no existe
+    if PG:
+        c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS comprobante TEXT DEFAULT NULL")
+    else:
+        try:
+            c.execute("ALTER TABLE pagos ADD COLUMN comprobante TEXT DEFAULT NULL")
+        except Exception:
+            pass
+
+    # Tabla de configuración
+    if PG:
+        c.execute('''CREATE TABLE IF NOT EXISTS configuracion (
+            clave TEXT PRIMARY KEY,
+            valor TEXT
+        )''')
+        defaults = [
+            ('wa_prefijo', '502'),
+            ('wa_saludo', 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋'),
+            ('wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'),
+            ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺'),
+            ('wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'),
+        ]
+        for clave, valor in defaults:
+            c.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT DO NOTHING", (clave, valor))
+    else:
+        c.execute('''CREATE TABLE IF NOT EXISTS configuracion (
+            clave TEXT PRIMARY KEY,
+            valor TEXT
+        )''')
+        defaults = [
+            ('wa_prefijo', '502'),
+            ('wa_saludo', 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋'),
+            ('wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'),
+            ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺'),
+            ('wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'),
+        ]
+        for clave, valor in defaults:
+            c.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
 
     conn.commit()
 
@@ -119,57 +169,102 @@ def init_db():
         _migrate_from_excel()
 
 
-def _migrate_from_excel():
+def _parse_excel_rows(excel_path):
+    """Lee el Excel con openpyxl y devuelve (headers_row, data_rows) como listas."""
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        import subprocess, sys
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'openpyxl'])
+        from openpyxl import load_workbook
+    from datetime import datetime
+    wb = load_workbook(excel_path, read_only=True, data_only=True)
+    ws = wb.active
+    all_rows = list(ws.iter_rows(values_only=True))
+    wb.close()
+    headers = list(all_rows[1])   # fila 2 = índice 1
+    data = all_rows[2:]           # desde fila 3
+    return headers, data
+
+
+def _cell_val(v):
+    return v if v is not None else None
+
+
+def _migrate_from_excel(update_existing=False):
     excel_path = os.path.join(os.path.dirname(__file__), 'IPTV Nuevo (2).xlsx')
     if not os.path.exists(excel_path):
-        return
+        return 0, 0
     try:
-        import pandas as pd
-        df = pd.read_excel(excel_path, sheet_name='Sheet1', header=None)
-        headers = df.iloc[1].tolist()
-        data = df.iloc[2:].copy()
-        data.columns = range(len(headers))
-        conn = get_db()
-        c = conn.cursor()
-        for _, row in data.iterrows():
-            username = str(row[0]).strip() if pd.notna(row[0]) else None
-            if not username or username == 'nan':
-                continue
-            nombre = str(row[1]).strip() if pd.notna(row[1]) else ''
-            contact = str(row[3]).strip() if pd.notna(row[3]) else ''
-            referido_raw = str(row[4]).strip().upper() if pd.notna(row[4]) else 'NO'
-            referido = 'SI' if referido_raw in ('SI', 'S') else 'NO'
-            total = float(row[82]) if pd.notna(row[82]) else 0
-            exp_str = None
-            if pd.notna(row[2]):
-                try:
-                    exp_str = pd.Timestamp(row[2]).strftime('%Y-%m-%d')
-                except:
-                    pass
-            if PG:
-                c.execute("INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
-                          (username, nombre, contact, exp_str, referido, total))
-            else:
-                c.execute("INSERT OR IGNORE INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (?,?,?,?,?,?)",
-                          (username, nombre, contact, exp_str, referido, total))
-            for col in range(5, 82):
-                val = row[col]
-                if pd.notna(val) and isinstance(val, (int, float)) and val > 0:
-                    month_date = headers[col]
-                    if hasattr(month_date, 'strftime'):
-                        month_str = month_date.strftime('%Y-%m-%d')
-                        if PG:
-                            c.execute("INSERT INTO pagos (username,mes,monto) SELECT %s,%s,%s WHERE NOT EXISTS (SELECT 1 FROM pagos WHERE username=%s AND mes=%s)",
-                                      (username, month_str, float(val), username, month_str))
-                        else:
-                            ex = c.execute("SELECT 1 FROM pagos WHERE username=? AND mes=?", (username, month_str)).fetchone()
-                            if not ex:
-                                c.execute("INSERT INTO pagos (username,mes,monto) VALUES (?,?,?)", (username, month_str, float(val)))
-        conn.commit()
-        conn.close()
-        print("Migración desde Excel completada.")
+        return _import_excel_rows(excel_path, update_existing)
     except Exception as e:
         print(f"Error migrando Excel: {e}")
+        return 0, 0
+
+
+def _import_excel_rows(excel_path, update_existing=False):
+    from datetime import datetime as dt
+    headers, data = _parse_excel_rows(excel_path)
+    conn = get_db()
+    c = conn.cursor()
+    clients_ok = 0
+    pagos_ok = 0
+    for row in data:
+        if not row or len(row) < 5:
+            continue
+        username = str(row[0]).strip() if row[0] is not None else None
+        if not username or username.lower() == 'nan' or username == '':
+            continue
+        nombre = str(row[1]).strip() if row[1] is not None else ''
+        exp_val = row[2]
+        contact = str(row[3]).strip() if row[3] is not None else ''
+        referido_raw = str(row[4]).strip().upper() if row[4] is not None else 'NO'
+        referido = 'SI' if referido_raw in ('SI', 'S') else 'NO'
+        total = float(row[82]) if len(row) > 82 and row[82] is not None else 0
+        exp_str = None
+        if exp_val is not None:
+            try:
+                if isinstance(exp_val, (dt,)):
+                    exp_str = exp_val.strftime('%Y-%m-%d')
+                else:
+                    from datetime import datetime
+                    exp_str = datetime.strptime(str(exp_val)[:10], '%Y-%m-%d').strftime('%Y-%m-%d')
+            except:
+                pass
+        if PG:
+            if update_existing:
+                c.execute("""INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado)
+                             VALUES (%s,%s,%s,%s,%s,%s)
+                             ON CONFLICT (username) DO UPDATE SET
+                               nombre=EXCLUDED.nombre, contacto=EXCLUDED.contacto,
+                               vencimiento=EXCLUDED.vencimiento, referido=EXCLUDED.referido,
+                               total_pagado=EXCLUDED.total_pagado""",
+                          (username, nombre, contact, exp_str, referido, total))
+            else:
+                c.execute("INSERT INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+                          (username, nombre, contact, exp_str, referido, total))
+        else:
+            c.execute("INSERT OR IGNORE INTO clientes (username,nombre,contacto,vencimiento,referido,total_pagado) VALUES (?,?,?,?,?,?)",
+                      (username, nombre, contact, exp_str, referido, total))
+        clients_ok += 1
+        for col in range(5, min(82, len(row))):
+            val = row[col]
+            if val is not None and isinstance(val, (int, float)) and val > 0:
+                month_date = headers[col] if col < len(headers) else None
+                if month_date is not None and hasattr(month_date, 'strftime'):
+                    month_str = month_date.strftime('%Y-%m-%d')
+                    if PG:
+                        c.execute("INSERT INTO pagos (username,mes,monto) SELECT %s,%s,%s WHERE NOT EXISTS (SELECT 1 FROM pagos WHERE username=%s AND mes=%s)",
+                                  (username, month_str, float(val), username, month_str))
+                    else:
+                        ex = c.execute("SELECT 1 FROM pagos WHERE username=? AND mes=?", (username, month_str)).fetchone()
+                        if not ex:
+                            c.execute("INSERT INTO pagos (username,mes,monto) VALUES (?,?,?)", (username, month_str, float(val)))
+                    pagos_ok += 1
+    conn.commit()
+    conn.close()
+    print(f"Migración desde Excel completada: {clients_ok} clientes, {pagos_ok} pagos.")
+    return clients_ok, pagos_ok
 
 
 def login_required(f):
@@ -215,9 +310,9 @@ def index():
 def dashboard():
     db = get_db()
     c = db.cursor()
-    today = date.today().isoformat()
-    in_30 = date.today().replace(day=min(date.today().day + 30, 28)).isoformat()
-    mes_actual = date.today().strftime('%Y-%m')
+    today = today_gt().isoformat()
+    in_30 = today_gt().replace(day=min(today_gt().day + 30, 28)).isoformat()
+    mes_actual = today_gt().strftime('%Y-%m')
 
     c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE vencimiento >= ?"), (today,))
     activos = fetchone(c)['c']
@@ -231,18 +326,29 @@ def dashboard():
     c.execute(qmark("SELECT COALESCE(SUM(monto),0) as t FROM pagos WHERE mes LIKE ?"), (f'{mes_actual}%',))
     ingresos = fetchone(c)['t']
 
+    t = today_gt()
+    m6 = t.month - 6
+    y6 = t.year + (m6 - 1) // 12
+    m6 = ((m6 - 1) % 12) + 1
+    six_ago_str = f"{y6}-{m6:02d}"
     if PG:
         c.execute("""
-            SELECT TO_CHAR(mes::date, 'YYYY-MM') as m, SUM(monto) as total, COUNT(DISTINCT username) as clientes
-            FROM pagos WHERE mes::date >= NOW() - INTERVAL '6 months'
+            SELECT TO_CHAR(mes::date, 'YYYY-MM') as m,
+                   SUM(monto) as total,
+                   COUNT(DISTINCT username) as clientes,
+                   COUNT(*) as unidades
+            FROM pagos WHERE SUBSTRING(mes,1,7) >= %s
             GROUP BY m ORDER BY m
-        """)
+        """, (six_ago_str,))
     else:
         c.execute("""
-            SELECT strftime('%Y-%m', mes) as m, SUM(monto) as total, COUNT(DISTINCT username) as clientes
-            FROM pagos WHERE mes >= date('now', '-6 months')
+            SELECT strftime('%Y-%m', mes) as m,
+                   SUM(monto) as total,
+                   COUNT(DISTINCT username) as clientes,
+                   COUNT(*) as unidades
+            FROM pagos WHERE substr(mes,1,7) >= ?
             GROUP BY m ORDER BY m
-        """)
+        """, (six_ago_str,))
     ultimos_meses = fetchall(c)
 
     c.execute(qmark("""
@@ -266,22 +372,25 @@ def dashboard():
 def clientes():
     q = request.args.get('q', '').strip()
     estado = request.args.get('estado', '')
+    fecha = request.args.get('fecha', '').strip()
     page = int(request.args.get('page', 1))
     per_page = 20
     offset = (page - 1) * per_page
-    today = date.today().isoformat()
+    today = today_gt().isoformat()
 
     where, params = [], []
     if q:
         where.append("(nombre ILIKE ? OR username ILIKE ? OR contacto ILIKE ?)" if PG else
                      "(nombre LIKE ? OR username LIKE ? OR contacto LIKE ?)")
         params += [f'%{q}%', f'%{q}%', f'%{q}%']
-    if estado == 'activo':
+    if fecha:
+        where.append("vencimiento = ?"); params.append(fecha)
+    elif estado == 'activo':
         where.append("vencimiento >= ?"); params.append(today)
     elif estado == 'vencido':
         where.append("(vencimiento < ? OR vencimiento IS NULL)"); params.append(today)
     elif estado == 'por_vencer':
-        in_30 = date.today().replace(day=min(date.today().day + 30, 28)).isoformat()
+        in_30 = today_gt().replace(day=min(today_gt().day + 30, 28)).isoformat()
         where.append("vencimiento >= ? AND vencimiento <= ?"); params += [today, in_30]
 
     where_sql = "WHERE " + " AND ".join(where) if where else ""
@@ -332,7 +441,7 @@ def cliente_detalle(username):
 
     rol = session.get('rol', 'atencion')
     # Ambos roles ven el historial de pagos reciente
-    c.execute(qmark("SELECT mes, monto, fecha_registro FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 24"), (username,))
+    c.execute(qmark("SELECT id, mes, monto, fecha_registro, (comprobante IS NOT NULL) as has_comprobante FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 24"), (username,))
     pagos = fetchall(c)
     db.close()
     return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol})
@@ -343,10 +452,15 @@ def actualizar_cliente(username):
     data = request.json
     db = get_db()
     c = db.cursor()
-    c.execute(qmark("UPDATE clientes SET nombre=?, contacto=?, vencimiento=?, referido=?, notas=? WHERE username=?"),
-              (data.get('nombre'), data.get('contacto'), data.get('vencimiento'),
-               data.get('referido'), data.get('notas'), username))
-    db.commit()
+    fields, params = [], []
+    for field in ['nombre', 'contacto', 'vencimiento', 'referido', 'notas']:
+        if field in data:
+            fields.append(f"{field}=?")
+            params.append(data[field])
+    if fields:
+        params.append(username)
+        c.execute(qmark(f"UPDATE clientes SET {', '.join(fields)} WHERE username=?"), params)
+        db.commit()
     db.close()
     return jsonify({'ok': True})
 
@@ -358,17 +472,315 @@ def registrar_pago():
     username = data.get('username')
     monto = float(data.get('monto', 0))
     vencimiento_nuevo = data.get('vencimiento')
-    mes = data.get('mes', date.today().strftime('%Y-%m-01'))
+    mes = data.get('mes', today_gt().strftime('%Y-%m-01'))
+    comprobante = data.get('comprobante')  # base64 data URL, optional
     if not username or monto <= 0:
         return jsonify({'error': 'Datos inválidos'}), 400
     db = get_db()
     c = db.cursor()
-    c.execute(qmark("INSERT INTO pagos (username, mes, monto) VALUES (?,?,?)"), (username, mes, monto))
+    c.execute(qmark("INSERT INTO pagos (username, mes, monto, comprobante) VALUES (?,?,?,?)"), (username, mes, monto, comprobante))
     c.execute(qmark("UPDATE clientes SET total_pagado = total_pagado + ?, vencimiento=? WHERE username=?"),
               (monto, vencimiento_nuevo, username))
     db.commit()
     db.close()
     return jsonify({'ok': True})
+
+@app.route('/api/admin/corregir-mes', methods=['POST'])
+@login_required
+def corregir_mes():
+    """Corrige pagos registrados con mes incorrecto (UTC vs Guatemala)."""
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Sin permiso'}), 403
+    data = request.json or {}
+    mes_incorrecto = data.get('mes_incorrecto', '2026-05')
+    mes_correcto   = data.get('mes_correcto',   '2026-04-30')
+    db = get_db()
+    c = db.cursor()
+    # Buscar pagos con el mes incorrecto
+    c.execute(qmark("SELECT id, username, monto, mes, fecha_registro FROM pagos WHERE mes LIKE ?"),
+              (f'{mes_incorrecto}%',))
+    pagos = fetchall(c)
+    if not pagos:
+        db.close()
+        return jsonify({'ok': True, 'corregidos': 0, 'mensaje': 'No se encontraron pagos con ese mes'})
+    ids = [p['id'] for p in pagos]
+    # Corregir
+    for pid in ids:
+        c.execute(qmark("UPDATE pagos SET mes=? WHERE id=?"), (mes_correcto, pid))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'corregidos': len(ids),
+                    'pagos': [{'id': p['id'], 'username': p['username'],
+                               'monto': p['monto'], 'mes_anterior': p['mes']} for p in pagos]})
+
+@app.route('/api/pagos/<int:pago_id>', methods=['DELETE'])
+@login_required
+def eliminar_pago(pago_id):
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username, monto FROM pagos WHERE id=?"), (pago_id,))
+    pago = fetchone(c)
+    if not pago:
+        db.close()
+        return jsonify({'error': 'Pago no encontrado'}), 404
+    c.execute(qmark("DELETE FROM pagos WHERE id=?"), (pago_id,))
+    c.execute(qmark("""UPDATE clientes SET total_pagado =
+        CASE WHEN total_pagado - ? < 0 THEN 0 ELSE total_pagado - ? END
+        WHERE username=?"""), (pago['monto'], pago['monto'], pago['username']))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'username': pago['username'], 'monto': pago['monto']})
+
+@app.route('/api/pagos/<int:pago_id>/comprobante')
+@login_required
+def get_comprobante(pago_id):
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT comprobante FROM pagos WHERE id=?"), (pago_id,))
+    row = fetchone(c)
+    db.close()
+    if not row or not row['comprobante']:
+        return jsonify({'error': 'No encontrado'}), 404
+    return jsonify({'comprobante': row['comprobante']})
+
+# ── API: ANALYTICS ────────────────────────────────────────────────────────────
+@app.route('/api/analytics')
+@login_required
+def analytics():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+
+    db = get_db()
+    c = db.cursor()
+
+    # Ventas mensuales (todo el tiempo)
+    if PG:
+        c.execute("""
+            SELECT TO_CHAR(mes::date, 'YYYY-MM') as m,
+                   SUM(monto) as total, COUNT(*) as n_pagos,
+                   COUNT(DISTINCT username) as clientes
+            FROM pagos GROUP BY m ORDER BY m
+        """)
+    else:
+        c.execute("""
+            SELECT strftime('%Y-%m', mes) as m,
+                   SUM(monto) as total, COUNT(*) as n_pagos,
+                   COUNT(DISTINCT username) as clientes
+            FROM pagos GROUP BY m ORDER BY m
+        """)
+    ventas_mensuales = fetchall(c)
+
+    # Ventas anuales
+    if PG:
+        c.execute("""
+            SELECT TO_CHAR(mes::date, 'YYYY') as y,
+                   SUM(monto) as total, COUNT(DISTINCT username) as clientes
+            FROM pagos GROUP BY y ORDER BY y
+        """)
+    else:
+        c.execute("""
+            SELECT strftime('%Y', mes) as y,
+                   SUM(monto) as total, COUNT(DISTINCT username) as clientes
+            FROM pagos GROUP BY y ORDER BY y
+        """)
+    ventas_anuales = fetchall(c)
+
+    # Distribución por tipo de plan (según monto del pago)
+    if PG:
+        c.execute("""
+            SELECT
+                CASE
+                    WHEN monto <= 120  THEN 'Mensual'
+                    WHEN monto <= 320  THEN 'Trimestral'
+                    WHEN monto <= 650  THEN 'Semestral'
+                    WHEN monto <= 1300 THEN 'Anual'
+                    ELSE 'Más de 1 año'
+                END as plan,
+                COUNT(*) as n, SUM(monto) as total
+            FROM pagos GROUP BY plan ORDER BY n DESC
+        """)
+    else:
+        c.execute("""
+            SELECT
+                CASE
+                    WHEN monto <= 120  THEN 'Mensual'
+                    WHEN monto <= 320  THEN 'Trimestral'
+                    WHEN monto <= 650  THEN 'Semestral'
+                    WHEN monto <= 1300 THEN 'Anual'
+                    ELSE 'Más de 1 año'
+                END as plan,
+                COUNT(*) as n, SUM(monto) as total
+            FROM pagos GROUP BY plan ORDER BY n DESC
+        """)
+    planes = fetchall(c)
+
+    # Clientes nuevos por mes (primer pago de cada usuario)
+    if PG:
+        c.execute("""
+            SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as nuevos
+            FROM pagos p
+            WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            GROUP BY m ORDER BY m
+        """)
+    else:
+        c.execute("""
+            SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as nuevos
+            FROM pagos p
+            WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            GROUP BY m ORDER BY m
+        """)
+    nuevos_por_mes = fetchall(c)
+
+    # Renovaciones por mes (pagos que NO son el primero del usuario)
+    if PG:
+        c.execute("""
+            SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as renovaciones
+            FROM pagos p
+            WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            GROUP BY m ORDER BY m
+        """)
+    else:
+        c.execute("""
+            SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as renovaciones
+            FROM pagos p
+            WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            GROUP BY m ORDER BY m
+        """)
+    renovaciones_por_mes = fetchall(c)
+
+    # Clientes que no renovaron (vencidos con pagos históricos)
+    today = today_gt().isoformat()
+    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE (vencimiento < ? OR vencimiento IS NULL) AND total_pagado > 0"), (today,))
+    no_renovaron = fetchone(c)['c']
+
+    # Total histórico
+    c.execute("SELECT COALESCE(SUM(monto),0) as t FROM pagos")
+    total_historico = round(float(fetchone(c)['t']), 2)
+
+    c.execute("SELECT COUNT(*) as c FROM clientes")
+    total_clientes = fetchone(c)['c']
+
+    db.close()
+
+    return jsonify({
+        'ventas_mensuales': ventas_mensuales,
+        'ventas_anuales': ventas_anuales,
+        'planes': planes,
+        'nuevos_por_mes': nuevos_por_mes,
+        'renovaciones_por_mes': renovaciones_por_mes,
+        'no_renovaron': no_renovaron,
+        'total_historico': total_historico,
+        'total_clientes': total_clientes
+    })
+
+
+# ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
+@app.route('/api/config', methods=['GET'])
+@login_required
+def get_config():
+    db = get_db()
+    c = db.cursor()
+    c.execute("SELECT clave, valor FROM configuracion")
+    rows = fetchall(c)
+    db.close()
+    return jsonify({r['clave']: r['valor'] for r in rows})
+
+
+@app.route('/api/config', methods=['POST'])
+@login_required
+def save_config():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    data = request.get_json()
+    db = get_db()
+    c = db.cursor()
+    for clave, valor in data.items():
+        if PG:
+            c.execute(
+                "INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor",
+                (clave, valor)
+            )
+        else:
+            c.execute("INSERT OR REPLACE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/cambiar-password', methods=['POST'])
+@login_required
+def cambiar_password():
+    data = request.json
+    password_actual = data.get('password_actual', '')
+    password_nueva = data.get('password_nueva', '')
+    if not password_actual or not password_nueva or len(password_nueva) < 4:
+        return jsonify({'error': 'Datos inválidos. La nueva contraseña debe tener al menos 4 caracteres.'}), 400
+    username = session['user']
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT id FROM usuarios WHERE username=? AND password=?"), (username, password_actual))
+    user = fetchone(c)
+    if not user:
+        db.close()
+        return jsonify({'error': 'La contraseña actual es incorrecta.'}), 403
+    c.execute(qmark("UPDATE usuarios SET password=? WHERE username=?"), (password_nueva, username))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/admin/reimportar-excel', methods=['POST'])
+@login_required
+def reimportar_excel():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    import tempfile
+    usar_tmp = False
+    if 'archivo' in request.files:
+        f = request.files['archivo']
+        suffix = '.xlsx' if f.filename.lower().endswith('.xlsx') else '.xls'
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        f.save(tmp.name)
+        excel_path = tmp.name
+        usar_tmp = True
+    else:
+        excel_path = os.path.join(os.path.dirname(__file__), 'IPTV Nuevo (2).xlsx')
+    if not os.path.exists(excel_path):
+        return jsonify({'ok': False, 'error': 'Excel no encontrado. Sube el archivo directamente.'})
+    try:
+        clientes, pagos = _import_excel_rows(excel_path, update_existing=True)
+        return jsonify({'ok': True, 'clientes_actualizados': clientes, 'pagos_procesados': pagos})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
+    finally:
+        if usar_tmp and os.path.exists(excel_path):
+            os.unlink(excel_path)
+
+
+@app.route('/api/diagnostico')
+@login_required
+def diagnostico():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    # Total pagos
+    c.execute("SELECT COUNT(*) as total FROM pagos")
+    total = fetchone(c)['total']
+    # Últimos 10 pagos registrados
+    c.execute(qmark("SELECT id, username, mes, monto, fecha_registro FROM pagos ORDER BY id DESC LIMIT 10"))
+    ultimos = fetchall(c)
+    # Tablas existentes
+    if PG:
+        c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+    else:
+        c.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    tablas = [r[0] for r in c.fetchall()]
+    db.close()
+    return jsonify({'total_pagos': total, 'ultimos_pagos': ultimos, 'tablas': tablas})
+
 
 if __name__ == '__main__':
     init_db()
