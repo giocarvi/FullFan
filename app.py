@@ -97,6 +97,7 @@ def init_db():
         c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('atencion','atencion123','atencion') ON CONFLICT DO NOTHING")
         c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('jackye','jackye123','atencion') ON CONFLICT DO NOTHING")
         c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('ingrid','ingrid123','atencion') ON CONFLICT DO NOTHING")
+        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('turcios','Turcios123','atencion') ON CONFLICT DO NOTHING")
     else:
         c.executescript('''
             CREATE TABLE IF NOT EXISTS clientes (
@@ -119,6 +120,7 @@ def init_db():
         c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('atencion','atencion123','atencion')")
         c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('jackye','jackye123','atencion')")
         c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('ingrid','ingrid123','atencion')")
+        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('turcios','Turcios123','atencion')")
 
     # Migrar: agregar columna comprobante a pagos si no existe
     if PG:
