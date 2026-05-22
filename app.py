@@ -466,6 +466,25 @@ def actualizar_cliente(username):
     db.close()
     return jsonify({'ok': True})
 
+@app.route('/api/clientes/<username>', methods=['DELETE'])
+@login_required
+def eliminar_cliente(username):
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
+    if not fetchone(c):
+        db.close()
+        return jsonify({'error': 'Cliente no encontrado'}), 404
+    # Eliminar pagos asociados primero
+    c.execute(qmark("DELETE FROM pagos WHERE username=?"), (username,))
+    # Luego eliminar el cliente
+    c.execute(qmark("DELETE FROM clientes WHERE username=?"), (username,))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
 # ── API: PAGOS ────────────────────────────────────────────────────────────────
 @app.route('/api/pagos', methods=['POST'])
 @login_required
@@ -664,6 +683,27 @@ def analytics():
     c.execute("SELECT COUNT(*) as c FROM clientes")
     total_clientes = fetchone(c)['c']
 
+    # Ventas por día (últimos 60 días)
+    mes_actual = today_gt().strftime('%Y-%m')
+    mes_anterior = (today_gt().replace(day=1) - timedelta(days=1)).strftime('%Y-%m')
+    if PG:
+        c.execute("""
+            SELECT TO_CHAR(mes::date, 'YYYY-MM-DD') as dia,
+                   SUM(monto) as total, COUNT(*) as n_pagos
+            FROM pagos
+            WHERE SUBSTRING(mes,1,7) IN (%s, %s)
+            GROUP BY dia ORDER BY dia
+        """, (mes_actual, mes_anterior))
+    else:
+        c.execute("""
+            SELECT strftime('%Y-%m-%d', mes) as dia,
+                   SUM(monto) as total, COUNT(*) as n_pagos
+            FROM pagos
+            WHERE substr(mes,1,7) IN (?, ?)
+            GROUP BY dia ORDER BY dia
+        """, (mes_actual, mes_anterior))
+    ventas_por_dia = fetchall(c)
+
     db.close()
 
     return jsonify({
@@ -674,7 +714,8 @@ def analytics():
         'renovaciones_por_mes': renovaciones_por_mes,
         'no_renovaron': no_renovaron,
         'total_historico': total_historico,
-        'total_clientes': total_clientes
+        'total_clientes': total_clientes,
+        'ventas_por_dia': ventas_por_dia
     })
 
 
