@@ -345,6 +345,17 @@ body {
 .analytics-table tr:last-child td { border-bottom: none; }
 .analytics-table .total-row td { font-weight: 700; color: var(--accent2); border-top: 1px solid var(--border); }
 
+/* ── VENTAS POR DÍA ───────────────────────────────────────────────── */
+.day-chart-wrap { overflow-x: auto; padding-bottom: 4px; }
+.day-chart-inner { display: flex; align-items: flex-end; gap: 4px; min-width: max-content; height: 80px; }
+.day-bar-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.day-bar { width: 18px; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--accent2), var(--accent)); min-height: 3px; cursor: pointer; transition: opacity 0.15s; }
+.day-bar:hover { opacity: 0.8; }
+.day-bar.today { background: linear-gradient(180deg, #10b981, #059669); }
+.day-label { font-size: 9px; color: var(--muted); white-space: nowrap; }
+.day-chart-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+.day-month-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+
 /* ── WHATSAPP ─────────────────────────────────────────────────────── */
 .wa-section { padding: 10px 20px 14px; border-bottom: 1px solid var(--border); }
 .wa-section-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; margin-bottom: 10px; }
@@ -538,6 +549,16 @@ body {
     <div class="kpi-card"><div class="kpi-val" id="kpi-promedio">—</div><div class="kpi-lbl">Promedio mensual</div></div>
     <div class="kpi-card"><div class="kpi-val" id="kpi-clientes">—</div><div class="kpi-lbl">Total clientes</div></div>
     <div class="kpi-card"><div class="kpi-val" id="kpi-no-renov">—</div><div class="kpi-lbl">No renovaron</div></div>
+  </div>
+
+  <!-- Ventas por día -->
+  <div class="analytics-chart-card">
+    <h3>📆 Ventas por día</h3>
+    <div class="day-month-tabs" id="day-month-tabs"></div>
+    <div class="day-chart-wrap">
+      <div class="day-chart-inner" id="day-chart-inner"></div>
+    </div>
+    <div class="day-chart-legend" id="day-chart-legend"></div>
   </div>
 
   <!-- Ventas por año -->
@@ -981,7 +1002,25 @@ async function openModal(username) {
           <input type="text" id="edit-contacto" value="${c.contacto || ''}" placeholder="ej: 55551234">
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Vencimiento</label>
+          <input type="date" id="edit-vencimiento" value="${c.vencimiento || ''}">
+        </div>
+        <div class="form-group">
+          <label>Referido</label>
+          <select id="edit-referido">
+            <option value="NO" ${(c.referido||'NO')==='NO'?'selected':''}>No</option>
+            <option value="SI" ${(c.referido||'')==='SI'?'selected':''}>Sí</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notas</label>
+        <textarea id="edit-notas" rows="2" placeholder="Notas internas..." style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:14px;resize:vertical;">${c.notas || ''}</textarea>
+      </div>
       <button class="btn-primary" onclick="guardarEdicion('${username}')">💾 Guardar cambios</button>
+      ${esAdmin ? `<button class="btn-danger" style="background:var(--red);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-left:6px;" onclick="eliminarCliente('${username}', '${(c.nombre||username).replace(/'/g,"\\'") }')">🗑️ Eliminar cliente</button>` : ''}
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
     </div>
 
@@ -1015,12 +1054,15 @@ async function openModal(username) {
 }
 
 async function guardarEdicion(username) {
-  const nombre = document.getElementById('edit-nombre').value.trim();
-  const contacto = document.getElementById('edit-contacto').value.trim();
+  const nombre     = document.getElementById('edit-nombre').value.trim();
+  const contacto   = document.getElementById('edit-contacto').value.trim();
+  const vencimiento= document.getElementById('edit-vencimiento').value || null;
+  const referido   = document.getElementById('edit-referido').value;
+  const notas      = document.getElementById('edit-notas').value.trim();
   const r = await fetch(`/api/clientes/${username}`, {
     method: 'PUT',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ nombre, contacto })
+    body: JSON.stringify({ nombre, contacto, vencimiento, referido, notas })
   });
   const d = await r.json();
   if (d.ok) {
@@ -1029,6 +1071,21 @@ async function guardarEdicion(username) {
     loadClientes(true);
   } else {
     showToast('❌ Error al guardar');
+  }
+}
+
+async function eliminarCliente(username, nombre) {
+  if (!confirm(`⚠️ ¿Eliminar permanentemente a "${nombre}" (${username})?\n\nEsto borrará también todo su historial de pagos. Esta acción NO se puede deshacer.`)) return;
+  const r = await fetch(`/api/clientes/${username}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.ok) {
+    closeModal();
+    showToast('🗑️ Cliente eliminado');
+    analyticsData = null; // Forzar recarga de analytics
+    loadClientes(true);
+    loadDashboard();
+  } else {
+    showToast('❌ ' + (d.error || 'Error al eliminar'));
   }
 }
 
@@ -1366,6 +1423,79 @@ function renderAnalytics(d) {
 
   // Tabla trimestral
   renderTablaTrimestral(d.ventas_mensuales);
+
+  // Ventas por día
+  renderDayChart(d.ventas_por_dia || []);
+}
+
+let _dayData = [];
+let _selectedDayMonth = '';
+
+function renderDayChart(data) {
+  _dayData = data;
+  const todayStr = localDateStr();
+  const mesMes = todayStr.substring(0,7);
+  const mesAnt  = (() => {
+    const d = new Date(todayStr + 'T12:00:00');
+    d.setDate(1); d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  })();
+  const availMonths = [...new Set(data.map(r => r.dia.substring(0,7)))].sort();
+  if (!_selectedDayMonth || !availMonths.includes(_selectedDayMonth)) {
+    _selectedDayMonth = mesMes;
+  }
+
+  // Month tabs
+  const tabsEl = document.getElementById('day-month-tabs');
+  const MNAMES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  tabsEl.innerHTML = availMonths.map(m => {
+    const lbl = MNAMES[parseInt(m.substring(5))-1] + ' ' + m.substring(0,4);
+    return `<button class="year-tab${m === _selectedDayMonth ? ' active' : ''}" data-m="${m}">${lbl}</button>`;
+  }).join('');
+  tabsEl.querySelectorAll('.year-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _selectedDayMonth = btn.dataset.m;
+      tabsEl.querySelectorAll('.year-tab').forEach(b => b.classList.toggle('active', b.dataset.m === _selectedDayMonth));
+      renderDayBars();
+    });
+  });
+  renderDayBars();
+}
+
+function renderDayBars() {
+  const todayStr = localDateStr();
+  const monthData = _dayData.filter(r => r.dia.startsWith(_selectedDayMonth));
+  const dataMap = Object.fromEntries(monthData.map(r => [r.dia, r]));
+
+  // Cuántos días tiene el mes
+  const [y, m] = _selectedDayMonth.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const days = Array.from({length: daysInMonth}, (_, i) => {
+    const d = String(i+1).padStart(2,'0');
+    return `${_selectedDayMonth}-${d}`;
+  });
+
+  const totals = days.map(d => dataMap[d] ? parseFloat(dataMap[d].total) : 0);
+  const maxVal = Math.max(...totals, 1);
+  const totalMes = totals.reduce((a,b) => a+b, 0);
+  const diasConVenta = totals.filter(v => v > 0).length;
+
+  const inner = document.getElementById('day-chart-inner');
+  inner.innerHTML = days.map((dia, i) => {
+    const val = totals[i];
+    const h = Math.max(Math.round((val / maxVal) * 74), val > 0 ? 4 : 0);
+    const isToday = dia === todayStr;
+    const n = dataMap[dia] ? dataMap[dia].n_pagos : 0;
+    const tipText = val > 0 ? `Q${Math.round(val).toLocaleString()} · ${n} pago${n!==1?'s':''}` : 'Sin ventas';
+    const dayNum = String(i+1);
+    return `<div class="day-bar-col">
+      <div class="day-bar${isToday?' today':''}" style="height:${h}px" title="${dia}\n${tipText}"></div>
+      <div class="day-label" style="${isToday?'color:var(--green);font-weight:700;':''}">${dayNum}</div>
+    </div>`;
+  }).join('');
+
+  const legend = document.getElementById('day-chart-legend');
+  legend.innerHTML = `<span>📅 Total mes: <strong style="color:var(--accent2)">Q${Math.round(totalMes).toLocaleString()}</strong></span><span>📆 Días con ventas: <strong>${diasConVenta}</strong> de ${daysInMonth}</span>`;
 }
 
 function renderYearTabs(containerId, years, active, onChangeFn) {
@@ -1493,3 +1623,4 @@ function renderTablaTrimestral(ventas) {
 </script>
 </body>
 </html>
+
