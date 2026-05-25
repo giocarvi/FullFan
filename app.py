@@ -368,6 +368,19 @@ def dashboard():
         'por_vencer_lista': pronto
     })
 
+# ── API: SYNC (para reporte_diario) ──────────────────────────────────────────
+@app.route('/api/sync/clientes')
+@login_required
+def sync_clientes():
+    """Devuelve todos los usernames + vencimiento de una sola vez (sin paginación).
+    Solo para uso interno del reporte_diario.py."""
+    db = get_db()
+    c = db.cursor()
+    c.execute("SELECT username, vencimiento FROM clientes ORDER BY username ASC")
+    rows = fetchall(c)
+    db.close()
+    return jsonify({'clientes': rows, 'total': len(rows)})
+
 # ── API: CLIENTES ─────────────────────────────────────────────────────────────
 @app.route('/api/clientes')
 @login_required
@@ -402,7 +415,7 @@ def clientes():
     total = fetchone(c)['c']
     c.execute(qmark(f"""
         SELECT username, nombre, contacto, vencimiento, referido, total_pagado, notas
-        FROM clientes {where_sql} ORDER BY vencimiento DESC LIMIT ? OFFSET ?
+        FROM clientes {where_sql} ORDER BY vencimiento DESC, username ASC LIMIT ? OFFSET ?
     """), params + [per_page, offset])
     rows = fetchall(c)
     db.close()
@@ -848,4 +861,5 @@ if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
 
