@@ -454,6 +454,24 @@ def actualizar_cliente(username):
     data = request.json
     db = get_db()
     c = db.cursor()
+
+    # Cambio de username (solo admin)
+    nuevo_username = data.get('nuevo_username', '').strip()
+    if nuevo_username and nuevo_username != username:
+        if session.get('rol') != 'admin':
+            db.close()
+            return jsonify({'error': 'Sin permiso para cambiar username'}), 403
+        # Verificar que el nuevo username no exista
+        c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (nuevo_username,))
+        if fetchone(c):
+            db.close()
+            return jsonify({'error': 'Ese username ya está en uso'}), 409
+        # Actualizar pagos primero (FK)
+        c.execute(qmark("UPDATE pagos SET username=? WHERE username=?"), (nuevo_username, username))
+        # Actualizar cliente
+        c.execute(qmark("UPDATE clientes SET username=? WHERE username=?"), (nuevo_username, username))
+        username = nuevo_username  # usar el nuevo para el resto de campos
+
     fields, params = [], []
     for field in ['nombre', 'contacto', 'vencimiento', 'referido', 'notas']:
         if field in data:
@@ -462,9 +480,10 @@ def actualizar_cliente(username):
     if fields:
         params.append(username)
         c.execute(qmark(f"UPDATE clientes SET {', '.join(fields)} WHERE username=?"), params)
-        db.commit()
+
+    db.commit()
     db.close()
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'nuevo_username': username})
 
 @app.route('/api/clientes/<username>', methods=['DELETE'])
 @login_required
@@ -829,3 +848,4 @@ if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
