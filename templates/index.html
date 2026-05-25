@@ -992,6 +992,14 @@ async function openModal(username) {
 
     <div class="pago-form" id="edit-form-${username}">
       <h3>✏️ Editar datos</h3>
+      ${esAdmin ? `
+      <div class="form-group" style="margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:6px;">
+          🔑 Username
+          <span style="font-size:10px;color:var(--yellow);background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);padding:2px 7px;border-radius:6px;">Solo admin</span>
+        </label>
+        <input type="text" id="edit-username" value="${username}" placeholder="username" style="font-family:monospace;font-size:14px;">
+      </div>` : ''}
       <div class="form-row">
         <div class="form-group">
           <label>Nombre</label>
@@ -1059,10 +1067,21 @@ async function guardarEdicion(username) {
   const vencimiento= document.getElementById('edit-vencimiento').value || null;
   const referido   = document.getElementById('edit-referido').value;
   const notas      = document.getElementById('edit-notas').value.trim();
+  const usernameEl = document.getElementById('edit-username');
+  const nuevo_username = usernameEl ? usernameEl.value.trim() : username;
+
+  // Advertencia si cambia el username
+  if (nuevo_username && nuevo_username !== username) {
+    if (!confirm(`¿Cambiar el username de "${username}" a "${nuevo_username}"?\n\nEsto actualizará también todo el historial de pagos.`)) return;
+  }
+
+  const body = { nombre, contacto, vencimiento, referido, notas };
+  if (nuevo_username && nuevo_username !== username) body.nuevo_username = nuevo_username;
+
   const r = await fetch(`/api/clientes/${username}`, {
     method: 'PUT',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ nombre, contacto, vencimiento, referido, notas })
+    body: JSON.stringify(body)
   });
   const d = await r.json();
   if (d.ok) {
@@ -1070,7 +1089,7 @@ async function guardarEdicion(username) {
     showToast('✅ Datos actualizados');
     loadClientes(true);
   } else {
-    showToast('❌ Error al guardar');
+    showToast('❌ ' + (d.error || 'Error al guardar'));
   }
 }
 
@@ -1623,4 +1642,3 @@ function renderTablaTrimestral(ventas) {
 </script>
 </body>
 </html>
-
