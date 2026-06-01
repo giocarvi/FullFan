@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
 import os
 from datetime import date, datetime, timezone, timedelta
 from functools import wraps
@@ -751,6 +751,159 @@ def analytics():
     })
 
 
+# ── EXPORTAR EXCEL ───────────────────────────────────────────────────────────
+@app.route('/api/admin/exportar-clientes')
+@login_required
+def exportar_clientes():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from io import BytesIO
+    except ImportError:
+        return jsonify({'error': 'openpyxl no instalado. Ejecuta: pip install openpyxl'}), 500
+
+    db = get_db()
+    c = db.cursor()
+
+    # Traer todos los clientes con su último pago
+    if PG:
+        c.execute("""
+            SELECT cl.username, cl.nombre, cl.contacto, cl.vencimiento,
+                   cl.total_pagado,
+                   MAX(p.mes) as ultimo_pago,
+                   COUNT(p.id) as num_pagos
+            FROM clientes cl
+            LEFT JOIN pagos p ON p.username = cl.username
+            GROUP BY cl.username, cl.nombre, cl.contacto, cl.vencimiento, cl.total_pagado
+            ORDER BY cl.vencimiento DESC NULLS LAST, cl.username ASC
+        """)
+    else:
+        c.execute("""
+            SELECT cl.username, cl.nombre, cl.contacto, cl.vencimiento,
+                   cl.total_pagado,
+                   MAX(p.mes) as ultimo_pago,
+                   COUNT(p.id) as num_pagos
+            FROM clientes cl
+            LEFT JOIN pagos p ON p.username = cl.username
+            GROUP BY cl.username, cl.nombre, cl.contacto, cl.vencimiento, cl.total_pagado
+            ORDER BY CASE WHEN cl.vencimiento IS NULL THEN 1 ELSE 0 END, cl.vencimiento DESC, cl.username ASC
+        """)
+    rows = fetchall(c)
+    db.close()
+
+    # Crear Excel
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Clientes Full Fan"
+
+    # Colores
+    HEADER_FILL  = PatternFill("solid", fgColor="1A1A2E")
+    ACCENT_FILL  = PatternFill("solid", fgColor="6C63FF")
+    ALT_FILL     = PatternFill("solid", fgColor="F0F4FF")
+    GREEN_FILL   = PatternFill("solid", fgColor="D1FAE5")
+    RED_FILL     = PatternFill("solid", fgColor="FEE2E2")
+    YELLOW_FILL  = PatternFill("solid", fgColor="FEF9C3")
+    WHITE_FILL   = PatternFill("solid", fgColor="FFFFFF")
+    thin = Side(style='thin', color="E2E8F0")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    today_str = today_gt().isoformat()
+
+    # Título
+    ws.merge_cells("A1:G1")
+    title_cell = ws["A1"]
+    title_cell.value = f"Full Fan Digital TV — Listado de Clientes  ({today_str})"
+    title_cell.font = Font(bold=True, size=14, color="FFFFFF")
+    title_cell.fill = HEADER_FILL
+    title_cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 30
+
+    # Encabezados
+    headers = ["Nombre", "Usuario", "Teléfono", "Vencimiento", "Último Pago", "Total Pagado (Q)", "# Pagos"]
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=col, value=h)
+        cell.font = Font(bold=True, size=11, color="FFFFFF")
+        cell.fill = ACCENT_FILL
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = border
+    ws.row_dimensions[2].height = 22
+
+    # Anchos de columna
+    col_widths = [28, 22, 16, 16, 16, 18, 10]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+
+    # Filas
+    for row_idx, r in enumerate(rows, 3):
+        venc = r.get('vencimiento') or ''
+        # Color de fila según vencimiento
+        if not venc:
+            row_fill = WHITE_FILL
+        elif venc < today_str:
+            row_fill = RED_FILL
+        elif venc <= (today_gt() + timedelta(days=7)).isoformat():
+            row_fill = YELLOW_FILL
+        else:
+            row_fill = GREEN_FILL if row_idx % 2 == 0 else WHITE_FILL
+
+        ultimo_pago = r.get('ultimo_pago') or ''
+        if ultimo_pago and len(str(ultimo_pago)) >= 10:
+            ultimo_pago = str(ultimo_pago)[:10]
+
+        valores = [
+            r.get('nombre') or '',
+            r.get('username') or '',
+            r.get('contacto') or '',
+            venc[:10] if venc else '',
+            ultimo_pago,
+            round(float(r.get('total_pagado') or 0), 2),
+            int(r.get('num_pagos') or 0),
+        ]
+        for col, val in enumerate(valores, 1):
+            cell = ws.cell(row=row_idx, column=col, value=val)
+            cell.fill = row_fill
+            cell.border = border
+            cell.alignment = Alignment(vertical="center",
+                                       horizontal="right" if col >= 6 else "left")
+            if col == 6:
+                cell.number_format = '#,##0.00'
+        ws.row_dimensions[row_idx].height = 18
+
+    # Fila de totales
+    total_row = len(rows) + 3
+    ws.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True, size=11)
+    ws.cell(row=total_row, column=1).fill = HEADER_FILL
+    ws.cell(row=total_row, column=1).font = Font(bold=True, color="FFFFFF")
+    total_q = round(sum(float(r.get('total_pagado') or 0) for r in rows), 2)
+    total_n = sum(int(r.get('num_pagos') or 0) for r in rows)
+    for col in range(1, 8):
+        cell = ws.cell(row=total_row, column=col)
+        cell.fill = HEADER_FILL
+        cell.border = border
+        cell.font = Font(bold=True, color="FFFFFF")
+        if col == 1:
+            cell.value = f"TOTAL — {len(rows)} clientes"
+        elif col == 6:
+            cell.value = total_q
+            cell.number_format = '#,##0.00'
+        elif col == 7:
+            cell.value = total_n
+
+    # Guardar en memoria
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"clientes_fullfan_{today_str}.xlsx"
+    return Response(
+        buf.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 # ── CONFIGURACIÓN ─────────────────────────────────────────────────────────────
 @app.route('/api/config', methods=['GET'])
 @login_required
@@ -861,5 +1014,4 @@ if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
-
 
