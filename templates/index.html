@@ -633,6 +633,14 @@ body {
     <button class="config-save-btn" onclick="saveConfig()">💾 Guardar cambios</button>
     <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display:none" onchange="reimportarExcel(this)">
     <button class="config-save-btn" style="background:#6c3483;margin-top:8px" onclick="document.getElementById('excel-upload').click()">🔄 Reimportar desde Excel</button>
+
+    <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:20px;">
+      <h3 style="font-size:14px;color:var(--muted);margin-bottom:10px;">📤 Exportar</h3>
+      <button class="config-save-btn" id="export-btn" style="background:linear-gradient(135deg,#10b981,#059669);" onclick="exportarClientes()">
+        📊 Descargar listado de clientes (.xlsx)
+      </button>
+      <p style="font-size:12px;color:var(--muted);margin-top:8px;">Incluye: Nombre, Usuario, Teléfono, Vencimiento, Último Pago, Total Pagado y Nº de pagos.</p>
+    </div>
   </div>
 </div>
 {% endif %}
@@ -1364,6 +1372,37 @@ async function saveConfig() {
     showToast('✅ Configuración guardada');
   } else {
     showToast('❌ Error al guardar');
+  }
+}
+
+async function exportarClientes() {
+  const btn = document.getElementById('export-btn');
+  const original = btn.innerHTML;
+  btn.innerHTML = '⏳ Generando...';
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/admin/exportar-clientes');
+    if (!r.ok) {
+      const d = await r.json();
+      showToast('❌ ' + (d.error || 'Error al exportar'));
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = localDateStr();
+    a.href = url;
+    a.download = `clientes_fullfan_${today}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✅ Archivo descargado');
+  } catch(e) {
+    showToast('❌ Error de conexión');
+  } finally {
+    btn.innerHTML = original;
+    btn.disabled = false;
   }
 }
 
