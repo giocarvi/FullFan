@@ -1383,8 +1383,20 @@ async function exportarClientes() {
   try {
     const r = await fetch('/api/admin/exportar-clientes');
     if (!r.ok) {
-      const d = await r.json();
-      showToast('❌ ' + (d.error || 'Error al exportar'));
+      let msg = `Error ${r.status}`;
+      try {
+        const ct = r.headers.get('content-type') || '';
+        if (ct.includes('json')) {
+          const d = await r.json();
+          msg = d.error || msg;
+        } else {
+          const txt = await r.text();
+          // Extraer mensaje de error de Flask si es HTML
+          const m = txt.match(/<title>(.*?)<\/title>/i) || txt.match(/Error.*?:/i);
+          msg = m ? m[1] || m[0] : `Error ${r.status}`;
+        }
+      } catch(e2) {}
+      showToast('❌ ' + msg);
       return;
     }
     const blob = await r.blob();
@@ -1399,7 +1411,7 @@ async function exportarClientes() {
     URL.revokeObjectURL(url);
     showToast('✅ Archivo descargado');
   } catch(e) {
-    showToast('❌ Error de conexión');
+    showToast('❌ Error de red: ' + e.message);
   } finally {
     btn.innerHTML = original;
     btn.disabled = false;
