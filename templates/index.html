@@ -432,6 +432,7 @@ body {
 .config-save-btn:hover { opacity: .9; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -1384,34 +1385,46 @@ async function exportarClientes() {
     const r = await fetch('/api/admin/exportar-clientes');
     if (!r.ok) {
       let msg = `Error ${r.status}`;
-      try {
-        const ct = r.headers.get('content-type') || '';
-        if (ct.includes('json')) {
-          const d = await r.json();
-          msg = d.error || msg;
-        } else {
-          const txt = await r.text();
-          // Extraer mensaje de error de Flask si es HTML
-          const m = txt.match(/<title>(.*?)<\/title>/i) || txt.match(/Error.*?:/i);
-          msg = m ? m[1] || m[0] : `Error ${r.status}`;
-        }
-      } catch(e2) {}
-      showToast('❌ ' + msg);
-      return;
+      try { const d = await r.json(); msg = d.error || msg; } catch(e2) {}
+      showToast('❌ ' + msg); return;
     }
-    const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const d = await r.json();
+    const clientes = d.clientes || [];
     const today = localDateStr();
-    a.href = url;
-    a.download = `clientes_fullfan_${today}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    // Construir filas
+    const headers = ['Nombre','Usuario','Teléfono','Vencimiento','Último Pago','Total Pagado (Q)','# Pagos'];
+    const data = [headers];
+    for (const c of clientes) {
+      const venc = (c.vencimiento || '').substring(0, 10);
+      const ultp = (c.ultimo_pago || '').substring(0, 10);
+      data.push([
+        c.nombre    || '',
+        c.username  || '',
+        c.contacto  || '',
+        venc,
+        ultp,
+        parseFloat(c.total_pagado || 0),
+        parseInt(c.num_pagos || 0),
+      ]);
+    }
+    // Fila de totales
+    const totalQ = clientes.reduce((s, c) => s + parseFloat(c.total_pagado || 0), 0);
+    const totalN = clientes.reduce((s, c) => s + parseInt(c.num_pagos || 0), 0);
+    data.push([`TOTAL — ${clientes.length} clientes`, '', '', '', '', Math.round(totalQ * 100) / 100, totalN]);
+
+    // Crear libro Excel con SheetJS
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Anchos de columna
+    ws['!cols'] = [28,22,16,16,16,18,10].map(w => ({wch: w}));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes Full Fan');
+    XLSX.writeFile(wb, `clientes_fullfan_${today}.xlsx`);
     showToast('✅ Archivo descargado');
   } catch(e) {
-    showToast('❌ Error de red: ' + e.message);
+    showToast('❌ ' + e.message);
   } finally {
     btn.innerHTML = original;
     btn.disabled = false;
