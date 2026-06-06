@@ -751,6 +751,50 @@ def analytics():
     })
 
 
+# ── CLIENTES NUEVOS POR RANGO ─────────────────────────────────────────────────
+@app.route('/api/admin/clientes-nuevos')
+@login_required
+def clientes_nuevos():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    desde = request.args.get('desde', '')
+    hasta = request.args.get('hasta', '')
+    if not desde or not hasta:
+        return jsonify({'error': 'Parámetros desde y hasta requeridos'}), 400
+    db = get_db()
+    c = db.cursor()
+    if PG:
+        c.execute("""
+            SELECT cl.username, cl.nombre, cl.contacto, cl.vencimiento,
+                   cl.total_pagado, cl.created_at,
+                   COUNT(p.id) as num_pagos,
+                   MAX(p.mes) as ultimo_pago
+            FROM clientes cl
+            LEFT JOIN pagos p ON p.username = cl.username
+            WHERE SUBSTRING(cl.created_at, 1, 10) >= %s
+              AND SUBSTRING(cl.created_at, 1, 10) <= %s
+            GROUP BY cl.username, cl.nombre, cl.contacto,
+                     cl.vencimiento, cl.total_pagado, cl.created_at
+            ORDER BY cl.created_at ASC
+        """, (desde, hasta))
+    else:
+        c.execute("""
+            SELECT cl.username, cl.nombre, cl.contacto, cl.vencimiento,
+                   cl.total_pagado, cl.created_at,
+                   COUNT(p.id) as num_pagos,
+                   MAX(p.mes) as ultimo_pago
+            FROM clientes cl
+            LEFT JOIN pagos p ON p.username = cl.username
+            WHERE substr(cl.created_at, 1, 10) >= ?
+              AND substr(cl.created_at, 1, 10) <= ?
+            GROUP BY cl.username, cl.nombre, cl.contacto,
+                     cl.vencimiento, cl.total_pagado, cl.created_at
+            ORDER BY cl.created_at ASC
+        """, (desde, hasta))
+    rows = fetchall(c)
+    db.close()
+    return jsonify({'clientes': rows, 'total': len(rows), 'desde': desde, 'hasta': hasta})
+
 # ── EXPORTAR CLIENTES (datos JSON para generar Excel en el frontend) ──────────
 @app.route('/api/admin/exportar-clientes')
 @login_required
