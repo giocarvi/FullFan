@@ -637,10 +637,52 @@ body {
 
     <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:20px;">
       <h3 style="font-size:14px;color:var(--muted);margin-bottom:10px;">📤 Exportar</h3>
+
+      <!-- Todos los clientes -->
       <button class="config-save-btn" id="export-btn" style="background:linear-gradient(135deg,#10b981,#059669);" onclick="exportarClientes()">
-        📊 Descargar listado de clientes (.xlsx)
+        📊 Descargar listado completo de clientes (.xlsx)
       </button>
-      <p style="font-size:12px;color:var(--muted);margin-top:8px;">Incluye: Nombre, Usuario, Teléfono, Vencimiento, Último Pago, Total Pagado y Nº de pagos.</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:6px;margin-bottom:18px;">Incluye: Nombre, Usuario, Teléfono, Vencimiento, Último Pago, Total Pagado y Nº de pagos.</p>
+
+      <!-- Clientes nuevos por rango -->
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+        <h4 style="font-size:13px;font-weight:700;margin-bottom:12px;">🆕 Clientes nuevos por rango de fechas</h4>
+        <div class="form-row" style="margin-bottom:10px;">
+          <div class="form-group">
+            <label>Desde</label>
+            <input type="date" id="nuevos-desde">
+          </div>
+          <div class="form-group">
+            <label>Hasta</label>
+            <input type="date" id="nuevos-hasta">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="config-save-btn" id="nuevos-ver-btn" style="background:var(--accent);margin-top:0;flex:1;" onclick="verClientesNuevos()">
+            🔍 Ver en pantalla
+          </button>
+          <button class="config-save-btn" id="nuevos-export-btn" style="background:linear-gradient(135deg,#10b981,#059669);margin-top:0;flex:1;" onclick="exportarClientesNuevos()">
+            📥 Descargar Excel
+          </button>
+        </div>
+        <!-- Resultado -->
+        <div id="nuevos-resultado" style="margin-top:14px;display:none;">
+          <div id="nuevos-resumen" style="font-size:13px;color:var(--muted);margin-bottom:8px;"></div>
+          <div style="overflow-x:auto;">
+            <table class="analytics-table" id="nuevos-tabla">
+              <thead><tr>
+                <th style="text-align:left">Nombre</th>
+                <th style="text-align:left">Usuario</th>
+                <th>Teléfono</th>
+                <th>Registrado</th>
+                <th>Vencimiento</th>
+                <th>Total (Q)</th>
+              </tr></thead>
+              <tbody id="nuevos-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1279,6 +1321,14 @@ async function loadConfig() {
 }
 
 function loadConfigView() {
+  // Precargar fechas del rango de clientes nuevos (primer día del mes hasta hoy)
+  const hoy = localDateStr();
+  const primerDia = hoy.substring(0,8) + '01';
+  const desdeEl = document.getElementById('nuevos-desde');
+  const hastaEl = document.getElementById('nuevos-hasta');
+  if (desdeEl && !desdeEl.value) desdeEl.value = primerDia;
+  if (hastaEl && !hastaEl.value) hastaEl.value = hoy;
+
   const cfg = window._appConfig;
   const set = (id, key, def) => {
     const el = document.getElementById(id);
@@ -1428,6 +1478,97 @@ async function exportarClientes() {
   } finally {
     btn.innerHTML = original;
     btn.disabled = false;
+  }
+}
+
+// ── CLIENTES NUEVOS ──────────────────────────────────────────────────────────
+async function fetchClientesNuevos() {
+  const desde = document.getElementById('nuevos-desde').value;
+  const hasta = document.getElementById('nuevos-hasta').value;
+  if (!desde || !hasta) { showToast('⚠️ Selecciona las fechas'); return null; }
+  if (desde > hasta)    { showToast('⚠️ La fecha desde no puede ser mayor que hasta'); return null; }
+  const r = await fetch(`/api/admin/clientes-nuevos?desde=${desde}&hasta=${hasta}`);
+  if (!r.ok) {
+    let msg = `Error ${r.status}`;
+    try { const d = await r.json(); msg = d.error || msg; } catch(e) {}
+    showToast('❌ ' + msg); return null;
+  }
+  return await r.json();
+}
+
+async function verClientesNuevos() {
+  const btn = document.getElementById('nuevos-ver-btn');
+  btn.disabled = true; btn.innerHTML = '⏳ Cargando...';
+  try {
+    const d = await fetchClientesNuevos();
+    if (!d) return;
+    const { clientes, desde, hasta } = d;
+    const res = document.getElementById('nuevos-resultado');
+    res.style.display = 'block';
+    document.getElementById('nuevos-resumen').innerHTML =
+      `<strong style="color:var(--accent2)">${clientes.length} cliente${clientes.length!==1?'s':''}</strong> registrado${clientes.length!==1?'s':''} entre <strong>${desde}</strong> y <strong>${hasta}</strong>`;
+    const tbody = document.getElementById('nuevos-tbody');
+    if (!clientes.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:16px">Sin resultados en ese rango</td></tr>';
+      return;
+    }
+    tbody.innerHTML = clientes.map(c => {
+      const reg = (c.created_at || '').substring(0, 10);
+      const venc = (c.vencimiento || '').substring(0, 10);
+      const total = parseFloat(c.total_pagado || 0).toLocaleString('es-GT', {minimumFractionDigits:2});
+      return `<tr>
+        <td style="text-align:left">${c.nombre || '—'}</td>
+        <td style="text-align:left;font-family:monospace">${c.username}</td>
+        <td>${c.contacto || '—'}</td>
+        <td>${reg}</td>
+        <td>${venc || '—'}</td>
+        <td>Q${total}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    showToast('❌ ' + e.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '🔍 Ver en pantalla';
+  }
+}
+
+async function exportarClientesNuevos() {
+  const btn = document.getElementById('nuevos-export-btn');
+  btn.disabled = true; btn.innerHTML = '⏳ Generando...';
+  try {
+    const d = await fetchClientesNuevos();
+    if (!d) return;
+    const { clientes, desde, hasta } = d;
+    if (!clientes.length) { showToast('⚠️ Sin clientes en ese rango'); return; }
+
+    const headers = ['Nombre','Usuario','Teléfono','Fecha Registro','Vencimiento','Total Pagado (Q)','# Pagos'];
+    const data = [headers];
+    for (const c of clientes) {
+      data.push([
+        c.nombre    || '',
+        c.username  || '',
+        c.contacto  || '',
+        (c.created_at || '').substring(0, 10),
+        (c.vencimiento || '').substring(0, 10),
+        parseFloat(c.total_pagado || 0),
+        parseInt(c.num_pagos || 0),
+      ]);
+    }
+    const totalQ = clientes.reduce((s,c) => s + parseFloat(c.total_pagado||0), 0);
+    data.push([`TOTAL — ${clientes.length} clientes`, '', '', '', '',
+               Math.round(totalQ*100)/100,
+               clientes.reduce((s,c) => s + parseInt(c.num_pagos||0), 0)]);
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [28,22,16,16,16,18,10].map(w => ({wch:w}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Clientes Nuevos');
+    XLSX.writeFile(wb, `clientes_nuevos_${desde}_${hasta}.xlsx`);
+    showToast('✅ Archivo descargado');
+  } catch(e) {
+    showToast('❌ ' + e.message);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '📥 Descargar Excel';
   }
 }
 
