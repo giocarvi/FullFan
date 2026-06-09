@@ -629,6 +629,10 @@ body {
         <label>❌ Servicio vencido</label>
         <textarea id="cfg-wa-vencido"></textarea>
       </div>
+      <div class="config-group">
+        <label>📲 Nuevo número <span style="font-size:11px;color:var(--muted);font-weight:400;">(deja vacío para ocultar el botón)</span></label>
+        <textarea id="cfg-wa-nuevo-numero" placeholder="Ej: Hola {nombre}, te informamos que nuestro nuevo número a partir del 9 de junio, 2026, es el 47341871. ¡Gracias por preferirnos! 📺"></textarea>
+      </div>
     </div>
 
     <button class="config-save-btn" onclick="saveConfig()">💾 Guardar cambios</button>
@@ -1017,6 +1021,7 @@ async function openModal(username) {
         <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_recordatorio || 'Hola {nombre}, tu servicio vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'))}" target="_blank" rel="noopener">⚠️ Recordatorio</a>
         <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺'))}" target="_blank" rel="noopener">✅ Confirmar pago</a>
         <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_vencido || 'Hola {nombre}, tu servicio ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'))}" target="_blank" rel="noopener">❌ Servicio vencido</a>
+        ${cfg.wa_nuevo_numero ? `<a class="wa-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border-color:rgba(245,158,11,0.35);" href="${waBase}?text=${encMsg(waFill(cfg.wa_nuevo_numero))}" target="_blank" rel="noopener">📲 Nuevo número</a>` : ''}
       </div>
     </div>` : '';
 
@@ -1339,6 +1344,7 @@ function loadConfigView() {
   set('cfg-wa-recordatorio', 'wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺');
   set('cfg-wa-confirmar-pago', 'wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺');
   set('cfg-wa-vencido', 'wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜');
+  set('cfg-wa-nuevo-numero', 'wa_nuevo_numero', '');
 }
 
 function cerrarModalPassword() {
@@ -1412,6 +1418,7 @@ async function saveConfig() {
     wa_recordatorio: get('cfg-wa-recordatorio'),
     wa_confirmar_pago: get('cfg-wa-confirmar-pago'),
     wa_vencido: get('cfg-wa-vencido'),
+    wa_nuevo_numero: get('cfg-wa-nuevo-numero'),
   };
   const r = await fetch('/api/config', {
     method: 'POST',
@@ -1825,25 +1832,3 @@ function renderTablaTrimestral(ventas) {
 
   const rows = Object.entries(byQ).slice(-12); // last 12 quarters
   const grandTotal = rows.reduce((s,[,v]) => s + v.total, 0);
-
-  document.getElementById('tabla-trimestral').innerHTML = `
-    <table class="analytics-table">
-      <thead><tr><th>Trimestre</th><th>Ingresos</th><th>Pagos</th><th>Clientes</th></tr></thead>
-      <tbody>
-        ${rows.map(([q,v]) => `<tr>
-          <td>${q}</td>
-          <td>Q${Math.round(v.total).toLocaleString()}</td>
-          <td>${v.pagos}</td>
-          <td>${v.clientes}</td>
-        </tr>`).join('')}
-        <tr class="total-row">
-          <td>TOTAL</td>
-          <td>Q${Math.round(grandTotal).toLocaleString()}</td>
-          <td></td><td></td>
-        </tr>
-      </tbody>
-    </table>`;
-}
-</script>
-</body>
-</html>
