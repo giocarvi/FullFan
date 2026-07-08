@@ -856,8 +856,16 @@ def api_activation_tasks():
         LIMIT 100
     """), params)
     rows = fetchall(c)
+    c.execute("""
+        SELECT status, COUNT(*) as total
+        FROM activation_tasks
+        GROUP BY status
+    """)
+    counts_rows = fetchall(c)
+    counts = {r['status']: r['total'] for r in counts_rows}
+    counts['open'] = counts.get('pending', 0) + counts.get('in_progress', 0)
     db.close()
-    return jsonify({'tasks': rows})
+    return jsonify({'tasks': rows, 'counts': counts, 'status': status})
 
 
 @app.route('/api/activation-tasks', methods=['POST'])
