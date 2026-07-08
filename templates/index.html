@@ -450,6 +450,15 @@ body {
 .ops-btn-secondary { background: #374151; }
 .ops-btn-success { background: #10b981; }
 .ops-btn-danger { background: #ef4444; }
+.ops-tabs { display:flex; gap:8px; flex-wrap:wrap; margin: 0 0 12px; }
+.ops-tab { background: var(--card2); color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 8px 12px; cursor:pointer; font-size: 12px; font-weight:700; }
+.ops-tab.active { color:#fff; background: rgba(255,106,0,.22); border-color: rgba(255,200,87,.55); }
+.activation-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:1200; align-items:center; justify-content:center; padding:18px; }
+.activation-modal.open { display:flex; }
+.activation-modal-card { width:100%; max-width:420px; background:var(--card); border:1px solid var(--border); border-radius:18px; padding:20px; box-shadow:0 20px 55px rgba(0,0,0,.4); }
+.activation-modal-card h3 { margin:0 0 14px; color:var(--text); font-size:17px; }
+.activation-modal-card label { display:block; font-size:12px; color:var(--muted); margin:10px 0 5px; font-weight:700; }
+.activation-modal-card input, .activation-modal-card textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:10px; box-sizing:border-box; }
 @media (max-width: 640px) { .ops-form { grid-template-columns: 1fr; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -591,6 +600,13 @@ body {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
         <h3 style="margin:0;">📋 Cola pendiente</h3>
         <button class="ops-btn-secondary" onclick="loadActivationTasks()" style="border:none;border-radius:10px;padding:9px 12px;color:#fff;cursor:pointer;">Actualizar</button>
+      </div>
+      <div class="ops-tabs" id="activation-tabs">
+        <button class="ops-tab active" data-status="open">Abiertas <span id="act-count-open"></span></button>
+        <button class="ops-tab" data-status="pending">Pendientes <span id="act-count-pending"></span></button>
+        <button class="ops-tab" data-status="in_progress">En proceso <span id="act-count-in_progress"></span></button>
+        <button class="ops-tab" data-status="blocked">Bloqueadas <span id="act-count-blocked"></span></button>
+        <button class="ops-tab" data-status="done">Completadas <span id="act-count-done"></span></button>
       </div>
       <div id="activation-list"><div class="loading">Cargando...</div></div>
     </div>
@@ -843,6 +859,27 @@ body {
   </div>
 </div>
 
+<!-- ACTIVATION ACTION MODAL -->
+<div class="activation-modal" id="activation-action-modal">
+  <div class="activation-modal-card">
+    <h3 id="activation-modal-title">Completar activación</h3>
+    <input type="hidden" id="activation-modal-task-id">
+    <input type="hidden" id="activation-modal-action">
+    <div id="activation-complete-fields">
+      <label>Usuario XUI</label>
+      <input id="activation-modal-xui-username" placeholder="Usuario creado o renovado">
+      <label>Nuevo vencimiento</label>
+      <input id="activation-modal-expires" type="date">
+    </div>
+    <label id="activation-notes-label">Notas internas</label>
+    <textarea id="activation-modal-notes" rows="3" placeholder="Notas opcionales"></textarea>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn-secondary" style="flex:1;" onclick="closeActivationActionModal()">Cancelar</button>
+      <button class="btn-primary" style="flex:1;" onclick="submitActivationActionModal()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- LIGHTBOX -->
 <div class="lightbox-overlay" id="lightbox-overlay" onclick="closeLightbox()">
   <button class="lightbox-close" onclick="closeLightbox()">✕</button>
@@ -860,6 +897,7 @@ function localDateStr() {
 let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', loadingClientes = false, totalClientes = 0;
 let searchTimeout;
 let activationPlansLoaded = false;
+let currentActivationStatus = 'open';
 window._appConfig = {};
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────────
@@ -912,13 +950,21 @@ async function loadActivationTasks() {
   const list = document.getElementById('activation-list');
   if (!list) return;
   list.innerHTML = '<div class="loading">Cargando...</div>';
-  const r = await fetch('/api/activation-tasks?status=open');
+  const r = await fetch(`/api/activation-tasks?status=${encodeURIComponent(currentActivationStatus)}`);
   const d = await r.json();
+  updateActivationCounts(d.counts || {});
   if (!d.tasks.length) {
-    list.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>No hay activaciones pendientes</p></div>';
+    list.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>No hay tareas en este filtro</p></div>';
     return;
   }
   list.innerHTML = d.tasks.map(t => activationTaskItem(t)).join('');
+}
+
+function updateActivationCounts(counts) {
+  ['open','pending','in_progress','blocked','done'].forEach(k => {
+    const el = document.getElementById(`act-count-${k}`);
+    if (el) el.textContent = counts[k] ? `(${counts[k]})` : '';
+  });
 }
 
 function activationTaskItem(t) {
@@ -942,8 +988,8 @@ function activationTaskItem(t) {
       ${t.notes ? `<div class="ops-task-meta" style="margin-top:8px;">Notas: ${t.notes}</div>` : ''}
       <div class="ops-actions">
         <button class="ops-btn-secondary" onclick="marcarActivationTask(${t.id}, 'in_progress')">Tomar</button>
-        <button class="ops-btn-success" onclick='completarActivationTask(${t.id}, ${JSON.stringify(t.username || '')})'>Completar</button>
-        <button class="ops-btn-danger" onclick="bloquearActivationTask(${t.id})">Bloquear</button>
+        <button class="ops-btn-success" onclick='openCompleteActivationModal(${t.id}, ${JSON.stringify(t.username || '')})'>Completar</button>
+        <button class="ops-btn-danger" onclick="openBlockActivationModal(${t.id})">Bloquear</button>
       </div>
     </div>`;
 }
@@ -974,6 +1020,8 @@ async function crearActivationTask() {
   document.getElementById('act-amount').value = '';
   document.getElementById('act-notes').value = '';
   showToast('✅ Tarea creada');
+  currentActivationStatus = 'open';
+  setActivationTabActive();
   loadActivationTasks();
 }
 
@@ -986,36 +1034,76 @@ async function marcarActivationTask(id, status) {
   loadActivationTasks();
 }
 
-async function completarActivationTask(id, username) {
-  const xui_username = prompt('Usuario XUI creado/renovado:', username || '');
-  if (xui_username === null) return;
-  const xui_expires_at = prompt('Nuevo vencimiento (YYYY-MM-DD):', localDateStr());
-  if (xui_expires_at === null) return;
-  const notes = prompt('Notas internas opcionales:', '') || '';
+function setActivationTabActive() {
+  document.querySelectorAll('#activation-tabs .ops-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.status === currentActivationStatus);
+  });
+}
+
+document.querySelectorAll('#activation-tabs .ops-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentActivationStatus = btn.dataset.status;
+    setActivationTabActive();
+    loadActivationTasks();
+  });
+});
+
+function openCompleteActivationModal(id, username) {
+  document.getElementById('activation-modal-task-id').value = id;
+  document.getElementById('activation-modal-action').value = 'done';
+  document.getElementById('activation-modal-title').textContent = 'Completar activación';
+  document.getElementById('activation-complete-fields').style.display = 'block';
+  document.getElementById('activation-notes-label').textContent = 'Notas internas';
+  document.getElementById('activation-modal-xui-username').value = username || '';
+  document.getElementById('activation-modal-expires').value = localDateStr();
+  document.getElementById('activation-modal-notes').value = '';
+  document.getElementById('activation-action-modal').classList.add('open');
+}
+
+function openBlockActivationModal(id) {
+  document.getElementById('activation-modal-task-id').value = id;
+  document.getElementById('activation-modal-action').value = 'blocked';
+  document.getElementById('activation-modal-title').textContent = 'Bloquear tarea';
+  document.getElementById('activation-complete-fields').style.display = 'none';
+  document.getElementById('activation-notes-label').textContent = 'Motivo del bloqueo';
+  document.getElementById('activation-modal-notes').value = '';
+  document.getElementById('activation-action-modal').classList.add('open');
+}
+
+function closeActivationActionModal() {
+  document.getElementById('activation-action-modal').classList.remove('open');
+}
+
+async function submitActivationActionModal() {
+  const id = document.getElementById('activation-modal-task-id').value;
+  const action = document.getElementById('activation-modal-action').value;
+  const notes = document.getElementById('activation-modal-notes').value.trim();
+  const body = {status: action};
+  if (action === 'done') {
+    body.xui_username = document.getElementById('activation-modal-xui-username').value.trim();
+    body.xui_expires_at = document.getElementById('activation-modal-expires').value;
+    body.notes = notes;
+    if (!body.xui_username || !body.xui_expires_at) {
+      alert('Usuario XUI y vencimiento son obligatorios.');
+      return;
+    }
+  } else if (action === 'blocked') {
+    body.blocked_reason = notes || 'Sin motivo especificado';
+  }
   const r = await fetch(`/api/activation-tasks/${id}`, {
     method: 'PUT',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({status: 'done', xui_username, xui_expires_at, notes})
+    body: JSON.stringify(body)
   });
   const d = await r.json();
   if (!r.ok) {
-    alert(d.error || 'No se pudo completar la tarea.');
+    alert(d.error || 'No se pudo actualizar la tarea.');
     return;
   }
-  showToast('✅ Activación completada');
+  closeActivationActionModal();
+  showToast(action === 'done' ? '✅ Activación completada' : '⚠️ Tarea bloqueada');
   loadActivationTasks();
   if (document.getElementById('view-dashboard').classList.contains('active')) loadDashboard();
-}
-
-async function bloquearActivationTask(id) {
-  const blocked_reason = prompt('Motivo del bloqueo:');
-  if (blocked_reason === null) return;
-  await fetch(`/api/activation-tasks/${id}`, {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({status: 'blocked', blocked_reason})
-  });
-  loadActivationTasks();
 }
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
@@ -1298,6 +1386,7 @@ async function openModal(username) {
         <label for="pago-comprobante" class="file-upload-label" id="comprobante-label">📎 Adjuntar imagen de pago</label>
       </div>
       <button class="btn-primary" onclick="registrarPago('${username}')">✅ Registrar pago</button>
+      <button class="btn-primary" style="margin-top:8px;background:linear-gradient(135deg,#FF6A00,#FFB000);" onclick="prepararRenovacionDesdeCliente(${JSON.stringify(username)})">🔥 Crear tarea de renovación</button>
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
     </div>
     <div class="section-divider">Historial de pagos</div>
@@ -1395,6 +1484,18 @@ async function registrarPago(username) {
     showToast('✅ Pago registrado correctamente');
     loadDashboard();
   }
+}
+
+async function prepararRenovacionDesdeCliente(username) {
+  closeModal();
+  switchView('activaciones');
+  await loadActivationPlans();
+  currentActivationStatus = 'open';
+  setActivationTabActive();
+  document.getElementById('act-username').value = username || '';
+  document.getElementById('act-type').value = 'renewal';
+  document.getElementById('act-amount').focus();
+  showToast('🔥 Renovación preparada');
 }
 
 async function openComprobante(pagoId) {
