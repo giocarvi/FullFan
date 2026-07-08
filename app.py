@@ -1046,6 +1046,7 @@ def analytics():
 
     db = get_db()
     c = db.cursor()
+    credit_cost_gtq = 12.0
 
     # Ventas mensuales (todo el tiempo)
     if PG:
@@ -1175,6 +1176,102 @@ def analytics():
         """, (mes_actual, mes_anterior))
     ventas_por_dia = fetchall(c)
 
+    # Operación Fénix: créditos, utilidad y tareas (mes actual)
+    if PG:
+        c.execute("""
+            SELECT
+                COALESCE(SUM(o.amount),0) as ingresos,
+                COALESCE(SUM(t.credits_to_consume),0) as creditos,
+                COUNT(*) as completadas
+            FROM activation_tasks t
+            LEFT JOIN orders o ON o.id = t.order_id
+            WHERE t.status = 'done'
+              AND SUBSTRING(COALESCE(t.completed_at, ''), 1, 7) = %s
+        """, (mes_actual,))
+    else:
+        c.execute("""
+            SELECT
+                COALESCE(SUM(o.amount),0) as ingresos,
+                COALESCE(SUM(t.credits_to_consume),0) as creditos,
+                COUNT(*) as completadas
+            FROM activation_tasks t
+            LEFT JOIN orders o ON o.id = t.order_id
+            WHERE t.status = 'done'
+              AND substr(COALESCE(t.completed_at, ''), 1, 7) = ?
+        """, (mes_actual,))
+    op_mes = fetchone(c)
+    op_ingresos = float(op_mes['ingresos'] or 0)
+    op_creditos = int(op_mes['creditos'] or 0)
+    op_costo = op_creditos * credit_cost_gtq
+    op_utilidad = op_ingresos - op_costo
+    op_margin = round((op_utilidad / op_ingresos) * 100, 1) if op_ingresos > 0 else 0
+
+    c.execute("""
+        SELECT status, COUNT(*) as total
+        FROM activation_tasks
+        GROUP BY status
+        ORDER BY status
+    """)
+    tareas_por_estado = fetchall(c)
+
+    if PG:
+        c.execute("""
+            SELECT
+                COALESCE(assigned_to, 'Sin asignar') as agente,
+                COUNT(*) as tareas,
+                COALESCE(SUM(CASE WHEN status = 'done' THEN credits_to_consume ELSE 0 END),0) as creditos,
+                COALESCE(SUM(CASE WHEN status = 'done' THEN o.amount ELSE 0 END),0) as ingresos
+            FROM activation_tasks t
+            LEFT JOIN orders o ON o.id = t.order_id
+            WHERE SUBSTRING(COALESCE(t.created_at, ''), 1, 7) = %s
+            GROUP BY agente
+            ORDER BY tareas DESC
+            LIMIT 10
+        """, (mes_actual,))
+    else:
+        c.execute("""
+            SELECT
+                COALESCE(assigned_to, 'Sin asignar') as agente,
+                COUNT(*) as tareas,
+                COALESCE(SUM(CASE WHEN status = 'done' THEN credits_to_consume ELSE 0 END),0) as creditos,
+                COALESCE(SUM(CASE WHEN status = 'done' THEN o.amount ELSE 0 END),0) as ingresos
+            FROM activation_tasks t
+            LEFT JOIN orders o ON o.id = t.order_id
+            WHERE substr(COALESCE(t.created_at, ''), 1, 7) = ?
+            GROUP BY agente
+            ORDER BY tareas DESC
+            LIMIT 10
+        """, (mes_actual,))
+    tareas_por_agente = fetchall(c)
+
+    if PG:
+        c.execute("""
+            SELECT
+                TO_CHAR(t.completed_at::timestamp, 'YYYY-MM') as m,
+                COALESCE(SUM(t.credits_to_consume),0) as creditos,
+                COALESCE(SUM(o.amount),0) as ingresos,
+                COUNT(*) as completadas
+            FROM activation_tasks t
+            LEFT JOIN orders o ON o.id = t.order_id
+            WHERE t.status = 'done' AND t.completed_at IS NOT NULL
+            GROUP BY m
+            ORDER BY m
+        """)
+    else:
+        c.execute("""
+            SELECT
+                strftime('%Y-%m', t.completed_at) as m,
+                COALESCE(SUM(t.credits_to_consume),0) as creditos,
+                COALESCE(SUM(o.amount),0) as ingresos,
+                COUNT(*) as completadas
+            FROM activation_tasks t
+            LEFT JOIN orders o ON o.id = t.order_id
+            WHERE t.status = 'done' AND t.completed_at IS NOT NULL
+            GROUP BY m
+            ORDER BY m
+        """)
+    operacion_mensual = fetchall(c)
+
     db.close()
 
     return jsonify({
@@ -1186,7 +1283,20 @@ def analytics():
         'no_renovaron': no_renovaron,
         'total_historico': total_historico,
         'total_clientes': total_clientes,
-        'ventas_por_dia': ventas_por_dia
+        'ventas_por_dia': ventas_por_dia,
+        'operacion': {
+            'mes': mes_actual,
+            'credit_cost_gtq': credit_cost_gtq,
+            'ingresos_mes': round(op_ingresos, 2),
+            'creditos_mes': op_creditos,
+            'costo_mes': round(op_costo, 2),
+            'utilidad_mes': round(op_utilidad, 2),
+            'margen_mes': op_margin,
+            'completadas_mes': int(op_mes['completadas'] or 0),
+            'tareas_por_estado': tareas_por_estado,
+            'tareas_por_agente': tareas_por_agente,
+            'operacion_mensual': operacion_mensual
+        }
     })
 
 
