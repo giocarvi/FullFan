@@ -430,6 +430,27 @@ body {
   cursor: pointer; width: 100%; margin-top: 4px;
 }
 .config-save-btn:hover { opacity: .9; }
+.ops-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.ops-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.ops-card h3 { font-size: 15px; margin-bottom: 12px; color: var(--accent); }
+.ops-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ops-form .full { grid-column: 1 / -1; }
+.ops-form input, .ops-form select, .ops-form textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); padding: 10px; font-size: 14px;
+}
+.ops-task { border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; background: var(--card2); }
+.ops-task-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.ops-task-title { font-weight: 700; color: var(--text); }
+.ops-task-meta { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.ops-pill { font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 999px; background: rgba(255,106,0,.18); color: #FFC857; white-space: nowrap; }
+.ops-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.ops-actions button { border: none; border-radius: 10px; padding: 9px 12px; font-weight: 700; cursor: pointer; color: #fff; }
+.ops-btn-primary { background: #FF6A00; }
+.ops-btn-secondary { background: #374151; }
+.ops-btn-success { background: #10b981; }
+.ops-btn-danger { background: #ef4444; }
+@media (max-width: 640px) { .ops-form { grid-template-columns: 1fr; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -539,6 +560,40 @@ body {
   </div>
   <div style="text-align:center;padding:10px 0;" id="load-more-wrap" style="display:none">
     <button class="btn-secondary" id="load-more-btn" style="width:auto;padding:10px 32px;">Cargar más</button>
+  </div>
+</div>
+
+<!-- ACTIVACIONES VIEW -->
+<div id="view-activaciones" class="view">
+  <div class="ops-grid">
+    <div class="ops-card">
+      <h3>🔥 Nueva tarea de activación / renovación</h3>
+      <div class="ops-form">
+        <input id="act-username" placeholder="Usuario del cliente, ej: juanperez01">
+        <select id="act-plan"></select>
+        <select id="act-type">
+          <option value="renewal">Renovación</option>
+          <option value="new">Cliente nuevo</option>
+        </select>
+        <input id="act-amount" type="number" min="0" step="0.01" placeholder="Monto pagado, ej: 90">
+        <select id="act-currency">
+          <option value="GTQ">GTQ</option>
+          <option value="USD">USD</option>
+        </select>
+        <input id="act-payment-method" placeholder="Método, ej: transferencia">
+        <textarea id="act-notes" class="full" rows="2" placeholder="Notas internas opcionales"></textarea>
+        <button class="config-save-btn full" onclick="crearActivationTask()">Crear tarea pendiente</button>
+      </div>
+      <p class="config-hint" style="margin-top:10px;">Esta cola no crea nada en XUI automáticamente. Sirve para controlar lo que el operador debe crear o renovar manualmente.</p>
+    </div>
+
+    <div class="ops-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
+        <h3 style="margin:0;">📋 Cola pendiente</h3>
+        <button class="ops-btn-secondary" onclick="loadActivationTasks()" style="border:none;border-radius:10px;padding:9px 12px;color:#fff;cursor:pointer;">Actualizar</button>
+      </div>
+      <div id="activation-list"><div class="loading">Cargando...</div></div>
+    </div>
   </div>
 </div>
 
@@ -700,6 +755,9 @@ body {
   <button class="nav-btn" data-view="clientes">
     <span class="icon">👥</span>Clientes
   </button>
+  <button class="nav-btn" data-view="activaciones">
+    <span class="icon">🔥</span>Activar
+  </button>
   {% if rol == 'admin' %}
   <button class="nav-btn" data-view="analytics">
     <span class="icon">📈</span>Análisis
@@ -801,6 +859,7 @@ function localDateStr() {
 // ── STATE ──────────────────────────────────────────────────────────────────
 let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', loadingClientes = false, totalClientes = 0;
 let searchTimeout;
+let activationPlansLoaded = false;
 window._appConfig = {};
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────────
@@ -822,13 +881,142 @@ function switchView(view, estado) {
     loadClientes(true);
   }
   if (view === 'dashboard') loadDashboard();
+  if (view === 'activaciones') {
+    loadActivationPlans();
+    loadActivationTasks();
+  }
   if (view === 'analytics') loadAnalytics();
   if (view === 'config') loadConfigView();
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
-  btn.addEventListener('click', () => switchView(btn.dataset.view));
+  if (btn.dataset.view) btn.addEventListener('click', () => switchView(btn.dataset.view));
 });
+
+// ── ACTIVACIONES / RENOVACIONES ──────────────────────────────────────────────
+async function loadActivationPlans() {
+  if (activationPlansLoaded) return;
+  const select = document.getElementById('act-plan');
+  if (!select) return;
+  select.innerHTML = '<option value="">Cargando planes...</option>';
+  const r = await fetch('/api/plans');
+  const d = await r.json();
+  select.innerHTML = '<option value="">Selecciona plan</option>' + d.plans.map(p => {
+    const price = p.price_gtq ? `Q${p.price_gtq}` : (p.price_usd ? `US$${p.price_usd}` : '');
+    return `<option value="${p.id}" data-credits="${p.credits_required}" data-price="${p.price_gtq || p.price_usd || ''}">${p.name} · ${p.credits_required} crédito${p.credits_required != 1 ? 's' : ''} ${price ? '· ' + price : ''}</option>`;
+  }).join('');
+  activationPlansLoaded = true;
+}
+
+async function loadActivationTasks() {
+  const list = document.getElementById('activation-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading">Cargando...</div>';
+  const r = await fetch('/api/activation-tasks?status=open');
+  const d = await r.json();
+  if (!d.tasks.length) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>No hay activaciones pendientes</p></div>';
+    return;
+  }
+  list.innerHTML = d.tasks.map(t => activationTaskItem(t)).join('');
+}
+
+function activationTaskItem(t) {
+  const tipo = t.task_type === 'create_line' ? 'Nuevo' : 'Renovación';
+  const monto = t.amount ? `${t.currency || 'GTQ'} ${Number(t.amount).toLocaleString()}` : 'Sin monto';
+  const vence = t.vencimiento || 'sin vencimiento actual';
+  const plan = t.plan_name || 'Plan no definido';
+  return `
+    <div class="ops-task">
+      <div class="ops-task-head">
+        <div>
+          <div class="ops-task-title">${t.nombre || t.username || 'Cliente'} · ${tipo}</div>
+          <div class="ops-task-meta">
+            Usuario: <b>${t.username || '—'}</b> · Tel: ${t.contacto || '—'}<br>
+            Plan: ${plan} · Créditos: ${t.credits_to_consume || 0} · Pago: ${monto}<br>
+            Vence actual: ${vence} · Creada: ${(t.created_at || '').substring(0, 16)}
+          </div>
+        </div>
+        <span class="ops-pill">${t.status}</span>
+      </div>
+      ${t.notes ? `<div class="ops-task-meta" style="margin-top:8px;">Notas: ${t.notes}</div>` : ''}
+      <div class="ops-actions">
+        <button class="ops-btn-secondary" onclick="marcarActivationTask(${t.id}, 'in_progress')">Tomar</button>
+        <button class="ops-btn-success" onclick='completarActivationTask(${t.id}, ${JSON.stringify(t.username || '')})'>Completar</button>
+        <button class="ops-btn-danger" onclick="bloquearActivationTask(${t.id})">Bloquear</button>
+      </div>
+    </div>`;
+}
+
+async function crearActivationTask() {
+  const username = document.getElementById('act-username').value.trim();
+  const plan_id = document.getElementById('act-plan').value;
+  const type = document.getElementById('act-type').value;
+  const amount = document.getElementById('act-amount').value || 0;
+  const currency = document.getElementById('act-currency').value;
+  const payment_method = document.getElementById('act-payment-method').value.trim() || 'manual';
+  const notes = document.getElementById('act-notes').value.trim();
+  if (!username || !plan_id) {
+    alert('Ingresa usuario y plan.');
+    return;
+  }
+  const r = await fetch('/api/activation-tasks', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username, plan_id, type, amount, currency, payment_method, notes})
+  });
+  const d = await r.json();
+  if (!r.ok) {
+    alert(d.error || 'No se pudo crear la tarea.');
+    return;
+  }
+  document.getElementById('act-username').value = '';
+  document.getElementById('act-amount').value = '';
+  document.getElementById('act-notes').value = '';
+  showToast('✅ Tarea creada');
+  loadActivationTasks();
+}
+
+async function marcarActivationTask(id, status) {
+  await fetch(`/api/activation-tasks/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status})
+  });
+  loadActivationTasks();
+}
+
+async function completarActivationTask(id, username) {
+  const xui_username = prompt('Usuario XUI creado/renovado:', username || '');
+  if (xui_username === null) return;
+  const xui_expires_at = prompt('Nuevo vencimiento (YYYY-MM-DD):', localDateStr());
+  if (xui_expires_at === null) return;
+  const notes = prompt('Notas internas opcionales:', '') || '';
+  const r = await fetch(`/api/activation-tasks/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: 'done', xui_username, xui_expires_at, notes})
+  });
+  const d = await r.json();
+  if (!r.ok) {
+    alert(d.error || 'No se pudo completar la tarea.');
+    return;
+  }
+  showToast('✅ Activación completada');
+  loadActivationTasks();
+  if (document.getElementById('view-dashboard').classList.contains('active')) loadDashboard();
+}
+
+async function bloquearActivationTask(id) {
+  const blocked_reason = prompt('Motivo del bloqueo:');
+  if (blocked_reason === null) return;
+  await fetch(`/api/activation-tasks/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: 'blocked', blocked_reason})
+  });
+  loadActivationTasks();
+}
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
 async function loadDashboard() {
