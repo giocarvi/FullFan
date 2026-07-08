@@ -179,10 +179,10 @@ def init_db():
         )''')
         defaults = [
             ('wa_prefijo', '502'),
-            ('wa_saludo', 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋'),
-            ('wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'),
-            ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺'),
-            ('wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'),
+            ('wa_saludo', 'Hola {nombre}, te saludamos de Fénix Digital TV 👋 Tu entretenimiento, sin fronteras.'),
+            ('wa_recordatorio', 'Hola {nombre}, tu servicio de Fénix Digital TV vence el {fecha}. Puedes renovar antes de la fecha para evitar interrupciones. ¡Gracias! 🔥'),
+            ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'),
+            ('wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥'),
         ]
         for clave, valor in defaults:
             c.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT DO NOTHING", (clave, valor))
@@ -193,13 +193,24 @@ def init_db():
         )''')
         defaults = [
             ('wa_prefijo', '502'),
-            ('wa_saludo', 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋'),
-            ('wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'),
-            ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺'),
-            ('wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'),
+            ('wa_saludo', 'Hola {nombre}, te saludamos de Fénix Digital TV 👋 Tu entretenimiento, sin fronteras.'),
+            ('wa_recordatorio', 'Hola {nombre}, tu servicio de Fénix Digital TV vence el {fecha}. Puedes renovar antes de la fecha para evitar interrupciones. ¡Gracias! 🔥'),
+            ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'),
+            ('wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥'),
         ]
         for clave, valor in defaults:
             c.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
+
+    # Rebrand suave: solo reemplaza plantillas antiguas que aún mencionen Full Fan.
+    brand_updates = [
+        ('wa_saludo', 'Hola {nombre}, te saludamos de Fénix Digital TV 👋 Tu entretenimiento, sin fronteras.'),
+        ('wa_recordatorio', 'Hola {nombre}, tu servicio de Fénix Digital TV vence el {fecha}. Puedes renovar antes de la fecha para evitar interrupciones. ¡Gracias! 🔥'),
+        ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'),
+        ('wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥'),
+    ]
+    for clave, valor in brand_updates:
+        c.execute(qmark("UPDATE configuracion SET valor=? WHERE clave=? AND valor LIKE ?"),
+                  (valor, clave, '%Full Fan%'))
 
     conn.commit()
 
