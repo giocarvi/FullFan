@@ -18,6 +18,8 @@ if not app.secret_key:
     raise RuntimeError('SECRET_KEY environment variable is required')
 
 PASSWORD_HASH_PREFIXES = ('scrypt:', 'pbkdf2:', 'argon2:')
+CREDIT_COST_USD = float(os.environ.get('CREDIT_COST_USD', '1.25'))
+USD_GTQ_RATE = float(os.environ.get('USD_GTQ_RATE', '7.80'))
 
 def hash_password(password):
     return generate_password_hash(password)
@@ -42,6 +44,28 @@ def maybe_upgrade_password_hash(cursor, username, stored_password, candidate_pas
 # ── BASE DE DATOS ─────────────────────────────────────────────────────────────
 # Si existe DATABASE_URL (Railway PostgreSQL), lo usa.
 # Si no, usa SQLite local.
+def estimate_credits_from_amount(amount):
+    """Estima créditos históricos desde los planes conocidos, sin alterar datos antiguos."""
+    try:
+        amount = float(amount or 0)
+    except (TypeError, ValueError):
+        return 0
+    if amount <= 0:
+        return 0
+    known_plans = [
+        (90, 1),
+        (225, 3),
+        (400, 6),
+        (700, 12),
+        (1000, 18),
+        (1300, 24),
+    ]
+    nearest_amount, nearest_credits = min(known_plans, key=lambda p: abs(amount - p[0]))
+    if abs(amount - nearest_amount) > 120:
+        return max(1, round(amount / 90))
+    return nearest_credits
+
+
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 if DATABASE_URL:
@@ -1038,6 +1062,44 @@ def api_update_activation_task(task_id):
     return jsonify({'ok': True})
 
 # ── API: ANALYTICS ────────────────────────────────────────────────────────────
+@app.route('/api/activation-tasks/<int:task_id>', methods=['DELETE'])
+@login_required
+def api_delete_activation_task(task_id):
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT * FROM activation_tasks WHERE id=?"), (task_id,))
+    task = fetchone(c)
+    if not task:
+        db.close()
+        return jsonify({'error': 'Tarea no encontrada'}), 404
+
+    pago_revertido = False
+    if task.get('order_id'):
+        c.execute(qmark("SELECT * FROM orders WHERE id=?"), (task['order_id'],))
+        order = fetchone(c)
+        if order and order.get('payment_id'):
+            c.execute(qmark("SELECT * FROM pagos WHERE id=?"), (order['payment_id'],))
+            pago = fetchone(c)
+            if pago:
+                c.execute(qmark("DELETE FROM pagos WHERE id=?"), (order['payment_id'],))
+                if PG:
+                    c.execute("UPDATE clientes SET total_pagado = GREATEST(total_pagado - %s, 0) WHERE username=%s",
+                              (float(pago.get('monto') or 0), pago['username']))
+                else:
+                    c.execute("UPDATE clientes SET total_pagado = MAX(total_pagado - ?, 0) WHERE username=?",
+                              (float(pago.get('monto') or 0), pago['username']))
+                pago_revertido = True
+
+    c.execute(qmark("DELETE FROM activation_tasks WHERE id=?"), (task_id,))
+    if task.get('order_id'):
+        c.execute(qmark("DELETE FROM orders WHERE id=?"), (task['order_id'],))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'pago_revertido': pago_revertido})
+
+
 @app.route('/api/analytics')
 @login_required
 def analytics():
@@ -1046,7 +1108,9 @@ def analytics():
 
     db = get_db()
     c = db.cursor()
-    credit_cost_gtq = 12.0
+    credit_cost_usd = CREDIT_COST_USD
+    usd_gtq_rate = USD_GTQ_RATE
+    credit_cost_gtq = credit_cost_usd * usd_gtq_rate
 
     # Ventas mensuales (todo el tiempo)
     if PG:
@@ -1176,6 +1240,17 @@ def analytics():
         """, (mes_actual, mes_anterior))
     ventas_por_dia = fetchall(c)
 
+    # Créditos históricos estimados desde pagos antiguos; no modifica historial.
+    c.execute("SELECT COALESCE(SUM(monto),0) as ingresos, COUNT(*) as pagos FROM pagos")
+    retro_base = fetchone(c)
+    c.execute("SELECT monto FROM pagos")
+    retro_pagos = fetchall(c)
+    retro_creditos = sum(estimate_credits_from_amount(p.get('monto')) for p in retro_pagos)
+    retro_ingresos = float(retro_base['ingresos'] or 0)
+    retro_costo = retro_creditos * credit_cost_gtq
+    retro_utilidad = retro_ingresos - retro_costo
+    retro_margen = round((retro_utilidad / retro_ingresos) * 100, 1) if retro_ingresos > 0 else 0
+
     # Operación Fénix: créditos, utilidad y tareas (mes actual)
     if PG:
         c.execute("""
@@ -1286,6 +1361,8 @@ def analytics():
         'ventas_por_dia': ventas_por_dia,
         'operacion': {
             'mes': mes_actual,
+            'credit_cost_usd': credit_cost_usd,
+            'usd_gtq_rate': usd_gtq_rate,
             'credit_cost_gtq': credit_cost_gtq,
             'ingresos_mes': round(op_ingresos, 2),
             'creditos_mes': op_creditos,
@@ -1295,7 +1372,15 @@ def analytics():
             'completadas_mes': int(op_mes['completadas'] or 0),
             'tareas_por_estado': tareas_por_estado,
             'tareas_por_agente': tareas_por_agente,
-            'operacion_mensual': operacion_mensual
+            'operacion_mensual': operacion_mensual,
+            'retro': {
+                'ingresos': round(retro_ingresos, 2),
+                'pagos': int(retro_base['pagos'] or 0),
+                'creditos_estimados': int(retro_creditos),
+                'costo_estimado': round(retro_costo, 2),
+                'utilidad_estimada': round(retro_utilidad, 2),
+                'margen_estimado': retro_margen
+            }
         }
     })
 

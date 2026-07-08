@@ -921,6 +921,7 @@ let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', loadi
 let searchTimeout;
 let activationPlansLoaded = false;
 let currentActivationStatus = 'open';
+const IS_ADMIN = {{ 'true' if rol == 'admin' else 'false' }};
 window._appConfig = {};
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────────
@@ -997,6 +998,7 @@ function activationTaskItem(t) {
   const plan = t.plan_name || 'Plan no definido';
   const proofBtn = t.has_payment_proof ? `<button class="ops-btn-secondary" onclick="openActivationPaymentProof(${t.order_id})">Ver comprobante</button>` : '';
   const pagoEstado = t.payment_registered_at ? ' · Pago en historial' : '';
+  const deleteBtn = IS_ADMIN ? `<button class="ops-btn-danger" onclick="eliminarActivationTask(${t.id})">Eliminar prueba</button>` : '';
   return `
     <div class="ops-task">
       <div class="ops-task-head">
@@ -1016,6 +1018,7 @@ function activationTaskItem(t) {
         ${proofBtn}
         <button class="ops-btn-success" onclick='openCompleteActivationModal(${t.id}, ${JSON.stringify(t.username || '')}, ${Number(t.amount || 0)}, ${JSON.stringify(t.currency || 'GTQ')})'>Completar</button>
         <button class="ops-btn-danger" onclick="openBlockActivationModal(${t.id})">Bloquear</button>
+        ${deleteBtn}
       </div>
     </div>`;
 }
@@ -1094,6 +1097,20 @@ async function marcarActivationTask(id, status) {
   }
   showToast(status === 'in_progress' ? '🔥 Tarea tomada' : '✅ Tarea actualizada');
   loadActivationTasks();
+}
+
+async function eliminarActivationTask(id) {
+  if (!confirm('¿Eliminar esta tarea de prueba? Si generó un pago automático, también se revertirá del historial.')) return;
+  const r = await fetch(`/api/activation-tasks/${id}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (!r.ok) {
+    alert(d.error || 'No se pudo eliminar la tarea.');
+    return;
+  }
+  showToast(d.pago_revertido ? '🗑️ Tarea eliminada y pago revertido' : '🗑️ Tarea eliminada');
+  analyticsData = null;
+  loadActivationTasks();
+  if (document.getElementById('view-dashboard').classList.contains('active')) loadDashboard();
 }
 
 function setActivationTabActive() {
@@ -1980,7 +1997,7 @@ function renderAnalytics(d) {
   document.getElementById('kpi-promedio').textContent = 'Q' + Math.round(prom).toLocaleString();
   document.getElementById('kpi-clientes').textContent = d.total_clientes.toLocaleString();
   document.getElementById('kpi-no-renov').textContent = d.no_renovaron.toLocaleString();
-  renderOperacionFenix(d.operacion || {});
+  renderOperacionFenixV2(d.operacion || {});
 
   // Chart: Ventas anuales
   const years = d.ventas_anuales.map(r => r.y);
@@ -2069,6 +2086,75 @@ function renderOperacionFenix(op) {
 
   document.getElementById('op-tablas').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr;gap:14px;">
+      <div>
+        <h3 style="margin-top:0;">Estados de tareas</h3>
+        <table class="analytics-table">
+          <thead><tr><th>Estado</th><th>Total</th></tr></thead>
+          <tbody>${estadoRows}</tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Operación por agente (${op.mes || 'mes actual'})</h3>
+        <table class="analytics-table">
+          <thead><tr><th>Agente</th><th>Tareas</th><th>Créditos</th><th>Ingresos</th><th>Utilidad</th></tr></thead>
+          <tbody>${agenteRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderOperacionFenixV2(op) {
+  const ingresos = Number(op.ingresos_mes || 0);
+  const creditos = Number(op.creditos_mes || 0);
+  const costo = Number(op.costo_mes || 0);
+  const utilidad = Number(op.utilidad_mes || 0);
+  const creditCostUsd = Number(op.credit_cost_usd || 1.25);
+  const rate = Number(op.usd_gtq_rate || 7.8);
+  const creditCostGtq = Number(op.credit_cost_gtq || (creditCostUsd * rate));
+  const retro = op.retro || {};
+
+  document.getElementById('op-ingresos').textContent = 'Q' + Math.round(ingresos).toLocaleString();
+  document.getElementById('op-creditos').textContent = creditos.toLocaleString();
+  document.getElementById('op-costo').textContent = 'Q' + Math.round(costo).toLocaleString();
+  document.getElementById('op-utilidad').textContent = 'Q' + Math.round(utilidad).toLocaleString();
+  document.getElementById('op-resumen').innerHTML =
+    `Mes: <strong>${op.mes || '—'}</strong> · Costo usado: <strong>USD $${creditCostUsd.toLocaleString()} por crédito</strong> (Q${creditCostGtq.toLocaleString()} aprox.) · TC: <strong>${rate}</strong> · Margen estimado: <strong>${Number(op.margen_mes || 0)}%</strong> · Activaciones completadas: <strong>${Number(op.completadas_mes || 0).toLocaleString()}</strong>`;
+
+  const estados = op.tareas_por_estado || [];
+  const agentes = op.tareas_por_agente || [];
+  const estadoRows = estados.length ? estados.map(r => `
+    <tr><td>${r.status || '—'}</td><td>${Number(r.total || 0).toLocaleString()}</td></tr>
+  `).join('') : '<tr><td colspan="2">Sin tareas todavía</td></tr>';
+  const agenteRows = agentes.length ? agentes.map(r => {
+    const ingresosAgente = Number(r.ingresos || 0);
+    const creditosAgente = Number(r.creditos || 0);
+    const utilidadAgente = ingresosAgente - (creditosAgente * creditCostGtq);
+    return `<tr>
+      <td>${r.agente || 'Sin asignar'}</td>
+      <td>${Number(r.tareas || 0).toLocaleString()}</td>
+      <td>${creditosAgente.toLocaleString()}</td>
+      <td>Q${Math.round(ingresosAgente).toLocaleString()}</td>
+      <td>Q${Math.round(utilidadAgente).toLocaleString()}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5">Sin tareas este mes</td></tr>';
+
+  document.getElementById('op-tablas').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr;gap:14px;">
+      <div>
+        <h3 style="margin-top:0;">Estimado retroactivo desde historial de pagos</h3>
+        <table class="analytics-table">
+          <thead><tr><th>Pagos</th><th>Ingresos</th><th>Créditos est.</th><th>Costo est.</th><th>Utilidad est.</th><th>Margen</th></tr></thead>
+          <tbody><tr>
+            <td>${Number(retro.pagos || 0).toLocaleString()}</td>
+            <td>Q${Math.round(Number(retro.ingresos || 0)).toLocaleString()}</td>
+            <td>${Number(retro.creditos_estimados || 0).toLocaleString()}</td>
+            <td>Q${Math.round(Number(retro.costo_estimado || 0)).toLocaleString()}</td>
+            <td>Q${Math.round(Number(retro.utilidad_estimada || 0)).toLocaleString()}</td>
+            <td>${Number(retro.margen_estimado || 0)}%</td>
+          </tr></tbody>
+        </table>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;">Estimación basada en montos históricos: Q90=1, Q225=3, Q400=6, Q700=12, Q1000=18, Q1300=24 créditos. No modifica datos antiguos.</div>
+      </div>
       <div>
         <h3 style="margin-top:0;">Estados de tareas</h3>
         <table class="analytics-table">
