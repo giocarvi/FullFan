@@ -236,10 +236,12 @@ def init_db():
             currency TEXT DEFAULT 'GTQ',
             credits_required INTEGER DEFAULT 0,
             payment_method TEXT,
+            payment_proof TEXT,
             notes TEXT,
             created_at TEXT DEFAULT (NOW()::text),
             completed_at TEXT
         )''')
+        c.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_proof TEXT DEFAULT NULL")
         c.execute('''CREATE TABLE IF NOT EXISTS activation_tasks (
             id SERIAL PRIMARY KEY,
             order_id INTEGER,
@@ -316,6 +318,7 @@ def init_db():
                 currency TEXT DEFAULT 'GTQ',
                 credits_required INTEGER DEFAULT 0,
                 payment_method TEXT,
+                payment_proof TEXT,
                 notes TEXT,
                 created_at TEXT DEFAULT (datetime('now')),
                 completed_at TEXT
@@ -374,6 +377,11 @@ def init_db():
                          SELECT ?,?,? WHERE NOT EXISTS (
                            SELECT 1 FROM device_apps WHERE device_type=? AND app_name=?
                          )""", d + (d[0], d[1]))
+
+        try:
+            c.execute("ALTER TABLE orders ADD COLUMN payment_proof TEXT DEFAULT NULL")
+        except Exception:
+            pass
 
     conn.commit()
 
@@ -845,6 +853,7 @@ def api_activation_tasks():
     c.execute(qmark(f"""
         SELECT
           t.*, o.type as order_type, o.amount, o.currency, o.status as order_status,
+          (o.payment_proof IS NOT NULL) as has_payment_proof,
           p.name as plan_name, p.months, p.connections,
           cl.nombre, cl.contacto, cl.vencimiento
         FROM activation_tasks t
@@ -878,6 +887,7 @@ def api_create_activation_task():
     amount = float(data.get('amount') or 0)
     currency = data.get('currency') or 'GTQ'
     payment_method = data.get('payment_method') or 'manual'
+    payment_proof = data.get('payment_proof') or None
     notes = data.get('notes') or ''
     if not username or not plan_id:
         return jsonify({'error': 'Usuario y plan son obligatorios'}), 400
@@ -898,10 +908,10 @@ def api_create_activation_task():
     task_type = 'create_line' if order_type == 'new' else 'renew_line'
     if PG:
         c.execute("""
-            INSERT INTO orders (username, plan_id, type, status, amount, currency, credits_required, payment_method, notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            INSERT INTO orders (username, plan_id, type, status, amount, currency, credits_required, payment_method, payment_proof, notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING id
-        """, (username, plan_id, order_type, 'pending_activation', amount, currency, credits, payment_method, notes))
+        """, (username, plan_id, order_type, 'pending_activation', amount, currency, credits, payment_method, payment_proof, notes))
         order_id = c.fetchone()[0]
         c.execute("""
             INSERT INTO activation_tasks (order_id, username, task_type, status, assigned_to, credits_to_consume, notes)
@@ -911,9 +921,9 @@ def api_create_activation_task():
         task_id = c.fetchone()[0]
     else:
         c.execute("""
-            INSERT INTO orders (username, plan_id, type, status, amount, currency, credits_required, payment_method, notes)
-            VALUES (?,?,?,?,?,?,?,?,?)
-        """, (username, plan_id, order_type, 'pending_activation', amount, currency, credits, payment_method, notes))
+            INSERT INTO orders (username, plan_id, type, status, amount, currency, credits_required, payment_method, payment_proof, notes)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (username, plan_id, order_type, 'pending_activation', amount, currency, credits, payment_method, payment_proof, notes))
         order_id = c.lastrowid
         c.execute("""
             INSERT INTO activation_tasks (order_id, username, task_type, status, assigned_to, credits_to_consume, notes)
@@ -923,6 +933,19 @@ def api_create_activation_task():
     db.commit()
     db.close()
     return jsonify({'ok': True, 'order_id': order_id, 'task_id': task_id})
+
+
+@app.route('/api/orders/<int:order_id>/payment-proof')
+@login_required
+def api_order_payment_proof(order_id):
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT payment_proof FROM orders WHERE id=?"), (order_id,))
+    row = fetchone(c)
+    db.close()
+    if not row or not row['payment_proof']:
+        return jsonify({'error': 'No encontrado'}), 404
+    return jsonify({'payment_proof': row['payment_proof']})
 
 
 @app.route('/api/activation-tasks/<int:task_id>', methods=['PUT'])

@@ -590,6 +590,11 @@ body {
           <option value="USD">USD</option>
         </select>
         <input id="act-payment-method" placeholder="Método, ej: transferencia">
+        <div class="form-group full">
+          <label>Comprobante de pago (imagen)</label>
+          <input type="file" id="act-payment-proof" accept="image/*" style="display:none" onchange="onActivationProofSelected(this)">
+          <label for="act-payment-proof" class="file-upload-label" id="act-proof-label">📎 Adjuntar comprobante de pago</label>
+        </div>
         <textarea id="act-notes" class="full" rows="2" placeholder="Notas internas opcionales"></textarea>
         <button class="config-save-btn full" onclick="crearActivationTask()">Crear tarea pendiente</button>
       </div>
@@ -972,6 +977,7 @@ function activationTaskItem(t) {
   const monto = t.amount ? `${t.currency || 'GTQ'} ${Number(t.amount).toLocaleString()}` : 'Sin monto';
   const vence = t.vencimiento || 'sin vencimiento actual';
   const plan = t.plan_name || 'Plan no definido';
+  const proofBtn = t.has_payment_proof ? `<button class="ops-btn-secondary" onclick="openActivationPaymentProof(${t.order_id})">Ver comprobante</button>` : '';
   return `
     <div class="ops-task">
       <div class="ops-task-head">
@@ -988,6 +994,7 @@ function activationTaskItem(t) {
       ${t.notes ? `<div class="ops-task-meta" style="margin-top:8px;">Notas: ${t.notes}</div>` : ''}
       <div class="ops-actions">
         <button class="ops-btn-secondary" onclick="marcarActivationTask(${t.id}, 'in_progress')">Tomar</button>
+        ${proofBtn}
         <button class="ops-btn-success" onclick='openCompleteActivationModal(${t.id}, ${JSON.stringify(t.username || '')})'>Completar</button>
         <button class="ops-btn-danger" onclick="openBlockActivationModal(${t.id})">Bloquear</button>
       </div>
@@ -1002,6 +1009,11 @@ async function crearActivationTask() {
   const currency = document.getElementById('act-currency').value;
   const payment_method = document.getElementById('act-payment-method').value.trim() || 'manual';
   const notes = document.getElementById('act-notes').value.trim();
+  let payment_proof = null;
+  const proofInput = document.getElementById('act-payment-proof');
+  if (proofInput && proofInput.files && proofInput.files[0]) {
+    try { payment_proof = await fileToBase64(proofInput.files[0]); } catch(e) {}
+  }
   if (!username || !plan_id) {
     alert('Ingresa usuario y plan.');
     return;
@@ -1009,7 +1021,7 @@ async function crearActivationTask() {
   const r = await fetch('/api/activation-tasks', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({username, plan_id, type, amount, currency, payment_method, notes})
+    body: JSON.stringify({username, plan_id, type, amount, currency, payment_method, payment_proof, notes})
   });
   const d = await r.json();
   if (!r.ok) {
@@ -1019,10 +1031,35 @@ async function crearActivationTask() {
   document.getElementById('act-username').value = '';
   document.getElementById('act-amount').value = '';
   document.getElementById('act-notes').value = '';
+  if (proofInput) proofInput.value = '';
+  onActivationProofSelected(proofInput);
   showToast('✅ Tarea creada');
   currentActivationStatus = 'open';
   setActivationTabActive();
   loadActivationTasks();
+}
+
+function onActivationProofSelected(input) {
+  const label = document.getElementById('act-proof-label');
+  if (!label) return;
+  if (input && input.files && input.files[0]) {
+    label.textContent = '✅ ' + input.files[0].name;
+    label.classList.add('has-file');
+  } else {
+    label.textContent = '📎 Adjuntar comprobante de pago';
+    label.classList.remove('has-file');
+  }
+}
+
+async function openActivationPaymentProof(orderId) {
+  const r = await fetch(`/api/orders/${orderId}/payment-proof`);
+  const d = await r.json();
+  if (d.payment_proof) {
+    document.getElementById('lightbox-img').src = d.payment_proof;
+    document.getElementById('lightbox-overlay').classList.add('open');
+  } else {
+    showToast('No se encontró comprobante');
+  }
 }
 
 async function marcarActivationTask(id, status) {
