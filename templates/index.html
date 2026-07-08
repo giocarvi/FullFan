@@ -1063,11 +1063,17 @@ async function openActivationPaymentProof(orderId) {
 }
 
 async function marcarActivationTask(id, status) {
-  await fetch(`/api/activation-tasks/${id}`, {
+  const r = await fetch(`/api/activation-tasks/${id}`, {
     method: 'PUT',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({status})
   });
+  const d = await r.json();
+  if (!r.ok) {
+    alert(d.error || 'No se pudo actualizar la tarea.');
+    return;
+  }
+  showToast(status === 'in_progress' ? '🔥 Tarea tomada' : '✅ Tarea actualizada');
   loadActivationTasks();
 }
 
