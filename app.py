@@ -1219,12 +1219,12 @@ def analytics():
             SELECT
                 COALESCE(assigned_to, 'Sin asignar') as agente,
                 COUNT(*) as tareas,
-                COALESCE(SUM(CASE WHEN status = 'done' THEN credits_to_consume ELSE 0 END),0) as creditos,
-                COALESCE(SUM(CASE WHEN status = 'done' THEN o.amount ELSE 0 END),0) as ingresos
+                COALESCE(SUM(CASE WHEN t.status = 'done' THEN t.credits_to_consume ELSE 0 END),0) as creditos,
+                COALESCE(SUM(CASE WHEN t.status = 'done' THEN o.amount ELSE 0 END),0) as ingresos
             FROM activation_tasks t
             LEFT JOIN orders o ON o.id = t.order_id
             WHERE SUBSTRING(COALESCE(t.created_at, ''), 1, 7) = %s
-            GROUP BY agente
+            GROUP BY COALESCE(assigned_to, 'Sin asignar')
             ORDER BY tareas DESC
             LIMIT 10
         """, (mes_actual,))
@@ -1233,12 +1233,12 @@ def analytics():
             SELECT
                 COALESCE(assigned_to, 'Sin asignar') as agente,
                 COUNT(*) as tareas,
-                COALESCE(SUM(CASE WHEN status = 'done' THEN credits_to_consume ELSE 0 END),0) as creditos,
-                COALESCE(SUM(CASE WHEN status = 'done' THEN o.amount ELSE 0 END),0) as ingresos
+                COALESCE(SUM(CASE WHEN t.status = 'done' THEN t.credits_to_consume ELSE 0 END),0) as creditos,
+                COALESCE(SUM(CASE WHEN t.status = 'done' THEN o.amount ELSE 0 END),0) as ingresos
             FROM activation_tasks t
             LEFT JOIN orders o ON o.id = t.order_id
             WHERE substr(COALESCE(t.created_at, ''), 1, 7) = ?
-            GROUP BY agente
+            GROUP BY COALESCE(assigned_to, 'Sin asignar')
             ORDER BY tareas DESC
             LIMIT 10
         """, (mes_actual,))

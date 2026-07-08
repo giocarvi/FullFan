@@ -1953,11 +1953,26 @@ let selectedYear = null, selectedYearNR = null;
 async function loadAnalytics() {
   if (analyticsData) { renderAnalytics(analyticsData); return; }
   const r = await fetch('/api/analytics');
-  analyticsData = await r.json();
+  const d = await r.json();
+  if (!r.ok || d.error) {
+    const msg = d.error || 'No se pudo cargar anÃ¡lisis.';
+    document.getElementById('op-resumen').innerHTML = `<span style="color:var(--red)">Error cargando anÃ¡lisis: ${msg}</span>`;
+    showToast('âŒ ' + msg);
+    return;
+  }
+  analyticsData = d;
   renderAnalytics(analyticsData);
 }
 
 function renderAnalytics(d) {
+  d.ventas_mensuales = d.ventas_mensuales || [];
+  d.ventas_anuales = d.ventas_anuales || [];
+  d.planes = d.planes || [];
+  d.nuevos_por_mes = d.nuevos_por_mes || [];
+  d.renovaciones_por_mes = d.renovaciones_por_mes || [];
+  d.total_historico = Number(d.total_historico || 0);
+  d.total_clientes = Number(d.total_clientes || 0);
+  d.no_renovaron = Number(d.no_renovaron || 0);
   // KPIs
   document.getElementById('kpi-historico').textContent = 'Q' + Math.round(d.total_historico).toLocaleString();
   const meses = d.ventas_mensuales.length || 1;
