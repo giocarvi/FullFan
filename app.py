@@ -970,11 +970,18 @@ def api_update_activation_task(task_id):
         return jsonify({'error': 'Tarea no encontrada'}), 404
 
     completed_at = datetime.now(GT_TZ).isoformat() if status == 'done' else None
-    c.execute(qmark("""
-        UPDATE activation_tasks
-        SET status=?, xui_username=?, xui_expires_at=?, notes=?, blocked_reason=?, completed_at=?
-        WHERE id=?
-    """), (status, xui_username, xui_expires_at, notes, blocked_reason, completed_at, task_id))
+    if status in {'pending', 'in_progress', 'cancelled'}:
+        c.execute(qmark("""
+            UPDATE activation_tasks
+            SET status=?, assigned_to=?
+            WHERE id=?
+        """), (status, session.get('user'), task_id))
+    else:
+        c.execute(qmark("""
+            UPDATE activation_tasks
+            SET status=?, xui_username=?, xui_expires_at=?, notes=?, blocked_reason=?, completed_at=?
+            WHERE id=?
+        """), (status, xui_username, xui_expires_at, notes, blocked_reason, completed_at, task_id))
     if task.get('order_id'):
         order_status = 'activated' if status == 'done' else ('blocked' if status == 'blocked' else 'in_activation')
         c.execute(qmark("UPDATE orders SET status=?, completed_at=? WHERE id=?"),
