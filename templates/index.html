@@ -628,6 +628,19 @@ body {
     <div class="kpi-card"><div class="kpi-val" id="kpi-no-renov">—</div><div class="kpi-lbl">No renovaron</div></div>
   </div>
 
+  <!-- Operación Fénix -->
+  <div class="analytics-chart-card">
+    <h3>🔥 Operación Fénix — créditos y utilidad</h3>
+    <div class="analytics-kpi-grid">
+      <div class="kpi-card"><div class="kpi-val" id="op-ingresos">—</div><div class="kpi-lbl">Ingresos operativos mes</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="op-creditos">—</div><div class="kpi-lbl">Créditos consumidos</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="op-costo">—</div><div class="kpi-lbl">Costo estimado</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="op-utilidad">—</div><div class="kpi-lbl">Utilidad estimada</div></div>
+    </div>
+    <div id="op-resumen" style="font-size:13px;color:var(--muted);margin-bottom:12px;"></div>
+    <div id="op-tablas"></div>
+  </div>
+
   <!-- Ventas por día -->
   <div class="analytics-chart-card">
     <h3>📆 Ventas por día</h3>
@@ -1161,6 +1174,7 @@ async function submitActivationActionModal() {
   }
   closeActivationActionModal();
   showToast(action === 'done' ? '✅ Activación completada' : '⚠️ Tarea bloqueada');
+  analyticsData = null;
   loadActivationTasks();
   if (document.getElementById('view-dashboard').classList.contains('active')) loadDashboard();
 }
@@ -1951,6 +1965,7 @@ function renderAnalytics(d) {
   document.getElementById('kpi-promedio').textContent = 'Q' + Math.round(prom).toLocaleString();
   document.getElementById('kpi-clientes').textContent = d.total_clientes.toLocaleString();
   document.getElementById('kpi-no-renov').textContent = d.no_renovaron.toLocaleString();
+  renderOperacionFenix(d.operacion || {});
 
   // Chart: Ventas anuales
   const years = d.ventas_anuales.map(r => r.y);
@@ -2005,6 +2020,55 @@ function renderAnalytics(d) {
 
   // Ventas por día
   renderDayChart(d.ventas_por_dia || []);
+}
+
+function renderOperacionFenix(op) {
+  const ingresos = Number(op.ingresos_mes || 0);
+  const creditos = Number(op.creditos_mes || 0);
+  const costo = Number(op.costo_mes || 0);
+  const utilidad = Number(op.utilidad_mes || 0);
+  document.getElementById('op-ingresos').textContent = 'Q' + Math.round(ingresos).toLocaleString();
+  document.getElementById('op-creditos').textContent = creditos.toLocaleString();
+  document.getElementById('op-costo').textContent = 'Q' + Math.round(costo).toLocaleString();
+  document.getElementById('op-utilidad').textContent = 'Q' + Math.round(utilidad).toLocaleString();
+  document.getElementById('op-resumen').innerHTML =
+    `Mes: <strong>${op.mes || '—'}</strong> · Costo usado: <strong>Q${Number(op.credit_cost_gtq || 12).toLocaleString()} por crédito</strong> · Margen estimado: <strong>${Number(op.margen_mes || 0)}%</strong> · Activaciones completadas: <strong>${Number(op.completadas_mes || 0).toLocaleString()}</strong>`;
+
+  const estados = op.tareas_por_estado || [];
+  const agentes = op.tareas_por_agente || [];
+  const estadoRows = estados.length ? estados.map(r => `
+    <tr><td>${r.status || '—'}</td><td>${Number(r.total || 0).toLocaleString()}</td></tr>
+  `).join('') : '<tr><td colspan="2">Sin tareas todavía</td></tr>';
+  const agenteRows = agentes.length ? agentes.map(r => {
+    const ingresosAgente = Number(r.ingresos || 0);
+    const creditosAgente = Number(r.creditos || 0);
+    const utilidadAgente = ingresosAgente - (creditosAgente * Number(op.credit_cost_gtq || 12));
+    return `<tr>
+      <td>${r.agente || 'Sin asignar'}</td>
+      <td>${Number(r.tareas || 0).toLocaleString()}</td>
+      <td>${creditosAgente.toLocaleString()}</td>
+      <td>Q${Math.round(ingresosAgente).toLocaleString()}</td>
+      <td>Q${Math.round(utilidadAgente).toLocaleString()}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5">Sin tareas este mes</td></tr>';
+
+  document.getElementById('op-tablas').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr;gap:14px;">
+      <div>
+        <h3 style="margin-top:0;">Estados de tareas</h3>
+        <table class="analytics-table">
+          <thead><tr><th>Estado</th><th>Total</th></tr></thead>
+          <tbody>${estadoRows}</tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Operación por agente (${op.mes || 'mes actual'})</h3>
+        <table class="analytics-table">
+          <thead><tr><th>Agente</th><th>Tareas</th><th>Créditos</th><th>Ingresos</th><th>Utilidad</th></tr></thead>
+          <tbody>${agenteRows}</tbody>
+        </table>
+      </div>
+    </div>`;
 }
 
 let _dayData = [];
