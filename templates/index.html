@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Full Fan Digital TV</title>
+<title>Fénix Digital TV</title>
 <style>
 /* ── RESET & BASE ─────────────────────────────────────────────────── */
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -439,8 +439,8 @@ body {
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="topbar-title">
-    <img src="/static/logo.png" alt="Full Fan Digital TV" style="height:36px;object-fit:contain;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-    <span style="display:none;align-items:center;gap:6px;"><span>📡</span> Full Fan</span>
+      <img src="/static/logo.png" alt="Fénix Digital TV" style="height:36px;object-fit:contain;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span style="display:none;align-items:center;gap:6px;"><span>🔥</span> Fénix</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
     <span style="font-size:13px;color:var(--muted)">{{ user }}</span>
@@ -491,7 +491,7 @@ body {
   {% else %}
   <!-- Vista de atención al cliente -->
   <div style="text-align:center;padding:32px 16px 20px;">
-    <img src="/static/logo.png" alt="Full Fan Digital TV" style="height:80px;object-fit:contain;margin-bottom:16px;"
+      <img src="/static/logo.png" alt="Fénix Digital TV" style="height:80px;object-fit:contain;margin-bottom:16px;"
          onerror="this.style.display='none'">
     <div style="font-size:16px;font-weight:600;color:var(--text);">Bienvenido, {{ user }}</div>
     <div style="font-size:13px;color:var(--muted);margin-top:4px;">Panel de Atención al Cliente</div>
@@ -631,7 +631,7 @@ body {
       </div>
       <div class="config-group">
         <label>📲 Nuevo número <span style="font-size:11px;color:var(--muted);font-weight:400;">(deja vacío para ocultar el botón)</span></label>
-        <textarea id="cfg-wa-nuevo-numero" placeholder="Ej: Hola {nombre}, te informamos que nuestro nuevo número a partir del 9 de junio, 2026, es el 47341871. ¡Gracias por preferirnos! 📺"></textarea>
+            <textarea id="cfg-wa-nuevo-numero" placeholder="Ej: Hola {nombre}, te informamos que nuestro nuevo número de Fénix Digital TV es el 41562336. ¡Gracias por preferirnos! 🔥"></textarea>
       </div>
     </div>
 
@@ -1017,9 +1017,9 @@ async function openModal(username) {
       <div class="wa-section-title">💬 WhatsApp</div>
       <div class="wa-buttons">
         <a class="wa-btn primary" href="${waBase}" target="_blank" rel="noopener">📞 Abrir chat</a>
-        <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_saludo || 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋'))}" target="_blank" rel="noopener">👋 Saludo</a>
+      <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_saludo || 'Hola {nombre}, te saludamos de Fénix Digital TV 👋 Tu entretenimiento, sin fronteras.'))}" target="_blank" rel="noopener">👋 Saludo</a>
         <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_recordatorio || 'Hola {nombre}, tu servicio vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'))}" target="_blank" rel="noopener">⚠️ Recordatorio</a>
-        <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺'))}" target="_blank" rel="noopener">✅ Confirmar pago</a>
+      <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'))}" target="_blank" rel="noopener">✅ Confirmar pago</a>
         <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_vencido || 'Hola {nombre}, tu servicio ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'))}" target="_blank" rel="noopener">❌ Servicio vencido</a>
         ${cfg.wa_nuevo_numero ? '<a class="wa-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border-color:rgba(245,158,11,0.35);" href="' + waBase + '?text=' + encMsg(waFill(cfg.wa_nuevo_numero)) + '" target="_blank" rel="noopener">📲 Nuevo número</a>' : ''}
       </div>
@@ -1340,10 +1340,10 @@ function loadConfigView() {
     if (el) el.value = cfg[key] !== undefined ? cfg[key] : def;
   };
   set('cfg-wa-prefijo', 'wa_prefijo', '502');
-  set('cfg-wa-saludo', 'wa_saludo', 'Hola {nombre}, te saludamos de Full Fan Digital TV 👋');
-  set('cfg-wa-recordatorio', 'wa_recordatorio', 'Hola {nombre}, tu servicio de Full Fan Digital TV vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺');
-  set('cfg-wa-confirmar-pago', 'wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 📺');
-  set('cfg-wa-vencido', 'wa_vencido', 'Hola {nombre}, tu servicio de Full Fan Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜');
+  set('cfg-wa-saludo', 'wa_saludo', 'Hola {nombre}, te saludamos de Fénix Digital TV 👋 Tu entretenimiento, sin fronteras.');
+  set('cfg-wa-recordatorio', 'wa_recordatorio', 'Hola {nombre}, tu servicio de Fénix Digital TV vence el {fecha}. Puedes renovar antes de la fecha para evitar interrupciones. ¡Gracias! 🔥');
+  set('cfg-wa-confirmar-pago', 'wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥');
+  set('cfg-wa-vencido', 'wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥');
   set('cfg-wa-nuevo-numero', 'wa_nuevo_numero', '');
 }
 
@@ -1477,8 +1477,8 @@ async function exportarClientes() {
     ws['!cols'] = [28,22,16,16,16,18,10].map(w => ({wch: w}));
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Clientes Full Fan');
-    XLSX.writeFile(wb, `clientes_fullfan_${today}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, 'Clientes Fénix');
+  XLSX.writeFile(wb, `clientes_fenix_${today}.xlsx`);
     showToast('✅ Archivo descargado');
   } catch(e) {
     showToast('❌ ' + e.message);
