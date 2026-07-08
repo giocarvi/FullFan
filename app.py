@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
 import os
+import hmac
 from datetime import date, datetime, timezone, timedelta
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Zona horaria Guatemala (UTC-6)
 GT_TZ = timezone(timedelta(hours=-6))
@@ -11,7 +13,31 @@ def today_gt():
     return datetime.now(GT_TZ).date()
 
 app = Flask(__name__)
-app.secret_key = 'fullfan_secret_2026'
+app.secret_key = os.environ.get('SECRET_KEY') or os.environ.get('FLASK_SECRET_KEY')
+if not app.secret_key:
+    raise RuntimeError('SECRET_KEY environment variable is required')
+
+PASSWORD_HASH_PREFIXES = ('scrypt:', 'pbkdf2:', 'argon2:')
+
+def hash_password(password):
+    return generate_password_hash(password)
+
+def is_password_hash(value):
+    return isinstance(value, str) and value.startswith(PASSWORD_HASH_PREFIXES)
+
+def verify_password(stored_password, candidate_password):
+    """Acepta hashes nuevos y contraseñas legacy en texto plano durante la transición."""
+    if not stored_password:
+        return False
+    if is_password_hash(stored_password):
+        return check_password_hash(stored_password, candidate_password)
+    return hmac.compare_digest(str(stored_password), str(candidate_password))
+
+def maybe_upgrade_password_hash(cursor, username, stored_password, candidate_password):
+    """Si el usuario aún tiene password legacy, lo migra a hash después de login/cambio válido."""
+    if not is_password_hash(stored_password) and verify_password(stored_password, candidate_password):
+        cursor.execute(qmark("UPDATE usuarios SET password=? WHERE username=?"),
+                       (hash_password(candidate_password), username))
 
 # ── BASE DE DATOS ─────────────────────────────────────────────────────────────
 # Si existe DATABASE_URL (Railway PostgreSQL), lo usa.
@@ -93,11 +119,18 @@ def init_db():
             password TEXT,
             rol TEXT DEFAULT 'atencion'
         )''')
-        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('admin','admin123','admin') ON CONFLICT DO NOTHING")
-        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('atencion','atencion123','atencion') ON CONFLICT DO NOTHING")
-        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('jackye','jackye123','atencion') ON CONFLICT DO NOTHING")
-        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('ingrid','ingrid123','atencion') ON CONFLICT DO NOTHING")
-        c.execute("INSERT INTO usuarios (username,password,rol) VALUES ('turcios','Turcios123','atencion') ON CONFLICT DO NOTHING")
+        default_users = [
+            ('admin', os.environ.get('DEFAULT_ADMIN_PASSWORD'), 'admin'),
+            ('atencion', os.environ.get('DEFAULT_ATENCION_PASSWORD'), 'atencion'),
+            ('jackye', os.environ.get('DEFAULT_JACKYE_PASSWORD'), 'atencion'),
+            ('ingrid', os.environ.get('DEFAULT_INGRID_PASSWORD'), 'atencion'),
+            ('turcios', os.environ.get('DEFAULT_TURCIOS_PASSWORD'), 'atencion'),
+        ]
+        for username, password, rol in default_users:
+            if not password:
+                continue
+            c.execute("INSERT INTO usuarios (username,password,rol) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
+                      (username, hash_password(password), rol))
     else:
         c.executescript('''
             CREATE TABLE IF NOT EXISTS clientes (
@@ -116,11 +149,18 @@ def init_db():
                 password TEXT, rol TEXT DEFAULT 'atencion'
             );
         ''')
-        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('admin','admin123','admin')")
-        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('atencion','atencion123','atencion')")
-        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('jackye','jackye123','atencion')")
-        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('ingrid','ingrid123','atencion')")
-        c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES ('turcios','Turcios123','atencion')")
+        default_users = [
+            ('admin', os.environ.get('DEFAULT_ADMIN_PASSWORD'), 'admin'),
+            ('atencion', os.environ.get('DEFAULT_ATENCION_PASSWORD'), 'atencion'),
+            ('jackye', os.environ.get('DEFAULT_JACKYE_PASSWORD'), 'atencion'),
+            ('ingrid', os.environ.get('DEFAULT_INGRID_PASSWORD'), 'atencion'),
+            ('turcios', os.environ.get('DEFAULT_TURCIOS_PASSWORD'), 'atencion'),
+        ]
+        for username, password, rol in default_users:
+            if not password:
+                continue
+            c.execute("INSERT OR IGNORE INTO usuarios (username,password,rol) VALUES (?,?,?)",
+                      (username, hash_password(password), rol))
 
     # Migrar: agregar columna comprobante a pagos si no existe
     if PG:
@@ -286,13 +326,16 @@ def login():
         p = request.form.get('password', '').strip()
         db = get_db()
         c = db.cursor()
-        c.execute(qmark("SELECT * FROM usuarios WHERE username=? AND password=?"), (u, p))
+        c.execute(qmark("SELECT * FROM usuarios WHERE username=?"), (u,))
         user = fetchone(c)
-        db.close()
-        if user:
+        if user and verify_password(user.get('password'), p):
+            maybe_upgrade_password_hash(c, u, user.get('password'), p)
+            db.commit()
+            db.close()
             session['user'] = u
             session['rol'] = user['rol']
             return redirect(url_for('index'))
+        db.close()
         error = 'Usuario o contraseña incorrectos'
     return render_template('login.html', error=error)
 
@@ -874,12 +917,12 @@ def cambiar_password():
     username = session['user']
     db = get_db()
     c = db.cursor()
-    c.execute(qmark("SELECT id FROM usuarios WHERE username=? AND password=?"), (username, password_actual))
+    c.execute(qmark("SELECT id, password FROM usuarios WHERE username=?"), (username,))
     user = fetchone(c)
-    if not user:
+    if not user or not verify_password(user.get('password'), password_actual):
         db.close()
         return jsonify({'error': 'La contraseña actual es incorrecta.'}), 403
-    c.execute(qmark("UPDATE usuarios SET password=? WHERE username=?"), (password_nueva, username))
+    c.execute(qmark("UPDATE usuarios SET password=? WHERE username=?"), (hash_password(password_nueva), username))
     db.commit()
     db.close()
     return jsonify({'ok': True})
