@@ -875,6 +875,11 @@ body {
       <input id="activation-modal-xui-username" placeholder="Usuario creado o renovado">
       <label>Nuevo vencimiento</label>
       <input id="activation-modal-expires" type="date">
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+        <input id="activation-modal-register-payment" type="checkbox" checked style="width:auto;">
+        Registrar pago en historial al completar
+      </label>
+      <div id="activation-payment-hint" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
     </div>
     <label id="activation-notes-label">Notas internas</label>
     <textarea id="activation-modal-notes" rows="3" placeholder="Notas opcionales"></textarea>
@@ -978,6 +983,7 @@ function activationTaskItem(t) {
   const vence = t.vencimiento || 'sin vencimiento actual';
   const plan = t.plan_name || 'Plan no definido';
   const proofBtn = t.has_payment_proof ? `<button class="ops-btn-secondary" onclick="openActivationPaymentProof(${t.order_id})">Ver comprobante</button>` : '';
+  const pagoEstado = t.payment_registered_at ? ' · Pago en historial' : '';
   return `
     <div class="ops-task">
       <div class="ops-task-head">
@@ -985,7 +991,7 @@ function activationTaskItem(t) {
           <div class="ops-task-title">${t.nombre || t.username || 'Cliente'} · ${tipo}</div>
           <div class="ops-task-meta">
             Usuario: <b>${t.username || '—'}</b> · Tel: ${t.contacto || '—'}<br>
-            Plan: ${plan} · Créditos: ${t.credits_to_consume || 0} · Pago: ${monto}<br>
+            Plan: ${plan} · Créditos: ${t.credits_to_consume || 0} · Pago: ${monto}${pagoEstado}<br>
             Vence actual: ${vence} · Creada: ${(t.created_at || '').substring(0, 16)}
           </div>
         </div>
@@ -995,7 +1001,7 @@ function activationTaskItem(t) {
       <div class="ops-actions">
         <button class="ops-btn-secondary" onclick="marcarActivationTask(${t.id}, 'in_progress')">Tomar</button>
         ${proofBtn}
-        <button class="ops-btn-success" onclick='openCompleteActivationModal(${t.id}, ${JSON.stringify(t.username || '')})'>Completar</button>
+        <button class="ops-btn-success" onclick='openCompleteActivationModal(${t.id}, ${JSON.stringify(t.username || '')}, ${Number(t.amount || 0)}, ${JSON.stringify(t.currency || 'GTQ')})'>Completar</button>
         <button class="ops-btn-danger" onclick="openBlockActivationModal(${t.id})">Bloquear</button>
       </div>
     </div>`;
@@ -1091,7 +1097,7 @@ document.querySelectorAll('#activation-tabs .ops-tab').forEach(btn => {
   });
 });
 
-function openCompleteActivationModal(id, username) {
+function openCompleteActivationModal(id, username, amount = 0, currency = 'GTQ') {
   document.getElementById('activation-modal-task-id').value = id;
   document.getElementById('activation-modal-action').value = 'done';
   document.getElementById('activation-modal-title').textContent = 'Completar activación';
@@ -1100,6 +1106,14 @@ function openCompleteActivationModal(id, username) {
   document.getElementById('activation-modal-xui-username').value = username || '';
   document.getElementById('activation-modal-expires').value = localDateStr();
   document.getElementById('activation-modal-notes').value = '';
+  const registerPayment = document.getElementById('activation-modal-register-payment');
+  const paymentHint = document.getElementById('activation-payment-hint');
+  const hasAmount = Number(amount || 0) > 0;
+  registerPayment.checked = hasAmount;
+  registerPayment.disabled = !hasAmount;
+  paymentHint.textContent = hasAmount
+    ? `Se registrarÃ¡ un pago de ${currency || 'GTQ'} ${Number(amount).toLocaleString()} en el historial.`
+    : 'Esta tarea no tiene monto, por eso no se registrarÃ¡ pago automÃ¡tico.';
   document.getElementById('activation-action-modal').classList.add('open');
 }
 
@@ -1110,6 +1124,7 @@ function openBlockActivationModal(id) {
   document.getElementById('activation-complete-fields').style.display = 'none';
   document.getElementById('activation-notes-label').textContent = 'Motivo del bloqueo';
   document.getElementById('activation-modal-notes').value = '';
+  document.getElementById('activation-modal-register-payment').checked = false;
   document.getElementById('activation-action-modal').classList.add('open');
 }
 
@@ -1126,6 +1141,7 @@ async function submitActivationActionModal() {
     body.xui_username = document.getElementById('activation-modal-xui-username').value.trim();
     body.xui_expires_at = document.getElementById('activation-modal-expires').value;
     body.notes = notes;
+    body.register_payment = document.getElementById('activation-modal-register-payment').checked;
     if (!body.xui_username || !body.xui_expires_at) {
       alert('Usuario XUI y vencimiento son obligatorios.');
       return;

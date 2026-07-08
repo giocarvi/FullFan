@@ -237,11 +237,15 @@ def init_db():
             credits_required INTEGER DEFAULT 0,
             payment_method TEXT,
             payment_proof TEXT,
+            payment_registered_at TEXT,
+            payment_id INTEGER,
             notes TEXT,
             created_at TEXT DEFAULT (NOW()::text),
             completed_at TEXT
         )''')
         c.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_proof TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_registered_at TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_id INTEGER DEFAULT NULL")
         c.execute('''CREATE TABLE IF NOT EXISTS activation_tasks (
             id SERIAL PRIMARY KEY,
             order_id INTEGER,
@@ -319,6 +323,8 @@ def init_db():
                 credits_required INTEGER DEFAULT 0,
                 payment_method TEXT,
                 payment_proof TEXT,
+                payment_registered_at TEXT,
+                payment_id INTEGER,
                 notes TEXT,
                 created_at TEXT DEFAULT (datetime('now')),
                 completed_at TEXT
@@ -380,6 +386,14 @@ def init_db():
 
         try:
             c.execute("ALTER TABLE orders ADD COLUMN payment_proof TEXT DEFAULT NULL")
+        except Exception:
+            pass
+        try:
+            c.execute("ALTER TABLE orders ADD COLUMN payment_registered_at TEXT DEFAULT NULL")
+        except Exception:
+            pass
+        try:
+            c.execute("ALTER TABLE orders ADD COLUMN payment_id INTEGER DEFAULT NULL")
         except Exception:
             pass
 
@@ -853,6 +867,7 @@ def api_activation_tasks():
     c.execute(qmark(f"""
         SELECT
           t.*, o.type as order_type, o.amount, o.currency, o.status as order_status,
+          o.payment_registered_at, o.payment_id,
           (o.payment_proof IS NOT NULL) as has_payment_proof,
           p.name as plan_name, p.months, p.connections,
           cl.nombre, cl.contacto, cl.vencimiento
@@ -961,6 +976,7 @@ def api_update_activation_task(task_id):
     xui_expires_at = data.get('xui_expires_at') or None
     notes = data.get('notes') or ''
     blocked_reason = data.get('blocked_reason') or ''
+    register_payment = data.get('register_payment', True)
     db = get_db()
     c = db.cursor()
     c.execute(qmark("SELECT * FROM activation_tasks WHERE id=?"), (task_id,))
@@ -987,8 +1003,36 @@ def api_update_activation_task(task_id):
         c.execute(qmark("UPDATE orders SET status=?, completed_at=? WHERE id=?"),
                   (order_status, completed_at, task['order_id']))
     if status == 'done' and xui_expires_at:
-        c.execute(qmark("UPDATE clientes SET vencimiento=? WHERE username=?"),
-                  (xui_expires_at, task['username']))
+        payment_registered = False
+        order = None
+        if task.get('order_id'):
+            c.execute(qmark("SELECT * FROM orders WHERE id=?"), (task['order_id'],))
+            order = fetchone(c)
+        if register_payment and order and not order.get('payment_registered_at') and float(order.get('amount') or 0) > 0:
+            payment_month = today_gt().strftime('%Y-%m-01')
+            amount = float(order.get('amount') or 0)
+            comprobante = order.get('payment_proof')
+            if PG:
+                c.execute("""
+                    INSERT INTO pagos (username, mes, monto, comprobante)
+                    VALUES (%s,%s,%s,%s)
+                    RETURNING id
+                """, (task['username'], payment_month, amount, comprobante))
+                payment_id = c.fetchone()[0]
+            else:
+                c.execute("""
+                    INSERT INTO pagos (username, mes, monto, comprobante)
+                    VALUES (?,?,?,?)
+                """, (task['username'], payment_month, amount, comprobante))
+                payment_id = c.lastrowid
+            c.execute(qmark("UPDATE orders SET payment_registered_at=?, payment_id=? WHERE id=?"),
+                      (completed_at, payment_id, task['order_id']))
+            c.execute(qmark("UPDATE clientes SET total_pagado = total_pagado + ?, vencimiento=? WHERE username=?"),
+                      (amount, xui_expires_at, task['username']))
+            payment_registered = True
+        if not payment_registered:
+            c.execute(qmark("UPDATE clientes SET vencimiento=? WHERE username=?"),
+                      (xui_expires_at, task['username']))
     db.commit()
     db.close()
     return jsonify({'ok': True})
