@@ -212,6 +212,169 @@ def init_db():
         c.execute(qmark("UPDATE configuracion SET valor=? WHERE clave=? AND valor LIKE ?"),
                   (valor, clave, '%Full Fan%'))
 
+    # ── FÉNIX OPERACIÓN: planes, pedidos y cola manual ────────────────────────
+    if PG:
+        c.execute('''CREATE TABLE IF NOT EXISTS plans (
+            id SERIAL PRIMARY KEY,
+            slug TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            months INTEGER NOT NULL,
+            credits_required INTEGER NOT NULL,
+            connections INTEGER NOT NULL DEFAULT 3,
+            price_gtq REAL,
+            price_usd REAL,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TEXT DEFAULT (NOW()::text)
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS orders (
+            id SERIAL PRIMARY KEY,
+            username TEXT,
+            plan_id INTEGER,
+            type TEXT DEFAULT 'renewal',
+            status TEXT DEFAULT 'pending_activation',
+            amount REAL DEFAULT 0,
+            currency TEXT DEFAULT 'GTQ',
+            credits_required INTEGER DEFAULT 0,
+            payment_method TEXT,
+            notes TEXT,
+            created_at TEXT DEFAULT (NOW()::text),
+            completed_at TEXT
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS activation_tasks (
+            id SERIAL PRIMARY KEY,
+            order_id INTEGER,
+            username TEXT,
+            task_type TEXT DEFAULT 'renew_line',
+            status TEXT DEFAULT 'pending',
+            assigned_to TEXT,
+            xui_username TEXT,
+            xui_expires_at TEXT,
+            credits_to_consume INTEGER DEFAULT 0,
+            notes TEXT,
+            blocked_reason TEXT,
+            created_at TEXT DEFAULT (NOW()::text),
+            completed_at TEXT
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS device_apps (
+            id SERIAL PRIMARY KEY,
+            device_type TEXT NOT NULL,
+            app_name TEXT NOT NULL,
+            guide_slug TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TEXT DEFAULT (NOW()::text)
+        )''')
+        plan_defaults = [
+            ('fundador-1m', 'Fundador 1 mes', 1, 1, 3, 90, None),
+            ('fundador-3m', 'Fundador 3 meses', 3, 3, 3, 225, None),
+            ('fundador-6m', 'Fundador 6 meses', 6, 6, 3, 400, None),
+            ('fundador-12m', 'Fundador 12 meses', 12, 12, 3, 700, None),
+            ('familiar-1m', 'Familiar 1 mes', 1, 1, 3, None, 13.99),
+            ('familiar-3m', 'Familiar 3 meses', 3, 3, 3, None, 38.99),
+            ('familiar-6m', 'Familiar 6 meses', 6, 6, 3, None, 73.99),
+            ('familiar-12m', 'Familiar 12 meses', 12, 12, 3, None, 137.99),
+        ]
+        for p in plan_defaults:
+            c.execute("""INSERT INTO plans (slug,name,months,credits_required,connections,price_gtq,price_usd)
+                         VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (slug) DO NOTHING""", p)
+        device_defaults = [
+            ('Android', 'Max Player', 'android'),
+            ('iOS', 'Max Player', 'ios'),
+            ('Firestick', 'Max Player', 'firestick'),
+            ('Samsung Smart TV', 'Max Player', 'samsung'),
+            ('LG Smart TV', 'Max Player', 'lg'),
+            ('Windows', 'Max Player', 'windows'),
+            ('Mac', 'Max Player', 'mac'),
+            ('Hisense Smart TV', 'Smart One', 'hisense'),
+            ('Roku', 'Premium Player', 'roku'),
+        ]
+        for d in device_defaults:
+            c.execute("""INSERT INTO device_apps (device_type,app_name,guide_slug)
+                         SELECT %s,%s,%s WHERE NOT EXISTS (
+                           SELECT 1 FROM device_apps WHERE device_type=%s AND app_name=%s
+                         )""", d + (d[0], d[1]))
+    else:
+        c.executescript('''
+            CREATE TABLE IF NOT EXISTS plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                months INTEGER NOT NULL,
+                credits_required INTEGER NOT NULL,
+                connections INTEGER NOT NULL DEFAULT 3,
+                price_gtq REAL,
+                price_usd REAL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT,
+                plan_id INTEGER,
+                type TEXT DEFAULT 'renewal',
+                status TEXT DEFAULT 'pending_activation',
+                amount REAL DEFAULT 0,
+                currency TEXT DEFAULT 'GTQ',
+                credits_required INTEGER DEFAULT 0,
+                payment_method TEXT,
+                notes TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                completed_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS activation_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER,
+                username TEXT,
+                task_type TEXT DEFAULT 'renew_line',
+                status TEXT DEFAULT 'pending',
+                assigned_to TEXT,
+                xui_username TEXT,
+                xui_expires_at TEXT,
+                credits_to_consume INTEGER DEFAULT 0,
+                notes TEXT,
+                blocked_reason TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                completed_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS device_apps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_type TEXT NOT NULL,
+                app_name TEXT NOT NULL,
+                guide_slug TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+        ''')
+        plan_defaults = [
+            ('fundador-1m', 'Fundador 1 mes', 1, 1, 3, 90, None),
+            ('fundador-3m', 'Fundador 3 meses', 3, 3, 3, 225, None),
+            ('fundador-6m', 'Fundador 6 meses', 6, 6, 3, 400, None),
+            ('fundador-12m', 'Fundador 12 meses', 12, 12, 3, 700, None),
+            ('familiar-1m', 'Familiar 1 mes', 1, 1, 3, None, 13.99),
+            ('familiar-3m', 'Familiar 3 meses', 3, 3, 3, None, 38.99),
+            ('familiar-6m', 'Familiar 6 meses', 6, 6, 3, None, 73.99),
+            ('familiar-12m', 'Familiar 12 meses', 12, 12, 3, None, 137.99),
+        ]
+        for p in plan_defaults:
+            c.execute("""INSERT OR IGNORE INTO plans
+                         (slug,name,months,credits_required,connections,price_gtq,price_usd)
+                         VALUES (?,?,?,?,?,?,?)""", p)
+        device_defaults = [
+            ('Android', 'Max Player', 'android'),
+            ('iOS', 'Max Player', 'ios'),
+            ('Firestick', 'Max Player', 'firestick'),
+            ('Samsung Smart TV', 'Max Player', 'samsung'),
+            ('LG Smart TV', 'Max Player', 'lg'),
+            ('Windows', 'Max Player', 'windows'),
+            ('Mac', 'Max Player', 'mac'),
+            ('Hisense Smart TV', 'Smart One', 'hisense'),
+            ('Roku', 'Premium Player', 'roku'),
+        ]
+        for d in device_defaults:
+            c.execute("""INSERT INTO device_apps (device_type,app_name,guide_slug)
+                         SELECT ?,?,? WHERE NOT EXISTS (
+                           SELECT 1 FROM device_apps WHERE device_type=? AND app_name=?
+                         )""", d + (d[0], d[1]))
+
     conn.commit()
 
     # Migrar Excel si DB está vacía
@@ -651,6 +814,146 @@ def get_comprobante(pago_id):
     if not row or not row['comprobante']:
         return jsonify({'error': 'No encontrado'}), 404
     return jsonify({'comprobante': row['comprobante']})
+
+# ── API: FÉNIX OPERACIÓN / ACTIVACIONES ──────────────────────────────────────
+@app.route('/api/plans')
+@login_required
+def api_plans():
+    db = get_db()
+    c = db.cursor()
+    c.execute("SELECT * FROM plans WHERE is_active = TRUE ORDER BY months ASC, price_gtq ASC NULLS LAST" if PG else
+              "SELECT * FROM plans WHERE is_active = 1 ORDER BY months ASC, price_gtq IS NULL, price_gtq ASC")
+    rows = fetchall(c)
+    db.close()
+    return jsonify({'plans': rows})
+
+
+@app.route('/api/activation-tasks')
+@login_required
+def api_activation_tasks():
+    status = request.args.get('status', 'open')
+    db = get_db()
+    c = db.cursor()
+    where = ""
+    params = []
+    if status == 'open':
+        where = "WHERE t.status IN (?, ?)"
+        params = ['pending', 'in_progress']
+    elif status:
+        where = "WHERE t.status = ?"
+        params = [status]
+    c.execute(qmark(f"""
+        SELECT
+          t.*, o.type as order_type, o.amount, o.currency, o.status as order_status,
+          p.name as plan_name, p.months, p.connections,
+          cl.nombre, cl.contacto, cl.vencimiento
+        FROM activation_tasks t
+        LEFT JOIN orders o ON o.id = t.order_id
+        LEFT JOIN plans p ON p.id = o.plan_id
+        LEFT JOIN clientes cl ON cl.username = t.username
+        {where}
+        ORDER BY t.created_at ASC
+        LIMIT 100
+    """), params)
+    rows = fetchall(c)
+    db.close()
+    return jsonify({'tasks': rows})
+
+
+@app.route('/api/activation-tasks', methods=['POST'])
+@login_required
+def api_create_activation_task():
+    data = request.json or {}
+    username = (data.get('username') or '').strip()
+    plan_id = data.get('plan_id')
+    order_type = data.get('type') or 'renewal'
+    amount = float(data.get('amount') or 0)
+    currency = data.get('currency') or 'GTQ'
+    payment_method = data.get('payment_method') or 'manual'
+    notes = data.get('notes') or ''
+    if not username or not plan_id:
+        return jsonify({'error': 'Usuario y plan son obligatorios'}), 400
+
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
+    if not fetchone(c):
+        db.close()
+        return jsonify({'error': 'Cliente no encontrado'}), 404
+    c.execute(qmark("SELECT * FROM plans WHERE id=?"), (plan_id,))
+    plan = fetchone(c)
+    if not plan:
+        db.close()
+        return jsonify({'error': 'Plan no encontrado'}), 404
+
+    credits = int(plan['credits_required'] or 0)
+    task_type = 'create_line' if order_type == 'new' else 'renew_line'
+    if PG:
+        c.execute("""
+            INSERT INTO orders (username, plan_id, type, status, amount, currency, credits_required, payment_method, notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            RETURNING id
+        """, (username, plan_id, order_type, 'pending_activation', amount, currency, credits, payment_method, notes))
+        order_id = c.fetchone()[0]
+        c.execute("""
+            INSERT INTO activation_tasks (order_id, username, task_type, status, assigned_to, credits_to_consume, notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s)
+            RETURNING id
+        """, (order_id, username, task_type, 'pending', session.get('user'), credits, notes))
+        task_id = c.fetchone()[0]
+    else:
+        c.execute("""
+            INSERT INTO orders (username, plan_id, type, status, amount, currency, credits_required, payment_method, notes)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (username, plan_id, order_type, 'pending_activation', amount, currency, credits, payment_method, notes))
+        order_id = c.lastrowid
+        c.execute("""
+            INSERT INTO activation_tasks (order_id, username, task_type, status, assigned_to, credits_to_consume, notes)
+            VALUES (?,?,?,?,?,?,?)
+        """, (order_id, username, task_type, 'pending', session.get('user'), credits, notes))
+        task_id = c.lastrowid
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'order_id': order_id, 'task_id': task_id})
+
+
+@app.route('/api/activation-tasks/<int:task_id>', methods=['PUT'])
+@login_required
+def api_update_activation_task(task_id):
+    data = request.json or {}
+    status = data.get('status')
+    allowed = {'pending', 'in_progress', 'done', 'blocked', 'cancelled'}
+    if status not in allowed:
+        return jsonify({'error': 'Estado inválido'}), 400
+
+    xui_username = data.get('xui_username') or ''
+    xui_expires_at = data.get('xui_expires_at') or None
+    notes = data.get('notes') or ''
+    blocked_reason = data.get('blocked_reason') or ''
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT * FROM activation_tasks WHERE id=?"), (task_id,))
+    task = fetchone(c)
+    if not task:
+        db.close()
+        return jsonify({'error': 'Tarea no encontrada'}), 404
+
+    completed_at = datetime.now(GT_TZ).isoformat() if status == 'done' else None
+    c.execute(qmark("""
+        UPDATE activation_tasks
+        SET status=?, xui_username=?, xui_expires_at=?, notes=?, blocked_reason=?, completed_at=?
+        WHERE id=?
+    """), (status, xui_username, xui_expires_at, notes, blocked_reason, completed_at, task_id))
+    if task.get('order_id'):
+        order_status = 'activated' if status == 'done' else ('blocked' if status == 'blocked' else 'in_activation')
+        c.execute(qmark("UPDATE orders SET status=?, completed_at=? WHERE id=?"),
+                  (order_status, completed_at, task['order_id']))
+    if status == 'done' and xui_expires_at:
+        c.execute(qmark("UPDATE clientes SET vencimiento=? WHERE username=?"),
+                  (xui_expires_at, task['username']))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
 
 # ── API: ANALYTICS ────────────────────────────────────────────────────────────
 @app.route('/api/analytics')
