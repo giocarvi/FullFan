@@ -23,6 +23,8 @@
     .logo img { width:118px; max-height:52px; object-fit:contain; }
     .nav-actions { display:flex; gap:10px; align-items:center; }
     .link { color:var(--muted); font-size:14px; }
+    .nav-links { display:flex; gap:16px; align-items:center; color:var(--muted); font-size:13px; }
+    .nav-links a:hover { color:var(--gold); }
     .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; border:none; border-radius:999px; padding:12px 18px; font-weight:800; cursor:pointer; transition:.18s; }
     .btn:hover { transform:translateY(-1px); filter:brightness(1.06); }
     .btn-primary { background:linear-gradient(135deg,var(--orange),var(--gold)); color:#160B02; box-shadow:0 14px 32px rgba(255,106,0,.25); }
@@ -46,6 +48,10 @@
     .mini-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:24px; }
     .mini { background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:16px; padding:12px; min-height:78px; }
     .mini b { display:block; font-size:22px; color:var(--gold); }
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:18px; }
+    .stat { background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:18px; padding:16px; text-align:center; }
+    .stat b { display:block; font-size:28px; color:var(--gold); margin-bottom:4px; }
+    .stat span { color:var(--muted); font-size:13px; }
     section { padding:42px 0; }
     .section-title { font-size:clamp(28px,4vw,44px); margin:0 0 10px; letter-spacing:-.035em; }
     .section-sub { color:var(--muted); margin:0 0 22px; line-height:1.55; max-width:720px; }
@@ -53,6 +59,10 @@
     .card { background:rgba(17,24,39,.82); border:1px solid var(--border); border-radius:22px; padding:20px; }
     .card h3 { margin:0 0 8px; font-size:19px; }
     .card p { color:var(--muted); line-height:1.5; margin:0; }
+    .feature-list { display:grid; gap:10px; margin-top:14px; }
+    .feature { display:flex; gap:10px; color:var(--muted); line-height:1.45; }
+    .feature strong { color:var(--text); }
+    .feature span:first-child { color:var(--gold); font-weight:900; }
     .plans { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
     .plan { position:relative; background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); border:1px solid var(--border); border-radius:22px; padding:20px; }
     .plan.featured { border-color:rgba(255,200,87,.58); box-shadow:0 18px 50px rgba(255,106,0,.16); }
@@ -64,6 +74,20 @@
     .devices { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
     .device { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:18px; padding:15px; color:var(--muted); }
     .device b { color:var(--text); display:block; margin-bottom:4px; }
+    .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; counter-reset:steps; }
+    .step { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:22px; padding:18px; position:relative; }
+    .step:before { counter-increment:steps; content:counter(steps); display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#190C02; font-weight:900; margin-bottom:14px; }
+    .step h3 { margin:0 0 8px; }
+    .step p { color:var(--muted); line-height:1.5; margin:0; }
+    .sports-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; align-items:stretch; }
+    .sports-card { background:linear-gradient(135deg,rgba(255,106,0,.14),rgba(124,58,237,.14)); border:1px solid var(--border); border-radius:28px; padding:24px; overflow:hidden; position:relative; }
+    .sports-card:after { content:""; position:absolute; right:-60px; bottom:-70px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle,rgba(255,200,87,.35),transparent 70%); }
+    .event-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
+    .event { background:rgba(0,0,0,.2); border:1px solid var(--border); border-radius:16px; padding:13px; color:var(--muted); }
+    .event b { color:var(--text); display:block; margin-bottom:4px; }
+    .cta-band { display:flex; align-items:center; justify-content:space-between; gap:18px; background:linear-gradient(135deg,var(--orange),var(--purple)); border-radius:28px; padding:26px; box-shadow:0 22px 60px rgba(255,106,0,.22); }
+    .cta-band h2 { margin:0 0 6px; font-size:clamp(26px,4vw,42px); }
+    .cta-band p { margin:0; color:rgba(255,255,255,.82); }
     .formbox { display:grid; grid-template-columns:1fr 1fr; gap:24px; background:linear-gradient(135deg,rgba(255,106,0,.12),rgba(124,58,237,.12)); border:1px solid var(--border); border-radius:28px; padding:24px; }
     .form { display:grid; gap:10px; }
     input, select, textarea { width:100%; border:1px solid var(--border); background:rgba(7,11,24,.78); color:var(--text); border-radius:13px; padding:13px; font:inherit; }
@@ -77,10 +101,15 @@
       .hero, .formbox { grid-template-columns:1fr; }
       .cards, .plans { grid-template-columns:1fr 1fr; }
       .devices { grid-template-columns:1fr 1fr; }
+      .stats, .steps { grid-template-columns:1fr 1fr; }
+      .sports-grid { grid-template-columns:1fr; }
+      .nav-links { display:none; }
     }
     @media (max-width:560px) {
       .nav { align-items:flex-start; flex-direction:column; padding:12px 0; }
       .cards, .plans, .devices, .mini-grid { grid-template-columns:1fr; }
+      .stats, .steps, .event-grid { grid-template-columns:1fr; }
+      .cta-band { flex-direction:column; align-items:flex-start; }
       .hero { padding-top:42px; }
       .nav-actions { width:100%; justify-content:space-between; }
       .btn { width:100%; }
@@ -92,6 +121,13 @@
   <header>
     <div class="wrap nav">
       <a class="logo" href="/inicio"><img src="{{ url_for('static', filename='logo.png') }}" alt="Fénix Digital TV"></a>
+      <nav class="nav-links">
+        <a href="#planes">Planes</a>
+        <a href="#deportes">Deportes</a>
+        <a href="#dispositivos">Dispositivos</a>
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#faq">FAQ</a>
+      </nav>
       <div class="nav-actions">
         <a class="link" href="/login">Acceso clientes/equipo</a>
         <a class="btn btn-primary" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%20Digital%20TV%2C%20quiero%20informaci%C3%B3n%20del%20servicio" target="_blank" rel="noopener">WhatsApp</a>
@@ -115,6 +151,12 @@
           <span class="chip">📱 3 dispositivos simultáneos</span>
           <span class="chip">🌎 Atención internacional</span>
         </div>
+        <div class="stats">
+          <div class="stat"><b>1,500+</b><span>clientes activos</span></div>
+          <div class="stat"><b>3</b><span>pantallas simultáneas</span></div>
+          <div class="stat"><b>3h</b><span>demo sin costo</span></div>
+          <div class="stat"><b>7+</b><span>países objetivo</span></div>
+        </div>
       </div>
       <div class="hero-card">
         <div class="screen">
@@ -134,9 +176,29 @@
       <h2 class="section-title">¿Qué incluye?</h2>
       <p class="section-sub">Una experiencia pensada para quienes quieren variedad, estabilidad y acompañamiento al instalar.</p>
       <div class="cards">
-        <div class="card"><h3>🏆 Deportes</h3><p>Eventos, ligas, fútbol y contenido deportivo para seguir tus partidos favoritos.</p></div>
-        <div class="card"><h3>🎥 Películas y series</h3><p>Entretenimiento para toda la familia desde tus pantallas favoritas.</p></div>
-        <div class="card"><h3>🛟 Soporte por WhatsApp</h3><p>Te indicamos qué app descargar y cómo ingresar según tu dispositivo.</p></div>
+        <div class="card"><h3>🏆 Deportes</h3><p>Eventos, ligas, fútbol y contenido deportivo para seguir tus partidos favoritos.</p><div class="feature-list"><div class="feature"><span>✓</span><div><strong>Eventos en vivo</strong><br>Ideal para fines de semana deportivos, torneos y partidos importantes.</div></div><div class="feature"><span>✓</span><div><strong>Variedad internacional</strong><br>Contenido para audiencias de Guatemala, Centroamérica, México y Latinoamérica.</div></div></div></div>
+        <div class="card"><h3>🎥 Películas y series</h3><p>Entretenimiento para toda la familia desde tus pantallas favoritas.</p><div class="feature-list"><div class="feature"><span>✓</span><div><strong>Contenido OnDemand</strong><br>Opciones para ver en casa desde Smart TV, móvil o computadora.</div></div><div class="feature"><span>✓</span><div><strong>Actualización frecuente</strong><br>Una experiencia pensada para encontrar algo nuevo para ver.</div></div></div></div>
+        <div class="card"><h3>🛟 Soporte por WhatsApp</h3><p>Te indicamos qué app descargar y cómo ingresar según tu dispositivo.</p><div class="feature-list"><div class="feature"><span>✓</span><div><strong>Instalación guiada</strong><br>Te damos los pasos exactos según tu equipo.</div></div><div class="feature"><span>✓</span><div><strong>Activación manual</strong><br>Nuestro equipo valida tu pago y te entrega acceso.</div></div></div></div>
+      </div>
+    </section>
+
+    <section class="wrap" id="deportes">
+      <div class="sports-grid">
+        <div class="sports-card">
+          <div class="eyebrow">⚽ Deportes todo el año</div>
+          <h2 class="section-title">Partidos, ligas y eventos para no perderte la acción.</h2>
+          <p class="section-sub">Fénix está pensado para quienes viven el deporte: fútbol, torneos internacionales, ligas regionales y eventos destacados, junto con entretenimiento para el resto de la familia.</p>
+          <a class="btn btn-primary" href="#solicitar">Quiero probar deportes</a>
+        </div>
+        <div class="card">
+          <h3>Eventos que suelen buscar nuestros clientes</h3>
+          <div class="event-grid">
+            <div class="event"><b>Fútbol</b>Ligas, clásicos y torneos internacionales.</div>
+            <div class="event"><b>Centroamérica</b>Contenido de interés para Guatemala y la región.</div>
+            <div class="event"><b>México y LatAm</b>Opciones deportivas y entretenimiento regional.</div>
+            <div class="event"><b>Familia</b>Películas, series, canales y contenido variado.</div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -176,7 +238,7 @@
       </div>
     </section>
 
-    <section class="wrap">
+    <section class="wrap" id="dispositivos">
       <h2 class="section-title">Compatible con tus dispositivos</h2>
       <p class="section-sub">Te indicamos la app correcta según tu equipo.</p>
       <div class="devices">
@@ -191,15 +253,40 @@
       </div>
     </section>
 
+    <section class="wrap" id="como-funciona">
+      <h2 class="section-title">Cómo funciona la activación</h2>
+      <p class="section-sub">No necesitas ser técnico. Nuestro equipo te acompaña desde la prueba hasta la contratación.</p>
+      <div class="steps">
+        <div class="step"><h3>Solicita demo</h3><p>Nos escribes por WhatsApp con tu país y dispositivo principal.</p></div>
+        <div class="step"><h3>Instala la app</h3><p>Te indicamos si usar Max Player, Smart One o Premium Player.</p></div>
+        <div class="step"><h3>Prueba 3 horas</h3><p>Validas calidad, contenido y compatibilidad antes de contratar.</p></div>
+        <div class="step"><h3>Activa tu plan</h3><p>Confirmamos pago, cargamos acceso y te enviamos usuario/contraseña.</p></div>
+      </div>
+    </section>
+
+    <section class="wrap">
+      <h2 class="section-title">Por qué elegir Fénix</h2>
+      <p class="section-sub">Venimos de años operando como Full Fan Digital TV y estamos evolucionando a una marca más preparada para Latinoamérica.</p>
+      <div class="cards">
+        <div class="card"><h3>⚡ Activación guiada</h3><p>Recibes acompañamiento por WhatsApp, con instrucciones claras según tu dispositivo.</p></div>
+        <div class="card"><h3>📺 Calidad adaptable</h3><p>La experiencia puede variar según internet y equipo, pero te ayudamos a elegir la mejor configuración.</p></div>
+        <div class="card"><h3>🌎 Visión regional</h3><p>Atención para Guatemala, El Salvador, Honduras, Nicaragua, Costa Rica, Panamá, México y otros países.</p></div>
+      </div>
+    </section>
+
     <section class="wrap" id="solicitar">
       <div class="formbox">
         <div>
           <h2 class="section-title">Solicita tu demo o contratación</h2>
           <p class="section-sub">Completa los datos y te abriremos WhatsApp con el mensaje listo para enviarlo al equipo Fénix.</p>
-          <div class="faq">
+          <div class="faq" id="faq">
             <details open><summary>¿Antes eran Full Fan Digital TV?</summary><p>Sí. Full Fan Digital TV ahora evoluciona a Fénix Digital TV, con nueva imagen y una operación pensada para llegar a más países.</p></details>
             <details><summary>¿Puedo probar antes?</summary><p>Sí, contamos con demo de 3 horas para que pruebes el servicio.</p></details>
             <details><summary>¿Cuántos dispositivos incluye?</summary><p>Los planes incluyen hasta 3 dispositivos simultáneos.</p></details>
+            <details><summary>¿Qué velocidad de internet necesito?</summary><p>Recomendamos una conexión estable de al menos 10 Mbps para una mejor experiencia. La calidad final depende de tu internet, dispositivo y red WiFi.</p></details>
+            <details><summary>¿Cuánto tarda la activación?</summary><p>La activación se realiza manualmente después de validar datos y pago. Normalmente es rápida durante horario de atención.</p></details>
+            <details><summary>¿Qué métodos de pago aceptan?</summary><p>En Guatemala manejamos transferencia bancaria. Para otros países podemos coordinar opciones disponibles por WhatsApp.</p></details>
+            <details><summary>¿Funciona en Roku?</summary><p>Sí. Para Roku usamos Premium Player. Te guiamos con los pasos al solicitar demo o contratación.</p></details>
           </div>
         </div>
         <form class="form" onsubmit="sendLead(event)">
@@ -220,6 +307,16 @@
           <textarea id="lead-notes" placeholder="Mensaje opcional"></textarea>
           <button class="btn btn-primary" type="submit">Enviar por WhatsApp</button>
         </form>
+      </div>
+    </section>
+
+    <section class="wrap">
+      <div class="cta-band">
+        <div>
+          <h2>¿Listo para probar Fénix?</h2>
+          <p>Solicita tu demo de 3 horas y verifica el servicio en tu propio dispositivo.</p>
+        </div>
+        <a class="btn btn-primary" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%20Digital%20TV%2C%20quiero%20una%20demo%20gratis%20de%203%20horas" target="_blank" rel="noopener">Pedir demo ahora</a>
       </div>
     </section>
   </main>
