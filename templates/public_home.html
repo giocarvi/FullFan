@@ -45,6 +45,16 @@
     .live { display:inline-flex; gap:8px; align-items:center; background:rgba(239,68,68,.16); color:#FCA5A5; border:1px solid rgba(239,68,68,.35); padding:7px 10px; border-radius:999px; font-size:12px; font-weight:800; }
     .screen h2 { font-size:34px; margin:58px 0 10px; max-width:360px; }
     .screen p { color:var(--muted); max-width:360px; line-height:1.5; }
+    .poster-wall { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:22px; transform:rotate(-2deg); }
+    .poster { min-height:112px; border-radius:16px; padding:12px; display:flex; flex-direction:column; justify-content:flex-end; border:1px solid rgba(255,255,255,.16); box-shadow:0 12px 30px rgba(0,0,0,.28); overflow:hidden; position:relative; }
+    .poster:before { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent,rgba(0,0,0,.72)); }
+    .poster span { position:relative; z-index:1; font-size:12px; color:#fff; font-weight:900; text-shadow:0 2px 8px rgba(0,0,0,.6); }
+    .poster:nth-child(1) { background:linear-gradient(135deg,#FF6A00,#7C2D12); }
+    .poster:nth-child(2) { background:linear-gradient(135deg,#2563EB,#111827); margin-top:18px; }
+    .poster:nth-child(3) { background:linear-gradient(135deg,#7C3AED,#DB2777); }
+    .poster:nth-child(4) { background:linear-gradient(135deg,#059669,#064E3B); }
+    .poster:nth-child(5) { background:linear-gradient(135deg,#F59E0B,#581C87); margin-top:-16px; }
+    .poster:nth-child(6) { background:linear-gradient(135deg,#DC2626,#020617); }
     .mini-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:24px; }
     .mini { background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:16px; padding:12px; min-height:78px; }
     .mini b { display:block; font-size:22px; color:var(--gold); }
@@ -85,6 +95,16 @@
     .event-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
     .event { background:rgba(0,0,0,.2); border:1px solid var(--border); border-radius:16px; padding:13px; color:var(--muted); }
     .event b { color:var(--text); display:block; margin-bottom:4px; }
+    .showcase { overflow:hidden; border:1px solid var(--border); border-radius:28px; background:rgba(255,255,255,.035); padding:18px; }
+    .rail { display:grid; grid-template-columns:repeat(8, minmax(120px,1fr)); gap:12px; min-width:980px; }
+    .tile { min-height:170px; border-radius:18px; border:1px solid rgba(255,255,255,.15); padding:14px; display:flex; align-items:flex-end; background:linear-gradient(135deg,rgba(255,106,0,.6),rgba(124,58,237,.5)); position:relative; overflow:hidden; }
+    .tile:after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent,rgba(0,0,0,.76)); }
+    .tile b { position:relative; z-index:1; font-size:14px; }
+    .tile:nth-child(2n) { background:linear-gradient(135deg,rgba(16,185,129,.65),rgba(37,99,235,.45)); }
+    .tile:nth-child(3n) { background:linear-gradient(135deg,rgba(239,68,68,.65),rgba(245,158,11,.45)); }
+    .premium-list { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
+    .premium-list div { background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:16px; padding:13px; color:var(--muted); }
+    .premium-list strong { color:var(--text); display:block; margin-bottom:4px; }
     .cta-band { display:flex; align-items:center; justify-content:space-between; gap:18px; background:linear-gradient(135deg,var(--orange),var(--purple)); border-radius:28px; padding:26px; box-shadow:0 22px 60px rgba(255,106,0,.22); }
     .cta-band h2 { margin:0 0 6px; font-size:clamp(26px,4vw,42px); }
     .cta-band p { margin:0; color:rgba(255,255,255,.82); }
@@ -104,6 +124,7 @@
       .stats, .steps { grid-template-columns:1fr 1fr; }
       .sports-grid { grid-template-columns:1fr; }
       .nav-links { display:none; }
+      .premium-list { grid-template-columns:1fr; }
     }
     @media (max-width:560px) {
       .nav { align-items:flex-start; flex-direction:column; padding:12px 0; }
@@ -161,8 +182,16 @@
       <div class="hero-card">
         <div class="screen">
           <span class="live">● EN VIVO</span>
-          <h2>Deportes, estrenos y entretenimiento en una sola experiencia.</h2>
-          <p>Prueba el servicio antes de contratar. Te guiamos por WhatsApp según tu dispositivo.</p>
+          <h2>Una experiencia completa para casa, móvil y Smart TV.</h2>
+          <p>Canales en vivo, deportes, películas, series y contenido familiar con instalación guiada.</p>
+          <div class="poster-wall">
+            <div class="poster"><span>Fútbol en vivo</span></div>
+            <div class="poster"><span>Películas</span></div>
+            <div class="poster"><span>Series</span></div>
+            <div class="poster"><span>Familia</span></div>
+            <div class="poster"><span>Eventos</span></div>
+            <div class="poster"><span>Internacional</span></div>
+          </div>
           <div class="mini-grid">
             <div class="mini"><b>3h</b><span>Demo gratis</span></div>
             <div class="mini"><b>3</b><span>conexiones</span></div>
@@ -202,22 +231,45 @@
       </div>
     </section>
 
+    <section class="wrap">
+      <h2 class="section-title">Entretenimiento para todos los gustos</h2>
+      <p class="section-sub">Una landing más visual ayuda a que el cliente entienda rápido el valor: no solo compra acceso, compra una experiencia completa para ver deportes, películas, series y contenido en vivo desde sus pantallas favoritas.</p>
+      <div class="showcase">
+        <div class="rail">
+          <div class="tile"><b>Acción</b></div>
+          <div class="tile"><b>Estrenos</b></div>
+          <div class="tile"><b>Series</b></div>
+          <div class="tile"><b>Infantil</b></div>
+          <div class="tile"><b>Deportes</b></div>
+          <div class="tile"><b>Noticias</b></div>
+          <div class="tile"><b>Latinoamérica</b></div>
+          <div class="tile"><b>Eventos</b></div>
+        </div>
+      </div>
+      <div class="premium-list">
+        <div><strong>Sin instalaciones complicadas</strong>Te guiamos con la app correcta según tu dispositivo.</div>
+        <div><strong>Demo antes de contratar</strong>Prueba durante 3 horas para confirmar compatibilidad y experiencia.</div>
+        <div><strong>Planes flexibles</strong>Elige mensual, trimestral, semestral o anual según tu necesidad.</div>
+        <div><strong>Atención humana</strong>Soporte directo por WhatsApp para activación y dudas básicas.</div>
+      </div>
+    </section>
+
     <section class="wrap" id="planes">
       <h2 class="section-title">Planes Fénix</h2>
-      <p class="section-sub">Precios de referencia. Para Guatemala manejamos quetzales; para otros países podemos cotizar en dólares.</p>
+      <p class="section-sub">Elige el tiempo que prefieras. Todos los planes incluyen hasta 3 dispositivos simultáneos, soporte de instalación y acceso al ecosistema de entretenimiento Fénix. Para Guatemala manejamos quetzales; para otros países podemos cotizar en dólares.</p>
       <div class="plans">
         <div class="plan">
           <h3>1 mes</h3>
           <div class="price">Q90</div>
           <div class="usd">aprox. US$13.99</div>
-          <ul><li>3 dispositivos simultáneos</li><li>Soporte de instalación</li><li>Ideal para probar</li></ul>
+          <ul><li>3 dispositivos simultáneos</li><li>Soporte de instalación</li><li>Ideal para probar</li><li>Activación guiada por WhatsApp</li></ul>
           <a class="btn btn-ghost" href="#solicitar">Elegir</a>
         </div>
         <div class="plan">
           <h3>3 meses</h3>
           <div class="price">Q225</div>
           <div class="usd">aprox. US$38.99</div>
-          <ul><li>Mejor precio mensual</li><li>3 dispositivos simultáneos</li><li>Activación guiada</li></ul>
+          <ul><li>Mejor precio mensual</li><li>3 dispositivos simultáneos</li><li>Activación guiada</li><li>Buena opción familiar</li></ul>
           <a class="btn btn-ghost" href="#solicitar">Elegir</a>
         </div>
         <div class="plan featured">
@@ -225,17 +277,18 @@
           <h3>6 meses</h3>
           <div class="price">Q400</div>
           <div class="usd">aprox. US$73.99</div>
-          <ul><li>Excelente ahorro</li><li>3 dispositivos simultáneos</li><li>Soporte por WhatsApp</li></ul>
+          <ul><li>Excelente ahorro</li><li>3 dispositivos simultáneos</li><li>Soporte por WhatsApp</li><li>Recomendado para clientes frecuentes</li></ul>
           <a class="btn btn-primary" href="#solicitar">Elegir</a>
         </div>
         <div class="plan">
           <h3>12 meses</h3>
           <div class="price">Q700</div>
           <div class="usd">aprox. US$137.99</div>
-          <ul><li>Máximo ahorro anual</li><li>3 dispositivos simultáneos</li><li>Renovación sencilla</li></ul>
+          <ul><li>Máximo ahorro anual</li><li>3 dispositivos simultáneos</li><li>Renovación sencilla</li><li>Menor preocupación mes a mes</li></ul>
           <a class="btn btn-ghost" href="#solicitar">Elegir</a>
         </div>
       </div>
+      <p class="section-sub" style="margin-top:16px;font-size:14px;">La activación se realiza manualmente después de validar datos y pago. Durante horario de atención, el equipo te guía para que empieces lo antes posible.</p>
     </section>
 
     <section class="wrap" id="dispositivos">
