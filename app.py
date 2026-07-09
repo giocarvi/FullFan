@@ -538,6 +538,11 @@ def login_required(f):
     return decorated
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
+@app.route('/inicio')
+def public_home():
+    return render_template('public_home.html')
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None

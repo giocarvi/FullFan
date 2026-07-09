@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fénix Digital TV | Tu entretenimiento, sin fronteras</title>
+  <meta name="description" content="Fénix Digital TV: deportes, películas, series y entretenimiento en tus dispositivos favoritos. Demo gratis de 3 horas.">
+  <style>
+    :root {
+      --bg:#070B18; --card:#111827; --card2:#171E33; --text:#F8F7F2; --muted:#A8B3CF;
+      --orange:#FF6A00; --gold:#FFC857; --purple:#7C3AED; --green:#10B981; --border:rgba(255,255,255,.12);
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; background:
+      radial-gradient(circle at top left, rgba(255,106,0,.18), transparent 34%),
+      radial-gradient(circle at 85% 10%, rgba(124,58,237,.22), transparent 32%),
+      var(--bg); color:var(--text); }
+    a { color:inherit; text-decoration:none; }
+    .wrap { width:min(1120px, calc(100% - 32px)); margin:0 auto; }
+    header { position:sticky; top:0; z-index:10; backdrop-filter:blur(16px); background:rgba(7,11,24,.76); border-bottom:1px solid var(--border); }
+    .nav { display:flex; align-items:center; justify-content:space-between; min-height:74px; gap:16px; }
+    .logo { display:flex; align-items:center; gap:12px; }
+    .logo img { width:118px; max-height:52px; object-fit:contain; }
+    .nav-actions { display:flex; gap:10px; align-items:center; }
+    .link { color:var(--muted); font-size:14px; }
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; border:none; border-radius:999px; padding:12px 18px; font-weight:800; cursor:pointer; transition:.18s; }
+    .btn:hover { transform:translateY(-1px); filter:brightness(1.06); }
+    .btn-primary { background:linear-gradient(135deg,var(--orange),var(--gold)); color:#160B02; box-shadow:0 14px 32px rgba(255,106,0,.25); }
+    .btn-ghost { border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text); }
+    .hero { padding:72px 0 42px; display:grid; grid-template-columns:1.12fr .88fr; gap:34px; align-items:center; }
+    .eyebrow { display:inline-flex; border:1px solid rgba(255,200,87,.34); color:var(--gold); background:rgba(255,200,87,.08); padding:7px 12px; border-radius:999px; font-size:13px; font-weight:800; margin-bottom:18px; }
+    h1 { font-size:clamp(38px, 6vw, 72px); line-height:.98; margin:0 0 18px; letter-spacing:-.05em; }
+    .gradient { background:linear-gradient(135deg,#fff,var(--gold),var(--orange)); -webkit-background-clip:text; color:transparent; }
+    .lead { color:var(--muted); font-size:clamp(17px, 2.1vw, 22px); line-height:1.55; margin:0 0 24px; max-width:680px; }
+    .hero-actions { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:22px; }
+    .trust { display:flex; flex-wrap:wrap; gap:10px; color:var(--muted); font-size:13px; }
+    .chip { border:1px solid var(--border); background:rgba(255,255,255,.04); border-radius:999px; padding:8px 11px; }
+    .hero-card { background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03)); border:1px solid var(--border); border-radius:28px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+    .screen { min-height:360px; border-radius:22px; background:
+      linear-gradient(135deg,rgba(255,106,0,.2),rgba(124,58,237,.18)),
+      linear-gradient(180deg,#111827,#090D1C); border:1px solid rgba(255,255,255,.14); padding:20px; position:relative; overflow:hidden; }
+    .screen:before { content:""; position:absolute; inset:auto -50px -70px auto; width:240px; height:240px; background:radial-gradient(circle,var(--orange),transparent 66%); opacity:.42; }
+    .live { display:inline-flex; gap:8px; align-items:center; background:rgba(239,68,68,.16); color:#FCA5A5; border:1px solid rgba(239,68,68,.35); padding:7px 10px; border-radius:999px; font-size:12px; font-weight:800; }
+    .screen h2 { font-size:34px; margin:58px 0 10px; max-width:360px; }
+    .screen p { color:var(--muted); max-width:360px; line-height:1.5; }
+    .mini-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:24px; }
+    .mini { background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:16px; padding:12px; min-height:78px; }
+    .mini b { display:block; font-size:22px; color:var(--gold); }
+    section { padding:42px 0; }
+    .section-title { font-size:clamp(28px,4vw,44px); margin:0 0 10px; letter-spacing:-.035em; }
+    .section-sub { color:var(--muted); margin:0 0 22px; line-height:1.55; max-width:720px; }
+    .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .card { background:rgba(17,24,39,.82); border:1px solid var(--border); border-radius:22px; padding:20px; }
+    .card h3 { margin:0 0 8px; font-size:19px; }
+    .card p { color:var(--muted); line-height:1.5; margin:0; }
+    .plans { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+    .plan { position:relative; background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); border:1px solid var(--border); border-radius:22px; padding:20px; }
+    .plan.featured { border-color:rgba(255,200,87,.58); box-shadow:0 18px 50px rgba(255,106,0,.16); }
+    .badge { position:absolute; right:14px; top:14px; font-size:11px; color:#160B02; background:var(--gold); border-radius:999px; padding:5px 8px; font-weight:900; }
+    .price { font-size:34px; font-weight:900; margin:14px 0 4px; }
+    .usd { color:var(--muted); font-size:13px; margin-bottom:16px; }
+    .plan ul { padding:0; list-style:none; margin:0 0 18px; color:var(--muted); display:grid; gap:8px; font-size:14px; }
+    .plan li:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
+    .devices { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+    .device { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:18px; padding:15px; color:var(--muted); }
+    .device b { color:var(--text); display:block; margin-bottom:4px; }
+    .formbox { display:grid; grid-template-columns:1fr 1fr; gap:24px; background:linear-gradient(135deg,rgba(255,106,0,.12),rgba(124,58,237,.12)); border:1px solid var(--border); border-radius:28px; padding:24px; }
+    .form { display:grid; gap:10px; }
+    input, select, textarea { width:100%; border:1px solid var(--border); background:rgba(7,11,24,.78); color:var(--text); border-radius:13px; padding:13px; font:inherit; }
+    textarea { min-height:86px; resize:vertical; }
+    footer { border-top:1px solid var(--border); color:var(--muted); padding:28px 0 40px; font-size:13px; }
+    .faq { display:grid; gap:10px; }
+    details { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:16px; padding:14px 16px; }
+    summary { cursor:pointer; font-weight:800; }
+    details p { color:var(--muted); line-height:1.5; }
+    @media (max-width:900px) {
+      .hero, .formbox { grid-template-columns:1fr; }
+      .cards, .plans { grid-template-columns:1fr 1fr; }
+      .devices { grid-template-columns:1fr 1fr; }
+    }
+    @media (max-width:560px) {
+      .nav { align-items:flex-start; flex-direction:column; padding:12px 0; }
+      .cards, .plans, .devices, .mini-grid { grid-template-columns:1fr; }
+      .hero { padding-top:42px; }
+      .nav-actions { width:100%; justify-content:space-between; }
+      .btn { width:100%; }
+      .hero-actions .btn { width:100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <a class="logo" href="/inicio"><img src="{{ url_for('static', filename='logo.png') }}" alt="Fénix Digital TV"></a>
+      <div class="nav-actions">
+        <a class="link" href="/login">Acceso clientes/equipo</a>
+        <a class="btn btn-primary" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%20Digital%20TV%2C%20quiero%20informaci%C3%B3n%20del%20servicio" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="wrap hero">
+      <div>
+        <div class="eyebrow">🔥 Demo gratis de 3 horas</div>
+        <h1>Tu entretenimiento, <span class="gradient">sin fronteras.</span></h1>
+        <p class="lead">Fénix Digital TV reúne deportes, películas, series y contenido internacional para disfrutar desde celular, Smart TV, Firestick, Roku, computadora y más.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#solicitar">Solicitar demo</a>
+          <a class="btn btn-ghost" href="#planes">Ver planes</a>
+        </div>
+        <div class="trust">
+          <span class="chip">⚽ Todos los deportes</span>
+          <span class="chip">🎬 Películas y series</span>
+          <span class="chip">📱 3 dispositivos simultáneos</span>
+          <span class="chip">🌎 Atención internacional</span>
+        </div>
+      </div>
+      <div class="hero-card">
+        <div class="screen">
+          <span class="live">● EN VIVO</span>
+          <h2>Deportes, estrenos y entretenimiento en una sola experiencia.</h2>
+          <p>Prueba el servicio antes de contratar. Te guiamos por WhatsApp según tu dispositivo.</p>
+          <div class="mini-grid">
+            <div class="mini"><b>3h</b><span>Demo gratis</span></div>
+            <div class="mini"><b>3</b><span>conexiones</span></div>
+            <div class="mini"><b>24/7</b><span>contenido</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap">
+      <h2 class="section-title">¿Qué incluye?</h2>
+      <p class="section-sub">Una experiencia pensada para quienes quieren variedad, estabilidad y acompañamiento al instalar.</p>
+      <div class="cards">
+        <div class="card"><h3>🏆 Deportes</h3><p>Eventos, ligas, fútbol y contenido deportivo para seguir tus partidos favoritos.</p></div>
+        <div class="card"><h3>🎥 Películas y series</h3><p>Entretenimiento para toda la familia desde tus pantallas favoritas.</p></div>
+        <div class="card"><h3>🛟 Soporte por WhatsApp</h3><p>Te indicamos qué app descargar y cómo ingresar según tu dispositivo.</p></div>
+      </div>
+    </section>
+
+    <section class="wrap" id="planes">
+      <h2 class="section-title">Planes Fénix</h2>
+      <p class="section-sub">Precios de referencia. Para Guatemala manejamos quetzales; para otros países podemos cotizar en dólares.</p>
+      <div class="plans">
+        <div class="plan">
+          <h3>1 mes</h3>
+          <div class="price">Q90</div>
+          <div class="usd">aprox. US$13.99</div>
+          <ul><li>3 dispositivos simultáneos</li><li>Soporte de instalación</li><li>Ideal para probar</li></ul>
+          <a class="btn btn-ghost" href="#solicitar">Elegir</a>
+        </div>
+        <div class="plan">
+          <h3>3 meses</h3>
+          <div class="price">Q225</div>
+          <div class="usd">aprox. US$38.99</div>
+          <ul><li>Mejor precio mensual</li><li>3 dispositivos simultáneos</li><li>Activación guiada</li></ul>
+          <a class="btn btn-ghost" href="#solicitar">Elegir</a>
+        </div>
+        <div class="plan featured">
+          <span class="badge">Popular</span>
+          <h3>6 meses</h3>
+          <div class="price">Q400</div>
+          <div class="usd">aprox. US$73.99</div>
+          <ul><li>Excelente ahorro</li><li>3 dispositivos simultáneos</li><li>Soporte por WhatsApp</li></ul>
+          <a class="btn btn-primary" href="#solicitar">Elegir</a>
+        </div>
+        <div class="plan">
+          <h3>12 meses</h3>
+          <div class="price">Q700</div>
+          <div class="usd">aprox. US$137.99</div>
+          <ul><li>Máximo ahorro anual</li><li>3 dispositivos simultáneos</li><li>Renovación sencilla</li></ul>
+          <a class="btn btn-ghost" href="#solicitar">Elegir</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap">
+      <h2 class="section-title">Compatible con tus dispositivos</h2>
+      <p class="section-sub">Te indicamos la app correcta según tu equipo.</p>
+      <div class="devices">
+        <div class="device"><b>Android / iOS</b>Max Player</div>
+        <div class="device"><b>Firestick</b>Max Player</div>
+        <div class="device"><b>Samsung / LG Smart TV</b>Max Player</div>
+        <div class="device"><b>Windows / Mac</b>Max Player</div>
+        <div class="device"><b>Hisense Smart TV</b>Smart One</div>
+        <div class="device"><b>Roku</b>Premium Player</div>
+        <div class="device"><b>Atención</b>WhatsApp</div>
+        <div class="device"><b>Demo</b>3 horas gratis</div>
+      </div>
+    </section>
+
+    <section class="wrap" id="solicitar">
+      <div class="formbox">
+        <div>
+          <h2 class="section-title">Solicita tu demo o contratación</h2>
+          <p class="section-sub">Completa los datos y te abriremos WhatsApp con el mensaje listo para enviarlo al equipo Fénix.</p>
+          <div class="faq">
+            <details open><summary>¿Antes eran Full Fan Digital TV?</summary><p>Sí. Full Fan Digital TV ahora evoluciona a Fénix Digital TV, con nueva imagen y una operación pensada para llegar a más países.</p></details>
+            <details><summary>¿Puedo probar antes?</summary><p>Sí, contamos con demo de 3 horas para que pruebes el servicio.</p></details>
+            <details><summary>¿Cuántos dispositivos incluye?</summary><p>Los planes incluyen hasta 3 dispositivos simultáneos.</p></details>
+          </div>
+        </div>
+        <form class="form" onsubmit="sendLead(event)">
+          <input id="lead-name" placeholder="Tu nombre" required>
+          <input id="lead-country" placeholder="País" required>
+          <input id="lead-phone" placeholder="WhatsApp" required>
+          <select id="lead-device" required>
+            <option value="">Dispositivo principal</option>
+            <option>Celular Android</option><option>iPhone / iPad</option><option>Firestick</option>
+            <option>Samsung Smart TV</option><option>LG Smart TV</option><option>Hisense Smart TV</option>
+            <option>Roku</option><option>Windows / Mac</option>
+          </select>
+          <select id="lead-plan" required>
+            <option value="">Qué deseas</option>
+            <option>Demo gratis de 3 horas</option><option>Plan 1 mes</option><option>Plan 3 meses</option>
+            <option>Plan 6 meses</option><option>Plan 12 meses</option>
+          </select>
+          <textarea id="lead-notes" placeholder="Mensaje opcional"></textarea>
+          <button class="btn btn-primary" type="submit">Enviar por WhatsApp</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">© 2026 Fénix Digital TV. Tu entretenimiento, sin fronteras. Servicio sujeto a disponibilidad técnica por dispositivo y país.</div>
+  </footer>
+
+  <script>
+    function sendLead(e) {
+      e.preventDefault();
+      const data = {
+        nombre: document.getElementById('lead-name').value.trim(),
+        pais: document.getElementById('lead-country').value.trim(),
+        whatsapp: document.getElementById('lead-phone').value.trim(),
+        dispositivo: document.getElementById('lead-device').value,
+        plan: document.getElementById('lead-plan').value,
+        notas: document.getElementById('lead-notes').value.trim()
+      };
+      const msg = `Hola Fénix Digital TV, quiero información.\n\nNombre: ${data.nombre}\nPaís: ${data.pais}\nWhatsApp: ${data.whatsapp}\nDispositivo: ${data.dispositivo}\nInterés: ${data.plan}\nNotas: ${data.notas || 'N/A'}`;
+      window.open(`https://wa.me/50241562336?text=${encodeURIComponent(msg)}`, '_blank');
+    }
+  </script>
+</body>
+</html>
