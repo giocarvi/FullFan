@@ -548,6 +548,7 @@ DEVICE_GUIDES = {
         'title': 'Android / iOS',
         'app': 'Max Player',
         'icon': '📱',
+        'logo': 'apps/max-player.webp',
         'steps': [
             'Abre la tienda de aplicaciones de tu dispositivo.',
             'Busca e instala Max Player.',
@@ -561,6 +562,7 @@ DEVICE_GUIDES = {
         'title': 'Firestick',
         'app': 'Max Player',
         'icon': '🔥',
+        'logo': 'apps/max-player.webp',
         'steps': [
             'Conecta tu Firestick a internet.',
             'Busca Max Player desde tu tienda o método de instalación disponible.',
@@ -574,6 +576,7 @@ DEVICE_GUIDES = {
         'title': 'Samsung / LG Smart TV',
         'app': 'Max Player',
         'icon': '📺',
+        'logo': 'apps/max-player.webp',
         'steps': [
             'Abre la tienda de apps de tu Smart TV.',
             'Busca Max Player.',
@@ -587,6 +590,7 @@ DEVICE_GUIDES = {
         'title': 'Hisense Smart TV',
         'app': 'Smart One',
         'icon': '🖥️',
+        'logo': 'apps/smart-one.webp',
         'steps': [
             'Abre la tienda de aplicaciones de Hisense.',
             'Busca Smart One.',
@@ -600,6 +604,7 @@ DEVICE_GUIDES = {
         'title': 'Roku',
         'app': 'Premium Player',
         'icon': '🟣',
+        'logo': 'apps/premium-player.webp',
         'steps': [
             'Agrega Premium Player en tu Roku.',
             'Abre la app y revisa la pantalla inicial.',
@@ -613,6 +618,7 @@ DEVICE_GUIDES = {
         'title': 'Windows / Mac',
         'app': 'Max Player',
         'icon': '💻',
+        'logo': 'apps/max-player.webp',
         'steps': [
             'Instala Max Player o la app compatible que te indiquemos.',
             'Conecta tu computadora a una red estable.',
@@ -626,6 +632,7 @@ DEVICE_GUIDES = {
         'title': 'Atención por WhatsApp',
         'app': 'Soporte Fénix',
         'icon': '💬',
+        'logo': '',
         'steps': [
             'Escríbenos al WhatsApp oficial.',
             'Indica país, dispositivo y si deseas demo o contratar.',
@@ -639,6 +646,7 @@ DEVICE_GUIDES = {
         'title': 'Demo gratis de 3 horas',
         'app': 'Prueba Fénix',
         'icon': '⏱️',
+        'logo': '',
         'steps': [
             'Solicita la demo por WhatsApp.',
             'Indica tu dispositivo principal.',
