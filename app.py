@@ -1497,6 +1497,9 @@ def actualizar_cliente(username):
             return jsonify({'error': 'Ese username ya está en uso'}), 409
         # Actualizar pagos primero (FK)
         c.execute(qmark("UPDATE pagos SET username=? WHERE username=?"), (nuevo_username, username))
+        c.execute(qmark("UPDATE client_portal_accounts SET username=? WHERE username=?"), (nuevo_username, username))
+        c.execute(qmark("UPDATE client_service_credentials SET username=? WHERE username=?"), (nuevo_username, username))
+        c.execute(qmark("UPDATE activation_tasks SET username=? WHERE username=?"), (nuevo_username, username))
         # Actualizar cliente
         c.execute(qmark("UPDATE clientes SET username=? WHERE username=?"), (nuevo_username, username))
         username = nuevo_username  # usar el nuevo para el resto de campos
@@ -1509,6 +1512,62 @@ def actualizar_cliente(username):
     if fields:
         params.append(username)
         c.execute(qmark(f"UPDATE clientes SET {', '.join(fields)} WHERE username=?"), params)
+
+    service_username = (data.get('service_username') or '').strip()
+    service_password = (data.get('service_password') or '').strip()
+    if service_username or service_password or data.get('vencimiento'):
+        now = now_gt().isoformat(timespec='seconds')
+        expires_at = data.get('vencimiento') or ''
+        if PG:
+            c.execute("""
+                INSERT INTO client_service_credentials
+                    (username, app_name, service_username, service_password, expires_at, devices, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (username) DO UPDATE SET
+                    app_name=EXCLUDED.app_name,
+                    service_username=COALESCE(NULLIF(EXCLUDED.service_username,''), client_service_credentials.service_username),
+                    service_password=COALESCE(NULLIF(EXCLUDED.service_password,''), client_service_credentials.service_password),
+                    expires_at=COALESCE(NULLIF(EXCLUDED.expires_at,''), client_service_credentials.expires_at),
+                    devices=EXCLUDED.devices,
+                    maxplayer_user_id=CASE
+                        WHEN NULLIF(EXCLUDED.service_username,'') IS NOT NULL
+                             AND EXCLUDED.service_username <> client_service_credentials.service_username
+                        THEN NULL
+                        ELSE client_service_credentials.maxplayer_user_id
+                    END,
+                    maxplayer_sync_status=CASE
+                        WHEN NULLIF(EXCLUDED.service_username,'') IS NOT NULL
+                             AND EXCLUDED.service_username <> client_service_credentials.service_username
+                        THEN 'pending_restore'
+                        ELSE client_service_credentials.maxplayer_sync_status
+                    END,
+                    updated_at=EXCLUDED.updated_at
+            """, (username, 'Max Player', service_username, service_password, expires_at, 3, now))
+        else:
+            c.execute("""
+                INSERT INTO client_service_credentials
+                    (username, app_name, service_username, service_password, expires_at, devices, updated_at)
+                VALUES (?,?,?,?,?,?,?)
+                ON CONFLICT(username) DO UPDATE SET
+                    app_name=excluded.app_name,
+                    service_username=COALESCE(NULLIF(excluded.service_username,''), client_service_credentials.service_username),
+                    service_password=COALESCE(NULLIF(excluded.service_password,''), client_service_credentials.service_password),
+                    expires_at=COALESCE(NULLIF(excluded.expires_at,''), client_service_credentials.expires_at),
+                    devices=excluded.devices,
+                    maxplayer_user_id=CASE
+                        WHEN NULLIF(excluded.service_username,'') IS NOT NULL
+                             AND excluded.service_username <> client_service_credentials.service_username
+                        THEN NULL
+                        ELSE client_service_credentials.maxplayer_user_id
+                    END,
+                    maxplayer_sync_status=CASE
+                        WHEN NULLIF(excluded.service_username,'') IS NOT NULL
+                             AND excluded.service_username <> client_service_credentials.service_username
+                        THEN 'pending_restore'
+                        ELSE client_service_credentials.maxplayer_sync_status
+                    END,
+                    updated_at=excluded.updated_at
+            """, (username, 'Max Player', service_username, service_password, expires_at, 3, now))
 
     db.commit()
     db.close()

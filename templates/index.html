@@ -1466,6 +1466,7 @@ async function openModal(username) {
       <h3>Max Player</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <span class="badge gray">Usuario: ${service.service_username || c.username}</span>
+        <span class="badge gray">Password app: ${service.service_username || c.username}</span>
         <span class="badge ${service.maxplayer_user_id ? 'green' : 'yellow'}">${service.maxplayer_user_id ? 'ID guardado' : 'Sin ID guardado'}</span>
         ${service.maxplayer_sync_status ? `<span class="badge gray">${service.maxplayer_sync_status}</span>` : ''}
       </div>
@@ -1510,6 +1511,18 @@ async function openModal(username) {
         <label>Notas</label>
         <textarea id="edit-notas" rows="2" placeholder="Notas internas..." style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:14px;resize:vertical;">${c.notas || ''}</textarea>
       </div>
+      <div class="section-divider">Credenciales XUI / Max Player</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Usuario XUI / Max Player</label>
+          <input type="text" id="edit-service-username" value="${service.service_username || c.username}" placeholder="Usuario en XUI / Max Player" style="font-family:monospace;font-size:14px;">
+        </div>
+        <div class="form-group">
+          <label>Password XUI/IPTV interno</label>
+          <input type="password" id="edit-service-password" value="${service.service_password || ''}" placeholder="Password XUI/IPTV">
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">El portal del cliente muestra como password de Max Player el mismo usuario Max Player. El password XUI/IPTV queda solo para uso interno y sincronizacion.</div>
       <button class="btn-primary" onclick="guardarEdicion('${username}')">💾 Guardar cambios</button>
       ${esAdmin ? `<button class="btn-danger" style="background:var(--red);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-left:6px;" onclick="eliminarCliente('${username}', '${(c.nombre||username).replace(/'/g,"\\'") }')">🗑️ Eliminar cliente</button>` : ''}
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
@@ -1589,6 +1602,10 @@ async function guardarEdicion(username) {
   const vencimiento= document.getElementById('edit-vencimiento').value || null;
   const referido   = document.getElementById('edit-referido').value;
   const notas      = document.getElementById('edit-notas').value.trim();
+  const serviceUsernameEl = document.getElementById('edit-service-username');
+  const servicePasswordEl = document.getElementById('edit-service-password');
+  const service_username = serviceUsernameEl ? serviceUsernameEl.value.trim() : '';
+  const service_password = servicePasswordEl ? servicePasswordEl.value.trim() : '';
   const usernameEl = document.getElementById('edit-username');
   const nuevo_username = usernameEl ? usernameEl.value.trim() : username;
 
@@ -1597,7 +1614,7 @@ async function guardarEdicion(username) {
     if (!confirm(`¿Cambiar el username de "${username}" a "${nuevo_username}"?\n\nEsto actualizará también todo el historial de pagos.`)) return;
   }
 
-  const body = { nombre, contacto, vencimiento, referido, notas };
+  const body = { nombre, contacto, vencimiento, referido, notas, service_username, service_password };
   if (nuevo_username && nuevo_username !== username) body.nuevo_username = nuevo_username;
 
   const r = await fetch(`/api/clientes/${username}`, {
