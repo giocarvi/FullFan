@@ -38,6 +38,12 @@
     .trust { display:flex; flex-wrap:wrap; gap:10px; color:var(--muted); font-size:13px; }
     .chip { border:1px solid var(--border); background:rgba(255,255,255,.04); border-radius:999px; padding:8px 11px; }
     .hero-card { background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03)); border:1px solid var(--border); border-radius:28px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+    .landing-img { width:100%; display:block; border-radius:24px; border:1px solid var(--border); box-shadow:0 20px 54px rgba(0,0,0,.34); object-fit:cover; }
+    .image-card { position:relative; overflow:hidden; border-radius:28px; border:1px solid var(--border); background:rgba(255,255,255,.04); }
+    .image-card .landing-img { border:0; border-radius:28px; min-height:360px; }
+    .image-overlay { position:absolute; inset:auto 18px 18px 18px; padding:18px; border-radius:20px; background:linear-gradient(180deg,rgba(7,11,24,.2),rgba(7,11,24,.86)); border:1px solid rgba(255,255,255,.14); }
+    .image-overlay h3 { margin:0 0 6px; font-size:24px; }
+    .image-overlay p { margin:0; color:var(--muted); line-height:1.45; }
     .screen { min-height:360px; border-radius:22px; background:
       linear-gradient(135deg,rgba(255,106,0,.2),rgba(124,58,237,.18)),
       linear-gradient(180deg,#111827,#090D1C); border:1px solid rgba(255,255,255,.14); padding:20px; position:relative; overflow:hidden; }
@@ -91,11 +97,15 @@
     .step p { color:var(--muted); line-height:1.5; margin:0; }
     .sports-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; align-items:stretch; }
     .sports-card { background:linear-gradient(135deg,rgba(255,106,0,.14),rgba(124,58,237,.14)); border:1px solid var(--border); border-radius:28px; padding:24px; overflow:hidden; position:relative; }
+    .sports-image { min-height:360px; background-position:center; background-size:cover; border-radius:28px; border:1px solid var(--border); position:relative; overflow:hidden; }
+    .sports-image:after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(7,11,24,.82),rgba(7,11,24,.18)); }
+    .sports-image-content { position:absolute; z-index:1; left:24px; bottom:24px; right:24px; max-width:520px; }
     .sports-card:after { content:""; position:absolute; right:-60px; bottom:-70px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle,rgba(255,200,87,.35),transparent 70%); }
     .event-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
     .event { background:rgba(0,0,0,.2); border:1px solid var(--border); border-radius:16px; padding:13px; color:var(--muted); }
     .event b { color:var(--text); display:block; margin-bottom:4px; }
     .showcase { overflow:hidden; border:1px solid var(--border); border-radius:28px; background:rgba(255,255,255,.035); padding:18px; }
+    .showcase-image { margin-bottom:14px; max-height:360px; object-position:center; }
     .rail { display:grid; grid-template-columns:repeat(8, minmax(120px,1fr)); gap:12px; min-width:980px; }
     .tile { min-height:170px; border-radius:18px; border:1px solid rgba(255,255,255,.15); padding:14px; display:flex; align-items:flex-end; background:linear-gradient(135deg,rgba(255,106,0,.6),rgba(124,58,237,.5)); position:relative; overflow:hidden; }
     .tile:after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent,rgba(0,0,0,.76)); }
@@ -197,18 +207,15 @@
         </div>
       </div>
       <div class="hero-card">
-        <div class="screen">
-          <span class="live">● EN VIVO</span>
-          <h2>Una experiencia completa para casa, móvil y Smart TV.</h2>
-          <p>Canales en vivo, deportes, películas, series y contenido familiar con instalación guiada.</p>
-          <div class="poster-wall">
-            <div class="poster"><span>Fútbol en vivo</span></div>
-            <div class="poster"><span>Películas</span></div>
-            <div class="poster"><span>Series</span></div>
-            <div class="poster"><span>Familia</span></div>
-            <div class="poster"><span>Eventos</span></div>
-            <div class="poster"><span>Internacional</span></div>
+        <div class="image-card">
+          <img class="landing-img" src="{{ url_for('static', filename='landing/catalog-premium.webp') }}" alt="Catálogo premium de entretenimiento Fénix Digital TV">
+          <div class="image-overlay">
+            <span class="live">● EN VIVO</span>
+            <h3>Una experiencia completa para casa, móvil y Smart TV.</h3>
+            <p>Canales en vivo, deportes, películas, series y contenido familiar con instalación guiada.</p>
           </div>
+        </div>
+        <div class="screen" style="margin-top:14px;min-height:auto;">
           <div class="mini-grid">
             <div class="mini"><b>3h</b><span>Demo gratis</span></div>
             <div class="mini"><b>3</b><span>conexiones</span></div>
@@ -230,11 +237,13 @@
 
     <section class="wrap" id="deportes">
       <div class="sports-grid">
-        <div class="sports-card">
-          <div class="eyebrow">⚽ Deportes todo el año</div>
-          <h2 class="section-title">Partidos, ligas y eventos para no perderte la acción.</h2>
-          <p class="section-sub">Fénix está pensado para quienes viven el deporte: fútbol, torneos internacionales, ligas regionales y eventos destacados, junto con entretenimiento para el resto de la familia.</p>
-          <a class="btn btn-primary" href="#solicitar">Quiero probar deportes</a>
+        <div class="sports-image" style="background-image:url('{{ url_for('static', filename='landing/sports-live.webp') }}');">
+          <div class="sports-image-content">
+            <div class="eyebrow">⚽ Deportes todo el año</div>
+            <h2 class="section-title">Partidos, ligas y eventos para no perderte la acción.</h2>
+            <p class="section-sub">Fénix está pensado para quienes viven el deporte: fútbol, torneos internacionales, ligas regionales y eventos destacados, junto con entretenimiento para el resto de la familia.</p>
+            <a class="btn btn-primary" href="#solicitar">Quiero probar deportes</a>
+          </div>
         </div>
         <div class="card">
           <h3>Eventos que suelen buscar nuestros clientes</h3>
@@ -252,6 +261,7 @@
       <h2 class="section-title">Entretenimiento para todos los gustos</h2>
       <p class="section-sub">Una landing más visual ayuda a que el cliente entienda rápido el valor: no solo compra acceso, compra una experiencia completa para ver deportes, películas, series y contenido en vivo desde sus pantallas favoritas.</p>
       <div class="showcase">
+        <img class="landing-img showcase-image" src="{{ url_for('static', filename='landing/catalog-premium.webp') }}" alt="Películas, series y entretenimiento en Fénix Digital TV">
         <div class="rail">
           <div class="tile"><b>Acción</b></div>
           <div class="tile"><b>Estrenos</b></div>
@@ -356,12 +366,11 @@
               <a class="btn btn-ghost" href="#reseller-paquetes">Ver paquetes</a>
             </div>
           </div>
-          <div class="card">
-            <h3>Cómo funcionan los créditos</h3>
-            <p>1 crédito equivale a 1 mes de servicio para una cuenta. Si activas 3 meses, consumes 3 créditos; si activas 12 meses, consumes 12 créditos. Tú vendes al precio que definas y mantienes tu margen.</p>
-            <div class="feature-list">
-              <div class="feature"><span>✓</span><div><strong>Créditos acumulables</strong><br>Compra inventario y úsalo conforme cierres ventas.</div></div>
-              <div class="feature"><span>✓</span><div><strong>Soporte operativo</strong><br>Te orientamos en activaciones, apps y renovaciones.</div></div>
+          <div class="image-card">
+            <img class="landing-img" src="{{ url_for('static', filename='landing/reseller-network.webp') }}" alt="Programa de revendedores Fénix Digital TV">
+            <div class="image-overlay">
+              <h3>Cómo funcionan los créditos</h3>
+              <p>1 crédito equivale a 1 mes de servicio. Compras inventario, activas según ventas y mantienes tu margen.</p>
             </div>
           </div>
         </div>
