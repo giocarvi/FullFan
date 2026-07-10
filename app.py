@@ -87,7 +87,20 @@ def maxplayer_request(method, path, payload=None):
         raise MaxPlayerError('Max Player no está configurado. Agrega MAXPLAYER_API_TOKEN y MAXPLAYER_DOMAIN_ID en Railway.')
     url = f"{MAXPLAYER_API_BASE}{path}"
     body = None
-    headers = {'Api-Token': MAXPLAYER_API_TOKEN, 'Accept': 'application/json'}
+    headers = {
+        'Api-Token': MAXPLAYER_API_TOKEN,
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'es-GT,es;q=0.9,en;q=0.8',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Origin': 'https://my.maxplayer.tv',
+        'Referer': 'https://my.maxplayer.tv/',
+        'User-Agent': os.environ.get(
+            'MAXPLAYER_API_USER_AGENT',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+        ),
+    }
     if payload is not None:
         body = json.dumps(payload).encode('utf-8')
         headers['Content-Type'] = 'application/json'
