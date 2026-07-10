@@ -107,9 +107,13 @@
     .showcase { overflow:hidden; border:1px solid var(--border); border-radius:28px; background:rgba(255,255,255,.035); padding:18px; }
     .showcase-image { margin-bottom:14px; max-height:360px; object-position:center; }
     .rail { display:grid; grid-template-columns:repeat(8, minmax(120px,1fr)); gap:12px; min-width:980px; }
-    .tile { min-height:170px; border-radius:18px; border:1px solid rgba(255,255,255,.15); padding:14px; display:flex; align-items:flex-end; background:linear-gradient(135deg,rgba(255,106,0,.6),rgba(124,58,237,.5)); position:relative; overflow:hidden; }
-    .tile:after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent,rgba(0,0,0,.76)); }
-    .tile b { position:relative; z-index:1; font-size:14px; }
+    .tile { min-height:170px; border-radius:18px; border:1px solid rgba(255,255,255,.15); padding:14px; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(135deg,rgba(255,106,0,.6),rgba(124,58,237,.5)); position:relative; overflow:hidden; }
+    .tile:before { content:""; position:absolute; width:90px; height:90px; border-radius:50%; top:-28px; right:-26px; background:radial-gradient(circle,rgba(255,255,255,.28),transparent 68%); }
+    .tile:after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.72)); }
+    .tile b, .tile small, .tile .tile-icon { position:relative; z-index:1; }
+    .tile b { font-size:14px; }
+    .tile small { color:rgba(255,255,255,.78); line-height:1.35; font-weight:600; }
+    .tile-icon { width:48px; height:48px; display:grid; place-items:center; border-radius:16px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.18); font-size:25px; box-shadow:0 10px 22px rgba(0,0,0,.22); }
     .tile:nth-child(2n) { background:linear-gradient(135deg,rgba(16,185,129,.65),rgba(37,99,235,.45)); }
     .tile:nth-child(3n) { background:linear-gradient(135deg,rgba(239,68,68,.65),rgba(245,158,11,.45)); }
     .premium-list { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
@@ -263,14 +267,14 @@
       <div class="showcase">
         <img class="landing-img showcase-image" src="{{ url_for('static', filename='landing/catalog-premium.webp') }}" alt="Películas, series y entretenimiento en Fénix Digital TV">
         <div class="rail">
-          <div class="tile"><b>Acción</b></div>
-          <div class="tile"><b>Estrenos</b></div>
-          <div class="tile"><b>Series</b></div>
-          <div class="tile"><b>Infantil</b></div>
-          <div class="tile"><b>Deportes</b></div>
-          <div class="tile"><b>Noticias</b></div>
-          <div class="tile"><b>Latinoamérica</b></div>
-          <div class="tile"><b>Eventos</b></div>
+          <div class="tile"><span class="tile-icon">💥</span><div><b>Acción</b><small>Películas intensas y aventuras</small></div></div>
+          <div class="tile"><span class="tile-icon">🎬</span><div><b>Estrenos</b><small>Novedades para ver en casa</small></div></div>
+          <div class="tile"><span class="tile-icon">📺</span><div><b>Series</b><small>Historias para maratonear</small></div></div>
+          <div class="tile"><span class="tile-icon">🧸</span><div><b>Infantil</b><small>Opciones para los pequeños</small></div></div>
+          <div class="tile"><span class="tile-icon">⚽</span><div><b>Deportes</b><small>Partidos y eventos en vivo</small></div></div>
+          <div class="tile"><span class="tile-icon">📰</span><div><b>Noticias</b><small>Actualidad y señal en vivo</small></div></div>
+          <div class="tile"><span class="tile-icon">🌎</span><div><b>Latinoamérica</b><small>Contenido de la región</small></div></div>
+          <div class="tile"><span class="tile-icon">🔥</span><div><b>Eventos</b><small>Momentos especiales y torneos</small></div></div>
         </div>
       </div>
       <div class="premium-list">
