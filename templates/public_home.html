@@ -115,13 +115,12 @@
     .stick-art { left:20px; top:38px; width:110px; height:34px; border-radius:999px; background:linear-gradient(135deg,#222,#0b1020); border:1px solid rgba(255,255,255,.22); box-shadow:0 15px 28px rgba(0,0,0,.3); }
     .stick-art:after { content:""; position:absolute; right:-18px; top:9px; width:26px; height:16px; border-radius:5px; background:#151925; border:1px solid rgba(255,255,255,.15); }
     .brand-strip { position:absolute; right:10px; bottom:10px; left:10px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-    .brand-logo { max-width:74px; max-height:38px; object-fit:contain; padding:5px 7px; border-radius:10px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.08); }
-    .brand-logo.wide { max-width:104px; }
-    .brand-logo.square { max-width:52px; max-height:52px; padding:3px; }
+    .brand-logo { width:86px; height:44px; object-fit:contain; padding:6px 8px; border-radius:11px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1); box-shadow:0 10px 22px rgba(0,0,0,.16); }
+    .brand-logo.single { width:116px; height:48px; }
     .support-icons { height:100%; display:flex; align-items:center; justify-content:center; gap:14px; }
-    .support-icon { width:52px; height:52px; display:grid; place-items:center; border-radius:50%; font-weight:900; color:white; box-shadow:0 14px 30px rgba(0,0,0,.24); }
-    .support-icon.whatsapp { background:#25D366; }
-    .support-icon.telegram { background:#229ED9; transform:rotate(-10deg); }
+    .support-logo { width:58px; height:58px; object-fit:contain; padding:7px; border-radius:18px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1); box-shadow:0 14px 30px rgba(0,0,0,.24); }
+    .support-logo.round { border-radius:50%; }
+    .demo-badge { width:58px; height:58px; display:grid; place-items:center; border-radius:50%; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#170B02; font-size:22px; font-weight:950; line-height:1; box-shadow:0 14px 30px rgba(0,0,0,.24); }
     .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; counter-reset:steps; }
     .step { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:22px; padding:18px; position:relative; }
     .step:before { counter-increment:steps; content:counter(steps); display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#190C02; font-weight:900; margin-bottom:14px; }
@@ -398,7 +397,7 @@
         <a class="device" href="/dispositivo/firestick">
           <div class="device-scene">
             <div class="device-art stick-art"></div>
-            <div class="brand-strip"><img class="brand-logo square" src="{{ url_for('static', filename='devices/fire-tv.webp') }}" alt="Amazon Fire TV"></div>
+            <div class="brand-strip"><img class="brand-logo" src="{{ url_for('static', filename='devices/fire-tv.webp') }}" alt="Amazon Fire TV"></div>
           </div>
           <b>Firestick</b><small>Max Player</small><span>Ver instrucciones →</span>
         </a>
@@ -406,7 +405,7 @@
           <div class="device-scene">
             <div class="device-art tv-art"></div>
             <div class="brand-strip">
-              <img class="brand-logo wide" src="{{ url_for('static', filename='devices/samsung.webp') }}" alt="Samsung">
+              <img class="brand-logo" src="{{ url_for('static', filename='devices/samsung.webp') }}" alt="Samsung">
               <img class="brand-logo" src="{{ url_for('static', filename='devices/lg.webp') }}" alt="LG">
             </div>
           </div>
@@ -416,7 +415,7 @@
           <div class="device-scene">
             <div class="device-art computer-art"></div>
             <div class="brand-strip">
-              <img class="brand-logo wide" src="{{ url_for('static', filename='devices/windows.webp') }}" alt="Windows">
+              <img class="brand-logo" src="{{ url_for('static', filename='devices/windows.webp') }}" alt="Windows">
               <img class="brand-logo" src="{{ url_for('static', filename='devices/apple.webp') }}" alt="Mac">
             </div>
           </div>
@@ -425,28 +424,28 @@
         <a class="device" href="/dispositivo/hisense">
           <div class="device-scene">
             <div class="device-art tv-art"></div>
-            <div class="brand-strip"><img class="brand-logo wide" src="{{ url_for('static', filename='devices/hisense.webp') }}" alt="Hisense"></div>
+            <div class="brand-strip"><img class="brand-logo single" src="{{ url_for('static', filename='devices/hisense.webp') }}" alt="Hisense"></div>
           </div>
           <b>Hisense Smart TV</b><small>Smart One</small><span>Ver instrucciones →</span>
         </a>
         <a class="device" href="/dispositivo/roku">
           <div class="device-scene">
-            <div class="brand-strip" style="justify-content:center;inset:18px 12px 12px;"><img class="brand-logo wide" src="{{ url_for('static', filename='devices/roku.webp') }}" alt="Roku"></div>
+            <div class="brand-strip" style="justify-content:center;inset:18px 12px 12px;"><img class="brand-logo single" src="{{ url_for('static', filename='devices/roku.webp') }}" alt="Roku"></div>
           </div>
           <b>Roku</b><small>Premium Player</small><span>Ver instrucciones →</span>
         </a>
         <a class="device" href="/dispositivo/whatsapp">
           <div class="device-scene">
             <div class="support-icons">
-              <span class="support-icon whatsapp">WA</span>
-              <span class="support-icon telegram">TG</span>
+              <img class="support-logo" src="{{ url_for('static', filename='devices/whatsapp.webp') }}" alt="WhatsApp">
+              <img class="support-logo round" src="{{ url_for('static', filename='devices/telegram.webp') }}" alt="Telegram">
             </div>
           </div>
           <b>Atención</b><small>WhatsApp y Telegram</small><span>Ver instrucciones →</span>
         </a>
         <a class="device" href="/dispositivo/demo">
           <div class="device-scene">
-            <div class="support-icons"><span class="support-icon" style="background:linear-gradient(135deg,var(--orange),var(--gold));color:#170B02;">3h</span></div>
+            <div class="support-icons"><span class="demo-badge">3h</span></div>
           </div>
           <b>Demo</b><small>3 horas gratis</small><span>Ver instrucciones →</span>
         </a>
