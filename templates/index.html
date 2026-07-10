@@ -1375,6 +1375,7 @@ async function openModal(username) {
   if (d.error) { inner.innerHTML = '<div class="loading">Error al cargar</div>'; return; }
 
   const c = d.cliente;
+  const service = d.service || {};
   const status = clienteStatus(c.vencimiento);
   const initial = (c.nombre || c.username || '?')[0].toUpperCase();
 
@@ -1436,6 +1437,17 @@ async function openModal(username) {
     </div>
 
     ${waSection}
+
+    <div class="pago-form">
+      <h3>Max Player</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        <span class="badge gray">Usuario: ${service.service_username || c.username}</span>
+        <span class="badge ${service.maxplayer_user_id ? 'green' : 'yellow'}">${service.maxplayer_user_id ? 'ID guardado' : 'Sin ID guardado'}</span>
+        ${service.maxplayer_sync_status ? `<span class="badge gray">${service.maxplayer_sync_status}</span>` : ''}
+      </div>
+      <button class="btn-secondary" onclick="restaurarMaxPlayer('${username}')">Restaurar usuario Max Player</button>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">Borra el usuario anterior si lo encuentra y lo crea nuevamente. Max Player queda con password igual al usuario.</div>
+    </div>
 
     <div class="pago-form" id="edit-form-${username}">
       <h3>✏️ Editar datos</h3>
@@ -1507,6 +1519,18 @@ async function openModal(username) {
     <div class="section-divider">Historial de pagos</div>
     ${pagosHtml}
   `;
+}
+
+async function restaurarMaxPlayer(username) {
+  if (!confirm(`Restaurar usuario Max Player para ${username}?\n\nSe buscara/borrara el usuario anterior si existe y se creara nuevamente.`)) return;
+  const r = await fetch(`/api/clientes/${username}/maxplayer/restore`, { method: 'POST' });
+  const d = await r.json();
+  if (!r.ok) {
+    alert(d.error || 'No se pudo restaurar Max Player.');
+    return;
+  }
+  showToast('Max Player restaurado');
+  openModal(username);
 }
 
 async function guardarEdicion(username) {

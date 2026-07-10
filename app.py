@@ -1220,8 +1220,14 @@ def cliente_detalle(username):
     # Ambos roles ven el historial de pagos reciente
     c.execute(qmark("SELECT id, mes, monto, fecha_registro, (comprobante IS NOT NULL) as has_comprobante FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 24"), (username,))
     pagos = fetchall(c)
+    c.execute(qmark("""
+        SELECT service_username, service_password, expires_at,
+               maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status
+        FROM client_service_credentials WHERE username=?
+    """), (username,))
+    service = fetchone(c) or {}
     db.close()
-    return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol})
+    return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol, 'service': service})
 
 
 @app.route('/api/clientes/<username>/portal', methods=['POST'])
@@ -1298,6 +1304,65 @@ def actualizar_portal_cliente(username):
     db.commit()
     db.close()
     return jsonify({'ok': True})
+
+@app.route('/api/clientes/<username>/maxplayer/restore', methods=['POST'])
+@login_required
+def restaurar_maxplayer_cliente(username):
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT nombre FROM clientes WHERE username=?"), (username,))
+    cliente = fetchone(c)
+    if not cliente:
+        db.close()
+        return jsonify({'error': 'Cliente no encontrado'}), 404
+    c.execute(qmark("""
+        SELECT service_username, service_password, expires_at, maxplayer_user_id
+        FROM client_service_credentials WHERE username=?
+    """), (username,))
+    service = fetchone(c)
+    if not service or not service.get('service_username') or not service.get('service_password'):
+        db.close()
+        return jsonify({'error': 'Este cliente aún no tiene usuario/password XUI guardado para restaurar Max Player.'}), 400
+
+    service_username = service['service_username']
+    service_password = service['service_password']
+    try:
+        existing_user_id = service.get('maxplayer_user_id') or find_maxplayer_user_id(service_username)
+        if existing_user_id:
+            try:
+                delete_maxplayer_user(existing_user_id)
+            except MaxPlayerError as exc:
+                if not is_maxplayer_not_found_error(exc):
+                    raise
+        response, maxplayer_user_id = create_maxplayer_user(
+            username=service_username,
+            iptv_user=service_username,
+            iptv_pass=service_password,
+            password=service_username,
+            fullname=cliente.get('nombre') or username,
+            user_email=''
+        )
+    except MaxPlayerError as exc:
+        db.close()
+        return jsonify({'error': str(exc)}), 400
+
+    now = datetime.now(GT_TZ).isoformat()
+    sync_status = 'restored' if maxplayer_user_id else 'restored_no_id'
+    if PG:
+        c.execute("""
+            UPDATE client_service_credentials
+            SET maxplayer_user_id=%s, maxplayer_synced_at=%s, maxplayer_sync_status=%s, updated_at=%s
+            WHERE username=%s
+        """, (maxplayer_user_id, now, sync_status, now, username))
+    else:
+        c.execute("""
+            UPDATE client_service_credentials
+            SET maxplayer_user_id=?, maxplayer_synced_at=?, maxplayer_sync_status=?, updated_at=?
+            WHERE username=?
+        """, (maxplayer_user_id, now, sync_status, now, username))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'maxplayer_user_id': maxplayer_user_id, 'status': sync_status})
 
 @app.route('/api/clientes/<username>', methods=['PUT'])
 @login_required
