@@ -2405,8 +2405,7 @@ def importar_xui_credenciales():
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     f.save(tmp.name)
     excel_path = tmp.name
-    processed = matched = portal_created = 0
-    missing_clients = []
+    processed = matched = created_clients = portal_created = 0
     try:
         wb = load_workbook(excel_path, read_only=True, data_only=True)
         ws = wb.active
@@ -2444,9 +2443,22 @@ def importar_xui_credenciales():
                 else:
                     expires_at = str(value).strip()
             c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
-            if not fetchone(c):
-                missing_clients.append(username)
-                continue
+            client_exists = bool(fetchone(c))
+            if not client_exists:
+                if PG:
+                    c.execute("""
+                        INSERT INTO clientes
+                            (username, nombre, contacto, vencimiento, referido, notas, total_pagado)
+                        VALUES (%s,%s,%s,%s,%s,%s,0)
+                        ON CONFLICT (username) DO NOTHING
+                    """, (username, username, '', expires_at, 'NO', 'Creado automáticamente desde importación XUI'))
+                else:
+                    c.execute("""
+                        INSERT OR IGNORE INTO clientes
+                            (username, nombre, contacto, vencimiento, referido, notas, total_pagado)
+                        VALUES (?,?,?,?,?,?,0)
+                    """, (username, username, '', expires_at, 'NO', 'Creado automáticamente desde importación XUI'))
+                created_clients += 1
             matched += 1
             if expires_at:
                 c.execute(qmark("UPDATE clientes SET vencimiento=? WHERE username=?"), (expires_at, username))
@@ -2493,9 +2505,10 @@ def importar_xui_credenciales():
             'ok': True,
             'filas_procesadas': processed,
             'clientes_actualizados': matched,
+            'clientes_creados': created_clients,
             'portal_creados_si_faltaban': portal_created,
-            'no_encontrados': missing_clients[:50],
-            'no_encontrados_total': len(missing_clients)
+            'no_encontrados': [],
+            'no_encontrados_total': 0
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500

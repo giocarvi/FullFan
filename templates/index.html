@@ -1885,7 +1885,7 @@ async function importarCredencialesXui(input) {
     const d = await r.json();
     if (d.ok) {
       const extra = d.no_encontrados_total ? `\n${d.no_encontrados_total} usuarios del Excel no existen aún en Fénix.` : '';
-      alert(`✅ Credenciales XUI importadas\n${d.filas_procesadas} filas procesadas\n${d.clientes_actualizados} clientes actualizados\n${d.portal_creados_si_faltaban} accesos de portal creados si faltaban${extra}`);
+      alert(`✅ Credenciales XUI importadas\n${d.filas_procesadas} filas procesadas\n${d.clientes_actualizados} clientes actualizados\n${d.clientes_creados || 0} clientes creados desde XUI\n${d.portal_creados_si_faltaban} accesos de portal creados si faltaban${extra}`);
     } else {
       alert('Error: ' + (d.error || 'desconocido'));
     }
