@@ -990,6 +990,7 @@ let activationPlansLoaded = false;
 let currentActivationStatus = 'open';
 const IS_ADMIN = {{ 'true' if rol == 'admin' else 'false' }};
 window._appConfig = {};
+const DEFAULT_MIGRATION_MESSAGE = 'Hola {nombre}, le saludamos de Fenix Digital TV 🔥\n\nLe informamos que Full Fan Digital TV ya no opera, debido a la situacion que se dio en Guatemala a principios de junio. Ahora es parte del grupo internacional Fenix Digital TV: su entretenimiento, sin fronteras.\n\nSeguimos con la misma atencion, experiencia de 7 años y hoy lanzamos un nuevo servidor con nuevas opciones 😉\n\nLe invitamos a ingresar a nuestro portal de clientes:\n{portal}\n\nUsuario: {usuario}\nPassword: {password_portal}\n\nEn el portal podra ver apps recomendadas, su usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nPara Smart One el cambio se hara automatico.\n\nSu servicio vence el {fecha}. Gracias por seguir con nosotros 🖐🏻';
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────────
 function switchView(view, estado) {
@@ -1480,7 +1481,7 @@ async function openModal(username) {
     .replace(/\{password_portal\}/g, portalPassword)
     .replace(/\{app_usuario\}/g, appUser)
     .replace(/\{app_password\}/g, appPassword);
-  const migrationTemplate = cfg.wa_migracion || 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.';
+  const migrationTemplate = cfg.wa_migracion || DEFAULT_MIGRATION_MESSAGE;
   window._migrationWaUrls = window._migrationWaUrls || {};
   window._migrationWaUrls[username] = waBase ? `${waBase}?text=${encMsg(waFill(migrationTemplate))}` : '';
   const waSection = waBase ? `
@@ -1721,7 +1722,7 @@ function buildMigrationUrlFromDetail(d) {
   const _meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const expDate = c.vencimiento ? (date => `${String(date.getUTCDate()).padStart(2,'0')}-${_meses[date.getUTCMonth()]}-${date.getUTCFullYear()}`)(new Date(c.vencimiento)) : '';
   const appUser = service.service_username || c.username;
-  const tpl = cfg.wa_migracion || 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.';
+  const tpl = cfg.wa_migracion || DEFAULT_MIGRATION_MESSAGE;
   const msg = tpl
     .replace(/\{nombre\}/g, nombreCliente)
     .replace(/\{fecha\}/g, expDate)
@@ -2003,7 +2004,7 @@ function loadConfigView() {
   set('cfg-wa-confirmar-pago', 'wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥');
   set('cfg-wa-vencido', 'wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥');
   set('cfg-wa-nuevo-numero', 'wa_nuevo_numero', '');
-  set('cfg-wa-migracion', 'wa_migracion', 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.');
+  set('cfg-wa-migracion', 'wa_migracion', DEFAULT_MIGRATION_MESSAGE);
 }
 
 function cerrarModalPassword() {

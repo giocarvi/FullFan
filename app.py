@@ -295,6 +295,19 @@ def fetchall(cursor):
 def init_db():
     conn = get_db()
     c = conn.cursor()
+    migration_wa_message = (
+        'Hola {nombre}, le saludamos de Fenix Digital TV 🔥\n\n'
+        'Le informamos que Full Fan Digital TV ya no opera, debido a la situacion que se dio en Guatemala a principios de junio. '
+        'Ahora es parte del grupo internacional Fenix Digital TV: su entretenimiento, sin fronteras.\n\n'
+        'Seguimos con la misma atencion, experiencia de 7 años y hoy lanzamos un nuevo servidor con nuevas opciones 😉\n\n'
+        'Le invitamos a ingresar a nuestro portal de clientes:\n'
+        '{portal}\n\n'
+        'Usuario: {usuario}\n'
+        'Password: {password_portal}\n\n'
+        'En el portal podra ver apps recomendadas, su usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\n'
+        'Para Smart One el cambio se hara automatico.\n\n'
+        'Su servicio vence el {fecha}. Gracias por seguir con nosotros 🖐🏻'
+    )
 
     if PG:
         c.execute('''CREATE TABLE IF NOT EXISTS clientes (
@@ -396,7 +409,7 @@ def init_db():
             ('wa_recordatorio', 'Hola {nombre}, tu servicio de Fénix Digital TV vence el {fecha}. Puedes renovar antes de la fecha para evitar interrupciones. ¡Gracias! 🔥'),
             ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'),
             ('wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥'),
-            ('wa_migracion', 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.'),
+            ('wa_migracion', migration_wa_message),
         ]
         for clave, valor in defaults:
             c.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT DO NOTHING", (clave, valor))
@@ -411,7 +424,7 @@ def init_db():
             ('wa_recordatorio', 'Hola {nombre}, tu servicio de Fénix Digital TV vence el {fecha}. Puedes renovar antes de la fecha para evitar interrupciones. ¡Gracias! 🔥'),
             ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'),
             ('wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥'),
-            ('wa_migracion', 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.'),
+            ('wa_migracion', migration_wa_message),
         ]
         for clave, valor in defaults:
             c.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
@@ -422,6 +435,7 @@ def init_db():
         ('wa_recordatorio', 'Hola {nombre}, tu servicio de Fénix Digital TV vence el {fecha}. Puedes renovar antes de la fecha para evitar interrupciones. ¡Gracias! 🔥'),
         ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'),
         ('wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥'),
+        ('wa_migracion', migration_wa_message),
     ]
     for clave, valor in brand_updates:
         c.execute(qmark("UPDATE configuracion SET valor=? WHERE clave=? AND valor LIKE ?"),
