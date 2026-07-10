@@ -886,8 +886,8 @@ body {
     <div id="activation-complete-fields">
       <label>Usuario XUI</label>
       <input id="activation-modal-xui-username" placeholder="Usuario creado o renovado">
-      <label>Password Max Player / IPTV</label>
-      <input id="activation-modal-xui-password" placeholder="Password del servicio para el cliente">
+      <label>Password XUI / IPTV</label>
+      <input id="activation-modal-xui-password" placeholder="Password IPTV/XUI distinto al usuario">
       <label>Nuevo vencimiento</label>
       <input id="activation-modal-expires" type="date">
       <label>Contraseña portal cliente <span style="color:var(--muted);font-weight:500;">(opcional)</span></label>
@@ -905,7 +905,7 @@ body {
         <option value="recreate">Buscar, borrar anterior y crear de nuevo</option>
       </select>
       <div style="font-size:12px;color:var(--muted);margin-top:6px;">
-        Usa el usuario y password XUI como acceso Max Player. Si Max Player responde error, no se completa la activación.
+        Max Player usara el mismo usuario como contrasena. El portal Fenix tambien quedara con contrasena igual al usuario, y el cliente podra cambiarla despues.
       </div>
       <div id="activation-payment-hint" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
     </div>
@@ -1150,7 +1150,7 @@ function openCompleteActivationModal(id, username, amount = 0, currency = 'GTQ')
   document.getElementById('activation-notes-label').textContent = 'Notas internas';
   document.getElementById('activation-modal-xui-username').value = username || '';
   document.getElementById('activation-modal-xui-password').value = '';
-  document.getElementById('activation-modal-portal-password').value = '';
+  document.getElementById('activation-modal-portal-password').value = username || '';
   document.getElementById('activation-modal-expires').value = localDateStr();
   document.getElementById('activation-modal-notes').value = '';
   document.getElementById('activation-modal-maxplayer-sync').checked = true;

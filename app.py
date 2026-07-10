@@ -191,8 +191,8 @@ def create_maxplayer_user(username, iptv_user, iptv_pass, password='', fullname=
     }
     if username:
         payload['username'] = username
-    if password or iptv_pass:
-        payload['password'] = password or iptv_pass
+    if password or username:
+        payload['password'] = password or username
     if fullname:
         payload['fullname'] = fullname
     if user_email:
@@ -204,6 +204,10 @@ def delete_maxplayer_user(user_id):
     if not user_id:
         raise MaxPlayerError('No hay user_id de Max Player para eliminar.')
     return maxplayer_request('DELETE', f'/users/{user_id}')
+
+def is_maxplayer_not_found_error(error):
+    text = str(error).lower()
+    return '404' in text and ('user not found' in text or 'not found' in text)
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
@@ -1569,12 +1573,16 @@ def api_update_activation_task(task_id):
                 if not existing_user_id:
                     db.close()
                     return jsonify({'error': f'No encontré el usuario {xui_username} en Max Player para borrarlo. Puedes usar "Crear nuevo" o revisar el username en Max Player.'}), 400
-                delete_maxplayer_user(existing_user_id)
+                try:
+                    delete_maxplayer_user(existing_user_id)
+                except MaxPlayerError as exc:
+                    if not is_maxplayer_not_found_error(exc):
+                        raise
             maxplayer_response, maxplayer_user_id = create_maxplayer_user(
                 username=xui_username,
                 iptv_user=xui_username,
                 iptv_pass=xui_password,
-                password=xui_password,
+                password=xui_username,
                 fullname=client_row.get('nombre') or task['username'],
                 user_email=''
             )
@@ -1585,6 +1593,9 @@ def api_update_activation_task(task_id):
         except MaxPlayerError as exc:
             db.close()
             return jsonify({'error': str(exc)}), 400
+
+    if status == 'done' and not portal_password:
+        portal_password = task['username']
 
     completed_at = datetime.now(GT_TZ).isoformat() if status == 'done' else None
     if status in {'pending', 'in_progress', 'cancelled'}:
