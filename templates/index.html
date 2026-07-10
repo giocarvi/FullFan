@@ -619,6 +619,47 @@ body {
 </div>
 
 {% if rol == 'admin' %}
+<!-- MIGRACION VIEW -->
+<div id="view-migracion" class="view">
+  <div class="config-form">
+    <div class="config-section">
+      <h3>🔥 Migración masiva Fénix</h3>
+      <p class="config-hint">Controla qué clientes tienen portal, credenciales XUI/Max Player y sincronización lista antes de enviar el mensaje de migración.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Buscar</label>
+          <input id="migration-search" placeholder="Nombre, usuario, teléfono o usuario XUI">
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="migration-status">
+            <option value="">Todos</option>
+            <option value="activos">Activos</option>
+            <option value="vencidos">Vencidos / sin fecha</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;" onclick="loadMigrationClients()">Actualizar lista</button>
+        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#6c3483;" onclick="document.getElementById('xui-credentials-upload').click()">Importar Excel XUI</button>
+      </div>
+    </div>
+    <div class="analytics-kpi-grid" id="migration-kpis">
+      <div class="kpi-card"><div class="kpi-val" id="mig-total">—</div><div class="kpi-lbl">En lista</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="mig-sin-portal">—</div><div class="kpi-lbl">Sin portal</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="mig-sin-xui">—</div><div class="kpi-lbl">Sin XUI completo</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="mig-mp-pend">—</div><div class="kpi-lbl">Max Player pendiente</div></div>
+    </div>
+    <div class="analytics-chart-card">
+      <h3>Clientes para migración</h3>
+      <div id="migration-list"><div class="loading">Cargando...</div></div>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+
+{% if rol == 'admin' %}
 <!-- ANALYTICS VIEW -->
 <div id="view-analytics" class="view">
   <div class="analytics-kpi-grid" id="analytics-kpis">
@@ -801,6 +842,9 @@ body {
     <span class="icon">🔥</span>Activar
   </button>
   {% if rol == 'admin' %}
+  <button class="nav-btn" data-view="migracion">
+    <span class="icon">🚀</span>Migrar
+  </button>
   <button class="nav-btn" data-view="analytics">
     <span class="icon">📈</span>Análisis
   </button>
@@ -972,6 +1016,7 @@ function switchView(view, estado) {
   }
   if (view === 'analytics') loadAnalytics();
   if (view === 'config') loadConfigView();
+  if (view === 'migracion') loadMigrationClients();
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -1337,6 +1382,17 @@ document.querySelectorAll('.filter-tab').forEach(tab => {
   });
 });
 
+if (document.getElementById('migration-search')) {
+  let migrationSearchTimeout;
+  document.getElementById('migration-search').addEventListener('input', () => {
+    clearTimeout(migrationSearchTimeout);
+    migrationSearchTimeout = setTimeout(loadMigrationClients, 350);
+  });
+}
+if (document.getElementById('migration-status')) {
+  document.getElementById('migration-status').addEventListener('change', loadMigrationClients);
+}
+
 // ── CLIENT CARD HTML ────────────────────────────────────────────────────────
 function clienteItem(c, showDays) {
   const initial = (c.nombre || c.username || '?')[0].toUpperCase();
@@ -1594,6 +1650,113 @@ async function migrarFenixConMaxPlayer(username, hasSavedPassword = false) {
   const url = window._migrationWaUrls && window._migrationWaUrls[username];
   if (url) window.open(url, '_blank', 'noopener');
   openModal(username);
+}
+
+// ── MIGRACION MASIVA ────────────────────────────────────────────────────────
+function migrationBadge(ok, textOk, textBad) {
+  return `<span class="badge ${ok ? 'green' : 'yellow'}">${ok ? textOk : textBad}</span>`;
+}
+
+async function loadMigrationClients() {
+  if (!IS_ADMIN) return;
+  const list = document.getElementById('migration-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading">Cargando...</div>';
+  const q = encodeURIComponent(document.getElementById('migration-search')?.value || '');
+  const estado = encodeURIComponent(document.getElementById('migration-status')?.value || '');
+  const r = await fetch(`/api/admin/migracion-clientes?q=${q}&estado=${estado}`);
+  const d = await r.json();
+  if (!r.ok) {
+    list.innerHTML = `<div class="empty-state"><p>${d.error || 'No se pudo cargar la migración.'}</p></div>`;
+    return;
+  }
+  const c = d.counts || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val ?? '0'; };
+  set('mig-total', c.total || 0);
+  set('mig-sin-portal', c.sin_portal || 0);
+  set('mig-sin-xui', c.sin_xui || 0);
+  set('mig-mp-pend', c.maxplayer_pendiente || 0);
+
+  const rows = d.clientes || [];
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty-state"><p>Sin clientes para mostrar.</p></div>';
+    return;
+  }
+  list.innerHTML = rows.map(item => {
+    const phoneOk = (item.contacto || '').replace(/\D/g, '').length >= 8;
+    const xuiOk = !!item.service_username && item.has_service_password;
+    return `<div class="ops-task">
+      <div class="ops-task-head">
+        <div>
+          <div class="ops-task-title">${item.nombre || item.username} · <span style="font-family:monospace">${item.username}</span></div>
+          <div class="ops-task-meta">
+            XUI/Max Player: <b>${item.service_username || 'Pendiente'}</b> · Tel: ${item.contacto || '—'} · Vence: ${item.vencimiento || '—'}<br>
+            Estado Max Player: ${item.maxplayer_sync_status || 'pendiente'} ${item.maxplayer_synced_at ? '· ' + item.maxplayer_synced_at.substring(0, 16) : ''}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+            ${migrationBadge(item.portal_ok, 'Portal OK', 'Sin portal')}
+            ${migrationBadge(xuiOk, 'XUI OK', 'XUI incompleto')}
+            ${migrationBadge(item.maxplayer_ok, 'Max Player OK', 'Max Player pendiente')}
+            ${migrationBadge(phoneOk, 'WhatsApp OK', 'Sin teléfono')}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+          <button class="ops-btn-secondary" onclick="openModal('${item.username}')">Perfil</button>
+          <button class="ops-btn-primary" onclick="migrarClienteDesdeLista('${item.username}', ${item.has_service_password ? 'true' : 'false'})">Migrar + Max Player</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function buildMigrationUrlFromDetail(d) {
+  const c = d.cliente || {};
+  const service = d.service || {};
+  const cfg = window._appConfig || {};
+  const phone = (c.contacto || '').replace(/\D/g, '');
+  if (phone.length < 8) return '';
+  const prefijo = cfg.wa_prefijo || '502';
+  const waBase = `https://wa.me/${prefijo + phone.slice(-8)}`;
+  const nombreCliente = c.nombre || c.username;
+  const _meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const expDate = c.vencimiento ? (date => `${String(date.getUTCDate()).padStart(2,'0')}-${_meses[date.getUTCMonth()]}-${date.getUTCFullYear()}`)(new Date(c.vencimiento)) : '';
+  const appUser = service.service_username || c.username;
+  const tpl = cfg.wa_migracion || 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.';
+  const msg = tpl
+    .replace(/\{nombre\}/g, nombreCliente)
+    .replace(/\{fecha\}/g, expDate)
+    .replace(/\{portal\}/g, 'https://www.fenixdigitaltv.net/cliente/login')
+    .replace(/\{usuario\}/g, c.username)
+    .replace(/\{password_portal\}/g, c.username)
+    .replace(/\{app_usuario\}/g, appUser)
+    .replace(/\{app_password\}/g, appUser);
+  return `${waBase}?text=${encodeURIComponent(msg)}`;
+}
+
+async function migrarClienteDesdeLista(username, hasSavedPassword = false) {
+  if (!confirm(`Migrar ${username}?\n\nSe habilitara portal, se restaurara/creara Max Player y luego se abrira WhatsApp.`)) return;
+  const detailR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
+  const detail = await detailR.json();
+  if (!detailR.ok) {
+    alert(detail.error || 'No se pudo cargar el cliente.');
+    return;
+  }
+  await fetch(`/api/clientes/${encodeURIComponent(username)}/portal`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      portal_password: username,
+      enabled: true,
+      service_username: (detail.service && detail.service.service_username) || username,
+      expires_at: (detail.cliente && detail.cliente.vencimiento) || ''
+    })
+  });
+  const ok = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
+  if (!ok) return;
+  const url = buildMigrationUrlFromDetail(detail);
+  if (url) window.open(url, '_blank', 'noopener');
+  else alert('Max Player listo, pero este cliente no tiene teléfono válido para WhatsApp.');
+  loadMigrationClients();
 }
 
 async function guardarEdicion(username) {

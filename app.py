@@ -2366,6 +2366,86 @@ def clientes_nuevos():
     db.close()
     return jsonify({'clientes': rows, 'total': len(rows), 'desde': desde, 'hasta': hasta})
 
+
+# ── MIGRACIÓN MASIVA ─────────────────────────────────────────────────────────
+@app.route('/api/admin/migracion-clientes')
+@login_required
+def migracion_clientes():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    q = request.args.get('q', '').strip()
+    estado = request.args.get('estado', '').strip()
+    today = today_gt().isoformat()
+    params = []
+    where = []
+    if q:
+        like = f'%{q}%'
+        where.append("(cl.username LIKE ? OR cl.nombre LIKE ? OR cl.contacto LIKE ? OR svc.service_username LIKE ?)")
+        params.extend([like, like, like, like])
+    if estado == 'activos':
+        where.append("cl.vencimiento >= ?")
+        params.append(today)
+    elif estado == 'vencidos':
+        where.append("(cl.vencimiento < ? OR cl.vencimiento IS NULL OR cl.vencimiento = '')")
+        params.append(today)
+    where_sql = ('WHERE ' + ' AND '.join(where)) if where else ''
+
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark(f"""
+        SELECT
+            cl.username, cl.nombre, cl.contacto, cl.vencimiento,
+            acc.username AS portal_username,
+            acc.is_enabled AS portal_enabled,
+            svc.service_username, svc.service_password, svc.maxplayer_user_id,
+            svc.maxplayer_synced_at, svc.maxplayer_sync_status
+        FROM clientes cl
+        LEFT JOIN client_portal_accounts acc ON acc.username = cl.username
+        LEFT JOIN client_service_credentials svc ON svc.username = cl.username
+        {where_sql}
+        ORDER BY
+            CASE WHEN cl.vencimiento IS NULL OR cl.vencimiento = '' THEN 1 ELSE 0 END,
+            cl.vencimiento DESC,
+            cl.username ASC
+        LIMIT 500
+    """), params)
+    rows = fetchall(c)
+    db.close()
+
+    items = []
+    counts = {'total': 0, 'sin_portal': 0, 'sin_xui': 0, 'maxplayer_pendiente': 0, 'maxplayer_listo': 0}
+    for r in rows:
+        portal_ok = bool(r.get('portal_username')) and bool(r.get('portal_enabled'))
+        service_username = r.get('service_username') or ''
+        service_password = r.get('service_password') or ''
+        maxplayer_ok = bool(r.get('maxplayer_user_id')) and (
+            r.get('maxplayer_sync_status') in {'restored', 'created', 'done'} or bool(r.get('maxplayer_synced_at'))
+        )
+        counts['total'] += 1
+        if not portal_ok:
+            counts['sin_portal'] += 1
+        if not service_username or not service_password:
+            counts['sin_xui'] += 1
+        if maxplayer_ok:
+            counts['maxplayer_listo'] += 1
+        else:
+            counts['maxplayer_pendiente'] += 1
+        items.append({
+            'username': r.get('username'),
+            'nombre': r.get('nombre'),
+            'contacto': r.get('contacto'),
+            'vencimiento': r.get('vencimiento'),
+            'portal_ok': portal_ok,
+            'service_username': service_username,
+            'has_service_password': bool(service_password),
+            'maxplayer_ok': maxplayer_ok,
+            'maxplayer_user_id': r.get('maxplayer_user_id'),
+            'maxplayer_sync_status': r.get('maxplayer_sync_status') or '',
+            'maxplayer_synced_at': r.get('maxplayer_synced_at') or '',
+        })
+    return jsonify({'clientes': items, 'counts': counts})
+
+
 # ── EXPORTAR CLIENTES (datos JSON para generar Excel en el frontend) ──────────
 @app.route('/api/admin/exportar-clientes')
 @login_required
