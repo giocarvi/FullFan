@@ -598,6 +598,11 @@ def public_home():
     return render_template('public_home.html')
 
 
+@app.route('/')
+def public_root():
+    return redirect(url_for('public_home'))
+
+
 DEVICE_GUIDES = {
     'android-ios': {
         'title': 'Celulares/Tablets Android / iOS',
@@ -863,7 +868,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-@app.route('/')
+@app.route('/app')
 @login_required
 def index():
     return render_template('index.html', user=session['user'], rol=session['rol'])
