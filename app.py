@@ -811,6 +811,32 @@ def client_portal():
                            status=status)
 
 
+@app.route('/api/cliente/cambiar-password', methods=['POST'])
+@client_login_required
+def client_change_password():
+    data = request.json or {}
+    current_password = data.get('password_actual', '')
+    new_password = data.get('password_nueva', '')
+    confirm_password = data.get('password_confirmar', '')
+    if not current_password or not new_password or len(new_password) < 6 or new_password != confirm_password:
+        return jsonify({'error': 'Datos inválidos. La nueva contraseña debe tener al menos 6 caracteres y coincidir con la confirmación.'}), 400
+    username = session['client_username']
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT password FROM client_portal_accounts WHERE username=? AND is_enabled=?"),
+              (username, True if PG else 1))
+    account = fetchone(c)
+    if not account or not verify_password(account.get('password'), current_password):
+        db.close()
+        return jsonify({'error': 'La contraseña actual es incorrecta.'}), 403
+    now = now_gt().isoformat(timespec='seconds')
+    c.execute(qmark("UPDATE client_portal_accounts SET password=?, updated_at=? WHERE username=?"),
+              (hash_password(new_password), now, username))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
