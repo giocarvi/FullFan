@@ -543,6 +543,122 @@ def public_home():
     return render_template('public_home.html')
 
 
+DEVICE_GUIDES = {
+    'android-ios': {
+        'title': 'Android / iOS',
+        'app': 'Max Player',
+        'icon': '📱',
+        'steps': [
+            'Abre la tienda de aplicaciones de tu dispositivo.',
+            'Busca e instala Max Player.',
+            'Escríbenos por WhatsApp para solicitar demo o activar tu plan.',
+            'Ingresa el usuario y contraseña que te enviaremos.',
+            'Prueba la reproducción y confirma que todo funcione correctamente.'
+        ],
+        'tips': ['Usa una conexión WiFi estable.', 'Si cambias de celular, avísanos para revisar tu acceso.']
+    },
+    'firestick': {
+        'title': 'Firestick',
+        'app': 'Max Player',
+        'icon': '🔥',
+        'steps': [
+            'Conecta tu Firestick a internet.',
+            'Busca Max Player desde tu tienda o método de instalación disponible.',
+            'Instala la app y ábrela.',
+            'Solicita tus datos de acceso por WhatsApp.',
+            'Ingresa usuario y contraseña y prueba un canal.'
+        ],
+        'tips': ['Mantén espacio libre en el Firestick.', 'Reinicia el dispositivo si una app queda congelada.']
+    },
+    'samsung-lg': {
+        'title': 'Samsung / LG Smart TV',
+        'app': 'Max Player',
+        'icon': '📺',
+        'steps': [
+            'Abre la tienda de apps de tu Smart TV.',
+            'Busca Max Player.',
+            'Instala y abre la aplicación.',
+            'Envíanos por WhatsApp el modelo de TV si necesitas ayuda.',
+            'Ingresa los datos de acceso que te asignaremos.'
+        ],
+        'tips': ['Conecta la TV por cable de red si es posible.', 'Actualiza el software de la TV para mejor compatibilidad.']
+    },
+    'hisense': {
+        'title': 'Hisense Smart TV',
+        'app': 'Smart One',
+        'icon': '🖥️',
+        'steps': [
+            'Abre la tienda de aplicaciones de Hisense.',
+            'Busca Smart One.',
+            'Instala la app y ábrela.',
+            'Envíanos la información que solicite la app si aplica.',
+            'Te guiaremos por WhatsApp para cargar o activar el acceso.'
+        ],
+        'tips': ['Algunas versiones de Hisense pueden variar por país.', 'Si no aparece la app, escríbenos el modelo exacto.']
+    },
+    'roku': {
+        'title': 'Roku',
+        'app': 'Premium Player',
+        'icon': '🟣',
+        'steps': [
+            'Agrega Premium Player en tu Roku.',
+            'Abre la app y revisa la pantalla inicial.',
+            'Escríbenos por WhatsApp para confirmar compatibilidad.',
+            'Te enviaremos los datos de acceso o instrucciones necesarias.',
+            'Prueba la reproducción durante la demo.'
+        ],
+        'tips': ['Roku puede variar según región/cuenta.', 'Si la app no aparece, te indicaremos alternativas disponibles.']
+    },
+    'windows-mac': {
+        'title': 'Windows / Mac',
+        'app': 'Max Player',
+        'icon': '💻',
+        'steps': [
+            'Instala Max Player o la app compatible que te indiquemos.',
+            'Conecta tu computadora a una red estable.',
+            'Solicita demo o activación por WhatsApp.',
+            'Ingresa usuario y contraseña.',
+            'Ajusta pantalla completa para mejor experiencia.'
+        ],
+        'tips': ['Cierra VPNs o extensiones que afecten la conexión.', 'Usa audífonos o salida HDMI si conectarás a TV.']
+    },
+    'whatsapp': {
+        'title': 'Atención por WhatsApp',
+        'app': 'Soporte Fénix',
+        'icon': '💬',
+        'steps': [
+            'Escríbenos al WhatsApp oficial.',
+            'Indica país, dispositivo y si deseas demo o contratar.',
+            'Te diremos qué app instalar.',
+            'Validamos datos y pago cuando corresponda.',
+            'Te acompañamos hasta que puedas ingresar.'
+        ],
+        'tips': ['Incluye captura si ves algún error.', 'Indica si usas WiFi, datos móviles o cable de red.']
+    },
+    'demo': {
+        'title': 'Demo gratis de 3 horas',
+        'app': 'Prueba Fénix',
+        'icon': '⏱️',
+        'steps': [
+            'Solicita la demo por WhatsApp.',
+            'Indica tu dispositivo principal.',
+            'Instala la app recomendada.',
+            'Recibe tus datos temporales de prueba.',
+            'Evalúa calidad, contenido y compatibilidad.'
+        ],
+        'tips': ['La demo es para validar compatibilidad.', 'La disponibilidad puede depender del horario de atención.']
+    },
+}
+
+
+@app.route('/dispositivo/<slug>')
+def device_guide(slug):
+    guide = DEVICE_GUIDES.get(slug)
+    if not guide:
+        return redirect(url_for('public_home') + '#dispositivos')
+    return render_template('device_guide.html', guide=guide, slug=slug)
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None

@@ -85,11 +85,16 @@
     .badge { position:absolute; right:14px; top:14px; font-size:11px; color:#160B02; background:var(--gold); border-radius:999px; padding:5px 8px; font-weight:900; }
     .price { font-size:34px; font-weight:900; margin:14px 0 4px; }
     .usd { color:var(--muted); font-size:13px; margin-bottom:16px; }
+    .local-price { color:var(--gold); font-size:14px; font-weight:800; margin-bottom:14px; min-height:20px; }
+    .currency-box { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:0 0 18px; padding:12px; border:1px solid var(--border); border-radius:16px; background:rgba(255,255,255,.04); color:var(--muted); }
+    .currency-box select { width:auto; min-width:190px; padding:10px 12px; }
     .plan ul { padding:0; list-style:none; margin:0 0 18px; color:var(--muted); display:grid; gap:8px; font-size:14px; }
     .plan li:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
     .devices { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-    .device { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:18px; padding:15px; color:var(--muted); }
+    .device { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:18px; padding:15px; color:var(--muted); transition:.16s; display:block; }
+    .device:hover { transform:translateY(-2px); border-color:rgba(255,200,87,.45); background:rgba(255,255,255,.07); }
     .device b { color:var(--text); display:block; margin-bottom:4px; }
+    .device span { display:block; font-size:12px; color:var(--gold); margin-top:8px; font-weight:800; }
     .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; counter-reset:steps; }
     .step { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:22px; padding:18px; position:relative; }
     .step:before { counter-increment:steps; content:counter(steps); display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#190C02; font-weight:900; margin-bottom:14px; }
@@ -287,34 +292,48 @@
 
     <section class="wrap" id="planes">
       <h2 class="section-title">Planes Fénix</h2>
-      <p class="section-sub">Elige el tiempo que prefieras. Todos los planes incluyen hasta 3 dispositivos simultáneos, soporte de instalación y acceso al ecosistema de entretenimiento Fénix. Para Guatemala manejamos quetzales; para otros países podemos cotizar en dólares.</p>
+      <p class="section-sub">Elige el tiempo que prefieras. Todos los planes incluyen hasta 3 dispositivos simultáneos, soporte de instalación y acceso al ecosistema de entretenimiento Fénix.</p>
+      <div class="currency-box">
+        <span>Conversión local aproximada:</span>
+        <select id="currency-country" onchange="updateLocalPrices()">
+          <option value="GT">Guatemala — Quetzal</option>
+          <option value="HN">Honduras — Lempira</option>
+          <option value="SV">El Salvador — Dólar</option>
+          <option value="NI">Nicaragua — Córdoba</option>
+          <option value="CR">Costa Rica — Colón</option>
+          <option value="PA">Panamá — Dólar</option>
+          <option value="MX">México — Peso</option>
+          <option value="US">Otro país — Dólar</option>
+        </select>
+        <span id="currency-note">Valores referenciales sujetos a tipo de cambio.</span>
+      </div>
       <div class="plans">
-        <div class="plan">
+        <div class="plan" data-usd="13.99">
           <h3>1 mes</h3>
-          <div class="price">Q90</div>
-          <div class="usd">aprox. US$13.99</div>
+          <div class="price">US$13.99</div>
+          <div class="local-price"></div>
           <ul><li>3 dispositivos simultáneos</li><li>Soporte de instalación</li><li>Ideal para probar</li><li>Activación guiada por WhatsApp</li></ul>
           <a class="btn btn-ghost" href="#solicitar">Elegir</a>
         </div>
-        <div class="plan">
+        <div class="plan" data-usd="38.99">
           <h3>3 meses</h3>
-          <div class="price">Q225</div>
-          <div class="usd">aprox. US$38.99</div>
+          <div class="price">US$38.99</div>
+          <div class="local-price"></div>
           <ul><li>Mejor precio mensual</li><li>3 dispositivos simultáneos</li><li>Activación guiada</li><li>Buena opción familiar</li></ul>
           <a class="btn btn-ghost" href="#solicitar">Elegir</a>
         </div>
-        <div class="plan featured">
+        <div class="plan featured" data-usd="73.99">
           <span class="badge">Popular</span>
           <h3>6 meses</h3>
-          <div class="price">Q400</div>
-          <div class="usd">aprox. US$73.99</div>
+          <div class="price">US$73.99</div>
+          <div class="local-price"></div>
           <ul><li>Excelente ahorro</li><li>3 dispositivos simultáneos</li><li>Soporte por WhatsApp</li><li>Recomendado para clientes frecuentes</li></ul>
           <a class="btn btn-primary" href="#solicitar">Elegir</a>
         </div>
-        <div class="plan">
+        <div class="plan" data-usd="137.99">
           <h3>12 meses</h3>
-          <div class="price">Q700</div>
-          <div class="usd">aprox. US$137.99</div>
+          <div class="price">US$137.99</div>
+          <div class="local-price"></div>
           <ul><li>Máximo ahorro anual</li><li>3 dispositivos simultáneos</li><li>Renovación sencilla</li><li>Menor preocupación mes a mes</li></ul>
           <a class="btn btn-ghost" href="#solicitar">Elegir</a>
         </div>
@@ -324,16 +343,16 @@
 
     <section class="wrap" id="dispositivos">
       <h2 class="section-title">Compatible con tus dispositivos</h2>
-      <p class="section-sub">Te indicamos la app correcta según tu equipo.</p>
+      <p class="section-sub">Te indicamos la app correcta según tu equipo. Haz clic en tu dispositivo para ver la guía de instalación.</p>
       <div class="devices">
-        <div class="device"><b>Android / iOS</b>Max Player</div>
-        <div class="device"><b>Firestick</b>Max Player</div>
-        <div class="device"><b>Samsung / LG Smart TV</b>Max Player</div>
-        <div class="device"><b>Windows / Mac</b>Max Player</div>
-        <div class="device"><b>Hisense Smart TV</b>Smart One</div>
-        <div class="device"><b>Roku</b>Premium Player</div>
-        <div class="device"><b>Atención</b>WhatsApp</div>
-        <div class="device"><b>Demo</b>3 horas gratis</div>
+        <a class="device" href="/dispositivo/android-ios"><b>Android / iOS</b>Max Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/firestick"><b>Firestick</b>Max Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/samsung-lg"><b>Samsung / LG Smart TV</b>Max Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/windows-mac"><b>Windows / Mac</b>Max Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/hisense"><b>Hisense Smart TV</b>Smart One<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/roku"><b>Roku</b>Premium Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/whatsapp"><b>Atención</b>WhatsApp<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/demo"><b>Demo</b>3 horas gratis<span>Ver instrucciones →</span></a>
       </div>
     </section>
 
@@ -481,6 +500,56 @@
   </footer>
 
   <script>
+    const LOCAL_CURRENCIES = {
+      GT: { label: 'Quetzales', symbol: 'Q', rate: 7.8, locale: 'es-GT' },
+      HN: { label: 'Lempiras', symbol: 'L', rate: 26.2, locale: 'es-HN' },
+      SV: { label: 'Dólares', symbol: 'US$', rate: 1, locale: 'es-SV' },
+      NI: { label: 'Córdobas', symbol: 'C$', rate: 36.8, locale: 'es-NI' },
+      CR: { label: 'Colones', symbol: '₡', rate: 506, locale: 'es-CR' },
+      PA: { label: 'Dólares', symbol: 'US$', rate: 1, locale: 'es-PA' },
+      MX: { label: 'Pesos MXN', symbol: 'MX$', rate: 18.5, locale: 'es-MX' },
+      US: { label: 'Dólares', symbol: 'US$', rate: 1, locale: 'en-US' }
+    };
+
+    function guessCountry() {
+      const lang = (navigator.language || '').toUpperCase();
+      const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').toLowerCase();
+      if (lang.includes('-GT') || tz.includes('guatemala')) return 'GT';
+      if (lang.includes('-HN') || tz.includes('tegucigalpa')) return 'HN';
+      if (lang.includes('-SV') || tz.includes('el_salvador')) return 'SV';
+      if (lang.includes('-NI') || tz.includes('managua')) return 'NI';
+      if (lang.includes('-CR') || tz.includes('costa_rica')) return 'CR';
+      if (lang.includes('-PA') || tz.includes('panama')) return 'PA';
+      if (lang.includes('-MX') || tz.includes('mexico')) return 'MX';
+      return 'GT';
+    }
+
+    function formatLocal(amount, cfg) {
+      if (cfg.symbol === '₡') return cfg.symbol + Math.round(amount).toLocaleString(cfg.locale);
+      if (cfg.symbol === 'US$') return cfg.symbol + amount.toFixed(2);
+      return cfg.symbol + Math.round(amount).toLocaleString(cfg.locale);
+    }
+
+    function updateLocalPrices() {
+      const select = document.getElementById('currency-country');
+      if (!select) return;
+      const cfg = LOCAL_CURRENCIES[select.value] || LOCAL_CURRENCIES.GT;
+      document.querySelectorAll('.plan[data-usd]').forEach(plan => {
+        const usd = Number(plan.dataset.usd || 0);
+        const local = usd * cfg.rate;
+        const el = plan.querySelector('.local-price');
+        if (el) el.textContent = `aprox. ${formatLocal(local, cfg)} ${cfg.label}`;
+      });
+      const note = document.getElementById('currency-note');
+      if (note) note.textContent = `Tipo de cambio referencial. Precio base en dólares.`;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const select = document.getElementById('currency-country');
+      if (select) select.value = guessCountry();
+      updateLocalPrices();
+    });
+
     function sendLead(e) {
       e.preventDefault();
       const data = {
