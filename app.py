@@ -142,6 +142,47 @@ def extract_maxplayer_user_id(response):
             return str(value)
     return None
 
+def iter_maxplayer_users(payload):
+    """Recorre respuestas comunes de Get Users sin depender de una estructura exacta."""
+    if isinstance(payload, list):
+        for item in payload:
+            if isinstance(item, dict):
+                yield item
+        return
+    if not isinstance(payload, dict):
+        return
+    for key in ('users', 'customers', 'data', 'items', 'results'):
+        value = payload.get(key)
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    yield item
+        elif isinstance(value, dict):
+            for item in iter_maxplayer_users(value):
+                yield item
+
+def get_maxplayer_users():
+    return maxplayer_request('GET', '/users')
+
+def find_maxplayer_user_id(username):
+    if not username:
+        return None
+    target = str(username).strip().lower()
+    response = get_maxplayer_users()
+    for user in iter_maxplayer_users(response):
+        possible_names = [
+            user.get('username'),
+            user.get('name'),
+            user.get('user_name'),
+            user.get('iptv_user'),
+            user.get('iptv_username'),
+            user.get('email'),
+            user.get('user_email'),
+        ]
+        if any(str(value).strip().lower() == target for value in possible_names if value not in (None, '')):
+            return extract_maxplayer_user_id(user)
+    return None
+
 def create_maxplayer_user(username, iptv_user, iptv_pass, password='', fullname='', user_email=''):
     payload = {
         'domain_id': str(MAXPLAYER_DOMAIN_ID),
@@ -1524,8 +1565,10 @@ def api_update_activation_task(task_id):
             if maxplayer_mode == 'recreate':
                 existing_user_id = existing_service.get('maxplayer_user_id')
                 if not existing_user_id:
+                    existing_user_id = find_maxplayer_user_id(xui_username)
+                if not existing_user_id:
                     db.close()
-                    return jsonify({'error': 'Para recrear en Max Player primero necesitamos tener guardado el user_id existente. Usa crear nuevo o busca el usuario en Max Player.'}), 400
+                    return jsonify({'error': f'No encontré el usuario {xui_username} en Max Player para borrarlo. Puedes usar "Crear nuevo" o revisar el username en Max Player.'}), 400
                 delete_maxplayer_user(existing_user_id)
             maxplayer_response, maxplayer_user_id = create_maxplayer_user(
                 username=xui_username,
