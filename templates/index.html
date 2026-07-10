@@ -1445,7 +1445,7 @@ async function openModal(username) {
         <span class="badge ${service.maxplayer_user_id ? 'green' : 'yellow'}">${service.maxplayer_user_id ? 'ID guardado' : 'Sin ID guardado'}</span>
         ${service.maxplayer_sync_status ? `<span class="badge gray">${service.maxplayer_sync_status}</span>` : ''}
       </div>
-      <button class="btn-secondary" onclick="restaurarMaxPlayer('${username}')">Restaurar usuario Max Player</button>
+      <button class="btn-secondary" onclick="restaurarMaxPlayer('${username}', ${service.service_password ? 'true' : 'false'})">Restaurar usuario Max Player</button>
       <div style="font-size:12px;color:var(--muted);margin-top:8px;">Borra el usuario anterior si lo encuentra y lo crea nuevamente. Max Player queda con password igual al usuario.</div>
     </div>
 
@@ -1521,9 +1521,19 @@ async function openModal(username) {
   `;
 }
 
-async function restaurarMaxPlayer(username) {
+async function restaurarMaxPlayer(username, hasSavedPassword = false) {
   if (!confirm(`Restaurar usuario Max Player para ${username}?\n\nSe buscara/borrara el usuario anterior si existe y se creara nuevamente.`)) return;
-  const r = await fetch(`/api/clientes/${username}/maxplayer/restore`, { method: 'POST' });
+  const body = {};
+  if (!hasSavedPassword) {
+    const password = prompt(`Fenix no tiene guardado el password XUI/IPTV de ${username}.\n\nIngresa el password XUI/IPTV para guardarlo y restaurar Max Player:`);
+    if (!password) return;
+    body.service_password = password.trim();
+  }
+  const r = await fetch(`/api/clientes/${username}/maxplayer/restore`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
   const d = await r.json();
   if (!r.ok) {
     alert(d.error || 'No se pudo restaurar Max Player.');
