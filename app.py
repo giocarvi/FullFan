@@ -159,6 +159,11 @@ def create_maxplayer_user(username, iptv_user, iptv_pass, password='', fullname=
     response = maxplayer_request('POST', '/users', payload)
     return response, extract_maxplayer_user_id(response)
 
+def delete_maxplayer_user(user_id):
+    if not user_id:
+        raise MaxPlayerError('No hay user_id de Max Player para eliminar.')
+    return maxplayer_request('DELETE', f'/users/{user_id}')
+
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 if DATABASE_URL:
@@ -1495,6 +1500,7 @@ def api_update_activation_task(task_id):
     blocked_reason = data.get('blocked_reason') or ''
     register_payment = data.get('register_payment', True)
     maxplayer_sync = bool(data.get('maxplayer_sync', False))
+    maxplayer_mode = data.get('maxplayer_mode') or 'create'
     db = get_db()
     c = db.cursor()
     c.execute(qmark("SELECT * FROM activation_tasks WHERE id=?"), (task_id,))
@@ -1512,7 +1518,15 @@ def api_update_activation_task(task_id):
             return jsonify({'error': 'Para crear en Max Player se requiere Usuario XUI y Password IPTV.'}), 400
         c.execute(qmark("SELECT nombre, contacto FROM clientes WHERE username=?"), (task['username'],))
         client_row = fetchone(c) or {}
+        c.execute(qmark("SELECT maxplayer_user_id FROM client_service_credentials WHERE username=?"), (task['username'],))
+        existing_service = fetchone(c) or {}
         try:
+            if maxplayer_mode == 'recreate':
+                existing_user_id = existing_service.get('maxplayer_user_id')
+                if not existing_user_id:
+                    db.close()
+                    return jsonify({'error': 'Para recrear en Max Player primero necesitamos tener guardado el user_id existente. Usa crear nuevo o busca el usuario en Max Player.'}), 400
+                delete_maxplayer_user(existing_user_id)
             maxplayer_response, maxplayer_user_id = create_maxplayer_user(
                 username=xui_username,
                 iptv_user=xui_username,
@@ -1522,9 +1536,9 @@ def api_update_activation_task(task_id):
                 user_email=''
             )
             maxplayer_synced_at = datetime.now(GT_TZ).isoformat()
-            maxplayer_sync_status = 'created'
+            maxplayer_sync_status = 'recreated' if maxplayer_mode == 'recreate' else 'created'
             if not maxplayer_user_id:
-                maxplayer_sync_status = 'created_no_id'
+                maxplayer_sync_status = 'recreated_no_id' if maxplayer_mode == 'recreate' else 'created_no_id'
         except MaxPlayerError as exc:
             db.close()
             return jsonify({'error': str(exc)}), 400

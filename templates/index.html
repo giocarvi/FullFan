@@ -900,6 +900,10 @@ body {
         <input id="activation-modal-maxplayer-sync" type="checkbox" checked style="width:auto;">
         Crear usuario automáticamente en Max Player
       </label>
+      <select id="activation-modal-maxplayer-mode" style="margin-top:8px;">
+        <option value="create">Crear nuevo usuario en Max Player</option>
+        <option value="recreate">Borrar usuario anterior y crear de nuevo</option>
+      </select>
       <div style="font-size:12px;color:var(--muted);margin-top:6px;">
         Usa el usuario y password XUI como acceso Max Player. Si Max Player responde error, no se completa la activación.
       </div>
@@ -1150,6 +1154,7 @@ function openCompleteActivationModal(id, username, amount = 0, currency = 'GTQ')
   document.getElementById('activation-modal-expires').value = localDateStr();
   document.getElementById('activation-modal-notes').value = '';
   document.getElementById('activation-modal-maxplayer-sync').checked = true;
+  document.getElementById('activation-modal-maxplayer-mode').value = 'create';
   const registerPayment = document.getElementById('activation-modal-register-payment');
   const paymentHint = document.getElementById('activation-payment-hint');
   const hasAmount = Number(amount || 0) > 0;
@@ -1170,6 +1175,7 @@ function openBlockActivationModal(id) {
   document.getElementById('activation-modal-notes').value = '';
   document.getElementById('activation-modal-register-payment').checked = false;
   document.getElementById('activation-modal-maxplayer-sync').checked = false;
+  document.getElementById('activation-modal-maxplayer-mode').value = 'create';
   document.getElementById('activation-action-modal').classList.add('open');
 }
 
@@ -1190,6 +1196,7 @@ async function submitActivationActionModal() {
     body.notes = notes;
     body.register_payment = document.getElementById('activation-modal-register-payment').checked;
     body.maxplayer_sync = document.getElementById('activation-modal-maxplayer-sync').checked;
+    body.maxplayer_mode = document.getElementById('activation-modal-maxplayer-mode').value;
     if (!body.xui_username || !body.xui_expires_at) {
       alert('Usuario XUI y vencimiento son obligatorios.');
       return;
