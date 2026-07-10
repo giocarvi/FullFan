@@ -285,6 +285,24 @@ def init_db():
             created_at TEXT DEFAULT (NOW()::text),
             completed_at TEXT
         )''')
+        c.execute("ALTER TABLE activation_tasks ADD COLUMN IF NOT EXISTS xui_password TEXT DEFAULT NULL")
+        c.execute('''CREATE TABLE IF NOT EXISTS client_portal_accounts (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TEXT DEFAULT (NOW()::text),
+            updated_at TEXT
+        )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS client_service_credentials (
+            username TEXT PRIMARY KEY,
+            app_name TEXT DEFAULT 'Max Player',
+            service_username TEXT,
+            service_password TEXT,
+            expires_at TEXT,
+            devices INTEGER DEFAULT 3,
+            notes TEXT,
+            updated_at TEXT DEFAULT (NOW()::text)
+        )''')
         c.execute('''CREATE TABLE IF NOT EXISTS device_apps (
             id SERIAL PRIMARY KEY,
             device_type TEXT NOT NULL,
@@ -368,6 +386,23 @@ def init_db():
                 created_at TEXT DEFAULT (datetime('now')),
                 completed_at TEXT
             );
+            CREATE TABLE IF NOT EXISTS client_portal_accounts (
+                username TEXT PRIMARY KEY,
+                password TEXT NOT NULL,
+                is_enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS client_service_credentials (
+                username TEXT PRIMARY KEY,
+                app_name TEXT DEFAULT 'Max Player',
+                service_username TEXT,
+                service_password TEXT,
+                expires_at TEXT,
+                devices INTEGER DEFAULT 3,
+                notes TEXT,
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
             CREATE TABLE IF NOT EXISTS device_apps (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 device_type TEXT NOT NULL,
@@ -418,6 +453,10 @@ def init_db():
             pass
         try:
             c.execute("ALTER TABLE orders ADD COLUMN payment_id INTEGER DEFAULT NULL")
+        except Exception:
+            pass
+        try:
+            c.execute("ALTER TABLE activation_tasks ADD COLUMN xui_password TEXT DEFAULT NULL")
         except Exception:
             pass
 
@@ -536,6 +575,22 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
+
+
+def client_login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'client_username' not in session:
+            return redirect(url_for('client_login'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def service_status(expires_at):
+    today = today_gt().isoformat()
+    if not expires_at:
+        return 'pendiente'
+    return 'activo' if str(expires_at) >= today else 'vencido'
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
 @app.route('/inicio')
@@ -680,6 +735,80 @@ def device_guide(slug):
     if not guide:
         return redirect(url_for('public_home') + '#dispositivos')
     return render_template('device_guide.html', guide=guide, slug=slug)
+
+
+@app.route('/cliente/login', methods=['GET', 'POST'])
+def client_login():
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        db = get_db()
+        c = db.cursor()
+        c.execute(qmark("""
+            SELECT a.username, a.password, a.is_enabled, cl.nombre
+            FROM client_portal_accounts a
+            LEFT JOIN clientes cl ON cl.username = a.username
+            WHERE a.username=?
+        """), (username,))
+        account = fetchone(c)
+        if account and account.get('is_enabled') and verify_password(account.get('password'), password):
+            session.clear()
+            session['client_username'] = account['username']
+            session['client_name'] = account.get('nombre') or account['username']
+            db.close()
+            return redirect(url_for('client_portal'))
+        db.close()
+        error = 'Usuario o contraseña incorrectos, o acceso no habilitado.'
+    return render_template('client_login.html', error=error)
+
+
+@app.route('/cliente/logout')
+def client_logout():
+    session.pop('client_username', None)
+    session.pop('client_name', None)
+    return redirect(url_for('client_login'))
+
+
+@app.route('/cliente')
+@client_login_required
+def client_portal():
+    username = session['client_username']
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT * FROM clientes WHERE username=?"), (username,))
+    client = fetchone(c) or {'username': username, 'nombre': username}
+    c.execute(qmark("SELECT * FROM client_service_credentials WHERE username=?"), (username,))
+    service = fetchone(c)
+    if not service:
+        c.execute(qmark("""
+            SELECT username, xui_username as service_username, xui_password as service_password,
+                   xui_expires_at as expires_at, completed_at
+            FROM activation_tasks
+            WHERE username=? AND status='done'
+            ORDER BY completed_at DESC, id DESC
+            LIMIT 1
+        """), (username,))
+        latest = fetchone(c)
+        if latest:
+            service = {
+                'app_name': 'Max Player',
+                'service_username': latest.get('service_username'),
+                'service_password': latest.get('service_password'),
+                'expires_at': latest.get('expires_at'),
+                'devices': 3,
+            }
+    c.execute(qmark("SELECT mes, monto, fecha_registro FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 6"), (username,))
+    payments = fetchall(c)
+    db.close()
+    expires_at = (service or {}).get('expires_at') or client.get('vencimiento')
+    status = service_status(expires_at)
+    return render_template('client_portal.html',
+                           client=client,
+                           service=service or {},
+                           payments=payments,
+                           expires_at=expires_at,
+                           status=status)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -867,6 +996,82 @@ def cliente_detalle(username):
     pagos = fetchall(c)
     db.close()
     return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol})
+
+
+@app.route('/api/clientes/<username>/portal', methods=['POST'])
+@login_required
+def actualizar_portal_cliente(username):
+    data = request.json or {}
+    portal_password = (data.get('portal_password') or '').strip()
+    enabled = bool(data.get('enabled', True))
+    service_username = (data.get('service_username') or '').strip()
+    service_password = (data.get('service_password') or '').strip()
+    app_name = (data.get('app_name') or 'Max Player').strip()
+    expires_at = (data.get('expires_at') or '').strip()
+    devices = int(data.get('devices') or 3)
+    now = now_gt().isoformat(timespec='seconds')
+
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
+    if not fetchone(c):
+        db.close()
+        return jsonify({'error': 'Cliente no encontrado'}), 404
+
+    if portal_password:
+        if PG:
+            c.execute("""
+                INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
+                VALUES (%s,%s,%s,%s)
+                ON CONFLICT (username) DO UPDATE SET
+                    password=EXCLUDED.password,
+                    is_enabled=EXCLUDED.is_enabled,
+                    updated_at=EXCLUDED.updated_at
+            """, (username, hash_password(portal_password), enabled, now))
+        else:
+            c.execute("""
+                INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
+                VALUES (?,?,?,?)
+                ON CONFLICT(username) DO UPDATE SET
+                    password=excluded.password,
+                    is_enabled=excluded.is_enabled,
+                    updated_at=excluded.updated_at
+            """, (username, hash_password(portal_password), 1 if enabled else 0, now))
+    else:
+        c.execute(qmark("UPDATE client_portal_accounts SET is_enabled=?, updated_at=? WHERE username=?"),
+                  (enabled, now, username))
+
+    if service_username or service_password or expires_at:
+        if PG:
+            c.execute("""
+                INSERT INTO client_service_credentials
+                    (username, app_name, service_username, service_password, expires_at, devices, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (username) DO UPDATE SET
+                    app_name=EXCLUDED.app_name,
+                    service_username=COALESCE(NULLIF(EXCLUDED.service_username,''), client_service_credentials.service_username),
+                    service_password=COALESCE(NULLIF(EXCLUDED.service_password,''), client_service_credentials.service_password),
+                    expires_at=COALESCE(NULLIF(EXCLUDED.expires_at,''), client_service_credentials.expires_at),
+                    devices=EXCLUDED.devices,
+                    updated_at=EXCLUDED.updated_at
+            """, (username, app_name, service_username, service_password, expires_at, devices, now))
+        else:
+            c.execute("""
+                INSERT INTO client_service_credentials
+                    (username, app_name, service_username, service_password, expires_at, devices, updated_at)
+                VALUES (?,?,?,?,?,?,?)
+                ON CONFLICT(username) DO UPDATE SET
+                    app_name=excluded.app_name,
+                    service_username=COALESCE(NULLIF(excluded.service_username,''), client_service_credentials.service_username),
+                    service_password=COALESCE(NULLIF(excluded.service_password,''), client_service_credentials.service_password),
+                    expires_at=COALESCE(NULLIF(excluded.expires_at,''), client_service_credentials.expires_at),
+                    devices=excluded.devices,
+                    updated_at=excluded.updated_at
+            """, (username, app_name, service_username, service_password, expires_at, devices, now))
+
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
 
 @app.route('/api/clientes/<username>', methods=['PUT'])
 @login_required
@@ -1141,7 +1346,9 @@ def api_update_activation_task(task_id):
         return jsonify({'error': 'Estado inválido'}), 400
 
     xui_username = data.get('xui_username') or ''
+    xui_password = data.get('xui_password') or ''
     xui_expires_at = data.get('xui_expires_at') or None
+    portal_password = data.get('portal_password') or ''
     notes = data.get('notes') or ''
     blocked_reason = data.get('blocked_reason') or ''
     register_payment = data.get('register_payment', True)
@@ -1163,9 +1370,9 @@ def api_update_activation_task(task_id):
     else:
         c.execute(qmark("""
             UPDATE activation_tasks
-            SET status=?, xui_username=?, xui_expires_at=?, notes=?, blocked_reason=?, completed_at=?
+            SET status=?, xui_username=?, xui_password=?, xui_expires_at=?, notes=?, blocked_reason=?, completed_at=?
             WHERE id=?
-        """), (status, xui_username, xui_expires_at, notes, blocked_reason, completed_at, task_id))
+        """), (status, xui_username, xui_password, xui_expires_at, notes, blocked_reason, completed_at, task_id))
     if task.get('order_id'):
         order_status = 'activated' if status == 'done' else ('blocked' if status == 'blocked' else 'in_activation')
         c.execute(qmark("UPDATE orders SET status=?, completed_at=? WHERE id=?"),
@@ -1201,6 +1408,58 @@ def api_update_activation_task(task_id):
         if not payment_registered:
             c.execute(qmark("UPDATE clientes SET vencimiento=? WHERE username=?"),
                       (xui_expires_at, task['username']))
+        if PG:
+            c.execute("""
+                INSERT INTO client_service_credentials
+                    (username, app_name, service_username, service_password, expires_at, devices, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (username) DO UPDATE SET
+                    app_name=EXCLUDED.app_name,
+                    service_username=EXCLUDED.service_username,
+                    service_password=CASE
+                        WHEN EXCLUDED.service_password IS NULL OR EXCLUDED.service_password = ''
+                        THEN client_service_credentials.service_password
+                        ELSE EXCLUDED.service_password
+                    END,
+                    expires_at=EXCLUDED.expires_at,
+                    devices=EXCLUDED.devices,
+                    updated_at=EXCLUDED.updated_at
+            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, 3, completed_at))
+            if portal_password:
+                c.execute("""
+                    INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
+                    VALUES (%s,%s,TRUE,%s)
+                    ON CONFLICT (username) DO UPDATE SET
+                        password=EXCLUDED.password,
+                        is_enabled=TRUE,
+                        updated_at=EXCLUDED.updated_at
+                """, (task['username'], hash_password(portal_password), completed_at))
+        else:
+            c.execute("""
+                INSERT INTO client_service_credentials
+                    (username, app_name, service_username, service_password, expires_at, devices, updated_at)
+                VALUES (?,?,?,?,?,?,?)
+                ON CONFLICT(username) DO UPDATE SET
+                    app_name=excluded.app_name,
+                    service_username=excluded.service_username,
+                    service_password=CASE
+                        WHEN excluded.service_password IS NULL OR excluded.service_password = ''
+                        THEN client_service_credentials.service_password
+                        ELSE excluded.service_password
+                    END,
+                    expires_at=excluded.expires_at,
+                    devices=excluded.devices,
+                    updated_at=excluded.updated_at
+            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, 3, completed_at))
+            if portal_password:
+                c.execute("""
+                    INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
+                    VALUES (?,?,1,?)
+                    ON CONFLICT(username) DO UPDATE SET
+                        password=excluded.password,
+                        is_enabled=1,
+                        updated_at=excluded.updated_at
+                """, (task['username'], hash_password(portal_password), completed_at))
     db.commit()
     db.close()
     return jsonify({'ok': True})

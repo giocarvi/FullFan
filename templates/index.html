@@ -886,8 +886,12 @@ body {
     <div id="activation-complete-fields">
       <label>Usuario XUI</label>
       <input id="activation-modal-xui-username" placeholder="Usuario creado o renovado">
+      <label>Password Max Player / IPTV</label>
+      <input id="activation-modal-xui-password" placeholder="Password del servicio para el cliente">
       <label>Nuevo vencimiento</label>
       <input id="activation-modal-expires" type="date">
+      <label>Contraseña portal cliente <span style="color:var(--muted);font-weight:500;">(opcional)</span></label>
+      <input id="activation-modal-portal-password" placeholder="Crear o resetear acceso al portal">
       <label style="display:flex;align-items:center;gap:8px;margin-top:12px;">
         <input id="activation-modal-register-payment" type="checkbox" checked style="width:auto;">
         Registrar pago en historial al completar
@@ -1134,6 +1138,8 @@ function openCompleteActivationModal(id, username, amount = 0, currency = 'GTQ')
   document.getElementById('activation-complete-fields').style.display = 'block';
   document.getElementById('activation-notes-label').textContent = 'Notas internas';
   document.getElementById('activation-modal-xui-username').value = username || '';
+  document.getElementById('activation-modal-xui-password').value = '';
+  document.getElementById('activation-modal-portal-password').value = '';
   document.getElementById('activation-modal-expires').value = localDateStr();
   document.getElementById('activation-modal-notes').value = '';
   const registerPayment = document.getElementById('activation-modal-register-payment');
@@ -1169,7 +1175,9 @@ async function submitActivationActionModal() {
   const body = {status: action};
   if (action === 'done') {
     body.xui_username = document.getElementById('activation-modal-xui-username').value.trim();
+    body.xui_password = document.getElementById('activation-modal-xui-password').value.trim();
     body.xui_expires_at = document.getElementById('activation-modal-expires').value;
+    body.portal_password = document.getElementById('activation-modal-portal-password').value.trim();
     body.notes = notes;
     body.register_payment = document.getElementById('activation-modal-register-payment').checked;
     if (!body.xui_username || !body.xui_expires_at) {
