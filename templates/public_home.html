@@ -106,21 +106,24 @@
       linear-gradient(135deg,rgba(255,106,0,.08),rgba(124,58,237,.16)),
       rgba(7,11,24,.62); border:1px solid rgba(255,255,255,.09); overflow:hidden; }
     .device-art { position:absolute; inset:18px auto auto 18px; opacity:.92; }
-    .mobile-pair .phone { position:absolute; left:6px; top:18px; width:34px; height:60px; border:3px solid rgba(255,255,255,.88); border-radius:10px; background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.03)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
-    .mobile-pair .tablet { position:absolute; left:44px; top:8px; width:74px; height:78px; border:3px solid rgba(255,255,255,.88); border-radius:14px; background:linear-gradient(135deg,rgba(255,106,0,.18),rgba(124,58,237,.18)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
-    .tv-art { left:18px; top:20px; width:112px; height:66px; border:4px solid rgba(255,255,255,.86); border-radius:12px; background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.02)); box-shadow:0 18px 32px rgba(0,0,0,.28); }
+    .mobile-pair .phone { position:absolute; left:4px; top:22px; width:30px; height:56px; border:3px solid rgba(255,255,255,.88); border-radius:10px; background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.03)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
+    .mobile-pair .tablet { position:absolute; left:36px; top:10px; width:66px; height:74px; border:3px solid rgba(255,255,255,.88); border-radius:14px; background:linear-gradient(135deg,rgba(255,106,0,.18),rgba(124,58,237,.18)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
+    .tv-art { left:18px; top:20px; width:104px; height:66px; border:4px solid rgba(255,255,255,.86); border-radius:12px; background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.02)); box-shadow:0 18px 32px rgba(0,0,0,.28); }
     .tv-art:after { content:""; position:absolute; left:40px; right:40px; bottom:-13px; height:4px; background:rgba(255,255,255,.78); border-radius:999px; box-shadow:0 10px 0 8px rgba(255,255,255,.16); }
-    .computer-art { left:18px; top:19px; width:112px; height:66px; border:4px solid rgba(255,255,255,.84); border-radius:10px; background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(37,99,235,.15)); }
+    .computer-art { left:18px; top:19px; width:104px; height:66px; border:4px solid rgba(255,255,255,.84); border-radius:10px; background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(37,99,235,.15)); }
     .computer-art:after { content:""; position:absolute; left:18px; right:18px; bottom:-17px; height:6px; border-radius:999px; background:rgba(255,255,255,.78); }
     .stick-art { left:20px; top:38px; width:110px; height:34px; border-radius:999px; background:linear-gradient(135deg,#222,#0b1020); border:1px solid rgba(255,255,255,.22); box-shadow:0 15px 28px rgba(0,0,0,.3); }
     .stick-art:after { content:""; position:absolute; right:-18px; top:9px; width:26px; height:16px; border-radius:5px; background:#151925; border:1px solid rgba(255,255,255,.15); }
-    .brand-strip { position:absolute; right:10px; bottom:10px; left:10px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-    .brand-logo { width:86px; height:44px; object-fit:contain; padding:6px 8px; border-radius:11px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1); box-shadow:0 10px 22px rgba(0,0,0,.16); }
-    .brand-logo.single { width:116px; height:48px; }
+    .brand-strip { position:absolute; right:10px; top:10px; bottom:10px; width:74px; display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:7px; }
+    .brand-logo { width:74px; height:42px; object-fit:contain; padding:6px 7px; border-radius:12px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12); box-shadow:0 10px 22px rgba(0,0,0,.16); }
+    .brand-logo.single { width:112px; height:52px; }
+    .brand-strip.single-center { inset:0; width:auto; align-items:center; justify-content:center; }
     .support-icons { height:100%; display:flex; align-items:center; justify-content:center; gap:14px; }
-    .support-logo { width:58px; height:58px; object-fit:contain; padding:7px; border-radius:18px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.1); box-shadow:0 14px 30px rgba(0,0,0,.24); }
+    .support-logo { width:72px; height:72px; object-fit:contain; padding:8px; border-radius:22px; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.12); box-shadow:0 14px 30px rgba(0,0,0,.24); }
     .support-logo.round { border-radius:50%; }
-    .demo-badge { width:58px; height:58px; display:grid; place-items:center; border-radius:50%; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#170B02; font-size:22px; font-weight:950; line-height:1; box-shadow:0 14px 30px rgba(0,0,0,.24); }
+    .demo-card { display:grid; place-items:center; text-align:center; width:148px; min-height:76px; border-radius:20px; background:linear-gradient(135deg,rgba(255,106,0,.92),rgba(255,200,87,.94)); color:#170B02; font-weight:950; box-shadow:0 16px 34px rgba(0,0,0,.26); }
+    .demo-card b { display:block; color:#170B02; font-size:28px; line-height:1; margin:0; }
+    .demo-card small { color:#3B1900; font-size:12px; font-weight:900; }
     .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; counter-reset:steps; }
     .step { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:22px; padding:18px; position:relative; }
     .step:before { counter-increment:steps; content:counter(steps); display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#190C02; font-weight:900; margin-bottom:14px; }
@@ -397,7 +400,7 @@
         <a class="device" href="/dispositivo/firestick">
           <div class="device-scene">
             <div class="device-art stick-art"></div>
-            <div class="brand-strip"><img class="brand-logo" src="{{ url_for('static', filename='devices/fire-tv.webp') }}" alt="Amazon Fire TV"></div>
+            <div class="brand-strip single-center"><img class="brand-logo single" src="{{ url_for('static', filename='devices/fire-tv.webp') }}" alt="Amazon Fire TV"></div>
           </div>
           <b>Firestick</b><small>Max Player</small><span>Ver instrucciones →</span>
         </a>
@@ -424,13 +427,13 @@
         <a class="device" href="/dispositivo/hisense">
           <div class="device-scene">
             <div class="device-art tv-art"></div>
-            <div class="brand-strip"><img class="brand-logo single" src="{{ url_for('static', filename='devices/hisense.webp') }}" alt="Hisense"></div>
+            <div class="brand-strip single-center"><img class="brand-logo single" src="{{ url_for('static', filename='devices/hisense.webp') }}" alt="Hisense"></div>
           </div>
           <b>Hisense Smart TV</b><small>Smart One</small><span>Ver instrucciones →</span>
         </a>
         <a class="device" href="/dispositivo/roku">
           <div class="device-scene">
-            <div class="brand-strip" style="justify-content:center;inset:18px 12px 12px;"><img class="brand-logo single" src="{{ url_for('static', filename='devices/roku.webp') }}" alt="Roku"></div>
+            <div class="brand-strip single-center"><img class="brand-logo single" src="{{ url_for('static', filename='devices/roku.webp') }}" alt="Roku"></div>
           </div>
           <b>Roku</b><small>Premium Player</small><span>Ver instrucciones →</span>
         </a>
@@ -445,7 +448,7 @@
         </a>
         <a class="device" href="/dispositivo/demo">
           <div class="device-scene">
-            <div class="support-icons"><span class="demo-badge">3h</span></div>
+            <div class="support-icons"><span class="demo-card"><span><b>3h</b><small>demo gratis</small></span></span></div>
           </div>
           <b>Demo</b><small>3 horas gratis</small><span>Ver instrucciones →</span>
         </a>
