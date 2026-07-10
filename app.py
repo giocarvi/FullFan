@@ -545,7 +545,7 @@ def public_home():
 
 DEVICE_GUIDES = {
     'android-ios': {
-        'title': 'Android / iOS',
+        'title': 'Celulares/Tablets Android / iOS',
         'app': 'Max Player',
         'icon': '📱',
         'logo': 'apps/max-player.webp',
