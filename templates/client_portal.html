@@ -58,6 +58,20 @@
       <p class="lead">Aquí puedes consultar tu servicio, vencimiento y credenciales de acceso para tu app.</p>
     </section>
     <section class="grid">
+      <div class="card" style="grid-column:1/-1;border-color:rgba(255,200,87,.28);">
+        <h2>Confirma tus datos</h2>
+        <p class="lead" style="font-size:14px;">Ayúdanos a mantener tu cuenta actualizada. Usaremos estos datos para recordatorios, soporte y recuperación de acceso.</p>
+        <form onsubmit="updateProfile(event)">
+          <label>Celular principal</label>
+          <input id="profile-contacto" type="tel" inputmode="tel" value="{{ client.contacto or '' }}" placeholder="Ej: 41562336" required>
+          <label>Celular secundario / alterno</label>
+          <input id="profile-contacto-secundario" type="tel" inputmode="tel" value="{{ client.contacto_secundario or '' }}" placeholder="Opcional">
+          <label>Correo electrónico</label>
+          <input id="profile-email" type="email" value="{{ client.email or '' }}" placeholder="tu@email.com">
+          <div class="actions"><button type="submit">Guardar mis datos</button></div>
+          <div id="profile-message" class="message"></div>
+        </form>
+      </div>
       <div class="card">
         <span class="status {{ status }}">{{ status|capitalize }}</span>
         <h2>Tu servicio</h2>
@@ -122,6 +136,28 @@
       if (!text || text === 'Pendiente') return;
       await navigator.clipboard.writeText(text);
       alert('Copiado');
+    }
+    async function updateProfile(event) {
+      event.preventDefault();
+      const msg = document.getElementById('profile-message');
+      msg.className = 'message';
+      msg.textContent = '';
+      const contacto = document.getElementById('profile-contacto').value;
+      const contactoSecundario = document.getElementById('profile-contacto-secundario').value;
+      const email = document.getElementById('profile-email').value;
+      const r = await fetch('/api/cliente/actualizar-datos', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({contacto, contacto_secundario: contactoSecundario, email})
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        msg.className = 'message error';
+        msg.textContent = d.error || 'No se pudieron guardar tus datos.';
+        return;
+      }
+      msg.className = 'message ok';
+      msg.textContent = 'Datos actualizados correctamente.';
     }
     async function changePortalPassword(event) {
       event.preventDefault();

@@ -366,11 +366,23 @@ def init_db():
     # Migrar: agregar columna comprobante a pagos si no existe
     if PG:
         c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS comprobante TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS contacto_secundario TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS datos_actualizados_at TEXT DEFAULT NULL")
     else:
         try:
             c.execute("ALTER TABLE pagos ADD COLUMN comprobante TEXT DEFAULT NULL")
         except Exception:
             pass
+        for ddl in (
+            "ALTER TABLE clientes ADD COLUMN contacto_secundario TEXT DEFAULT NULL",
+            "ALTER TABLE clientes ADD COLUMN email TEXT DEFAULT NULL",
+            "ALTER TABLE clientes ADD COLUMN datos_actualizados_at TEXT DEFAULT NULL",
+        ):
+            try:
+                c.execute(ddl)
+            except Exception:
+                pass
 
     # Tabla de configuración
     if PG:
@@ -1034,6 +1046,31 @@ def client_change_password():
     now = now_gt().isoformat(timespec='seconds')
     c.execute(qmark("UPDATE client_portal_accounts SET password=?, updated_at=? WHERE username=?"),
               (hash_password(new_password), now, username))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/cliente/actualizar-datos', methods=['POST'])
+@client_login_required
+def client_update_profile():
+    data = request.json or {}
+    username = session['client_username']
+    contacto = ''.join(ch for ch in (data.get('contacto') or '') if ch.isdigit())[-12:]
+    contacto_secundario = ''.join(ch for ch in (data.get('contacto_secundario') or '') if ch.isdigit())[-12:]
+    email = (data.get('email') or '').strip().lower()
+    if not contacto or len(contacto) < 8:
+        return jsonify({'error': 'Ingresa un celular principal válido.'}), 400
+    if email and ('@' not in email or '.' not in email.split('@')[-1]):
+        return jsonify({'error': 'Ingresa un correo electrónico válido.'}), 400
+    now = now_gt().isoformat(timespec='seconds')
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("""
+        UPDATE clientes
+        SET contacto=?, contacto_secundario=?, email=?, datos_actualizados_at=?
+        WHERE username=?
+    """), (contacto, contacto_secundario, email, now, username))
     db.commit()
     db.close()
     return jsonify({'ok': True})
