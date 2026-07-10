@@ -147,11 +147,15 @@ def create_maxplayer_user(username, iptv_user, iptv_pass, password='', fullname=
         'domain_id': str(MAXPLAYER_DOMAIN_ID),
         'iptv_user': iptv_user,
         'iptv_pass': iptv_pass,
-        'username': username,
-        'password': password or iptv_pass,
-        'fullname': fullname or username,
-        'user_email': user_email or '',
     }
+    if username:
+        payload['username'] = username
+    if password or iptv_pass:
+        payload['password'] = password or iptv_pass
+    if fullname:
+        payload['fullname'] = fullname
+    if user_email:
+        payload['user_email'] = user_email
     response = maxplayer_request('POST', '/users', payload)
     return response, extract_maxplayer_user_id(response)
 
