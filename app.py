@@ -556,7 +556,12 @@ DEVICE_GUIDES = {
             'Ingresa el usuario y contraseña que te enviaremos.',
             'Prueba la reproducción y confirma que todo funcione correctamente.'
         ],
-        'tips': ['Usa una conexión WiFi estable.', 'Si cambias de celular, avísanos para revisar tu acceso.']
+        'tips': ['Usa una conexión WiFi estable.', 'Si cambias de celular, avísanos para revisar tu acceso.'],
+        'links': [
+            {'label': 'Max Player para Android', 'url': 'https://play.google.com/store/apps/details?id=tv.maxplayer.android'},
+            {'label': 'Max Player para iOS', 'url': 'https://apps.apple.com/app/maxplayer-iptv-player/id1660982028'},
+            {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+        ]
     },
     'firestick': {
         'title': 'Firestick',
@@ -570,7 +575,10 @@ DEVICE_GUIDES = {
             'Solicita tus datos de acceso por WhatsApp.',
             'Ingresa usuario y contraseña y prueba un canal.'
         ],
-        'tips': ['Mantén espacio libre en el Firestick.', 'Reinicia el dispositivo si una app queda congelada.']
+        'tips': ['Mantén espacio libre en el Firestick.', 'Reinicia el dispositivo si una app queda congelada.'],
+        'links': [
+            {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+        ]
     },
     'samsung-lg': {
         'title': 'Samsung / LG Smart TV',
@@ -584,7 +592,10 @@ DEVICE_GUIDES = {
             'Envíanos por WhatsApp el modelo de TV si necesitas ayuda.',
             'Ingresa los datos de acceso que te asignaremos.'
         ],
-        'tips': ['Conecta la TV por cable de red si es posible.', 'Actualiza el software de la TV para mejor compatibilidad.']
+        'tips': ['Conecta la TV por cable de red si es posible.', 'Actualiza el software de la TV para mejor compatibilidad.'],
+        'links': [
+            {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+        ]
     },
     'hisense': {
         'title': 'Hisense Smart TV',
@@ -626,7 +637,11 @@ DEVICE_GUIDES = {
             'Ingresa usuario y contraseña.',
             'Ajusta pantalla completa para mejor experiencia.'
         ],
-        'tips': ['Cierra VPNs o extensiones que afecten la conexión.', 'Usa audífonos o salida HDMI si conectarás a TV.']
+        'tips': ['Cierra VPNs o extensiones que afecten la conexión.', 'Usa audífonos o salida HDMI si conectarás a TV.'],
+        'links': [
+            {'label': 'Max Player para Windows', 'url': 'https://apps.microsoft.com/detail/9NJP3PH1HXL6'},
+            {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+        ]
     },
     'whatsapp': {
         'title': 'Atención por WhatsApp',
