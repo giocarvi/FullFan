@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mi cuenta | Fénix Digital TV</title>
+  <style>
+    :root { --bg:#070B18; --card:#111827; --text:#F8F7F2; --muted:#A8B3CF; --orange:#FF6A00; --gold:#FFC857; --green:#10B981; --red:#EF4444; --border:rgba(255,255,255,.12); }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; color:var(--text); background:radial-gradient(circle at top left,rgba(255,106,0,.18),transparent 34%),var(--bg); min-height:100vh; }
+    .wrap { width:min(980px,calc(100% - 32px)); margin:0 auto; }
+    header { border-bottom:1px solid var(--border); background:rgba(7,11,24,.8); backdrop-filter:blur(14px); }
+    .nav { min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:14px; }
+    .logo { width:120px; max-height:54px; object-fit:contain; }
+    a { color:inherit; text-decoration:none; }
+    .logout { color:var(--muted); font-size:14px; }
+    .hero { padding:36px 0 20px; }
+    h1 { font-size:clamp(32px,5vw,54px); letter-spacing:-.045em; margin:0 0 10px; }
+    .lead { color:var(--muted); line-height:1.55; margin:0; }
+    .grid { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; padding:18px 0 44px; }
+    .card { border:1px solid var(--border); border-radius:26px; padding:22px; background:rgba(17,24,39,.84); box-shadow:0 20px 60px rgba(0,0,0,.24); }
+    .status { display:inline-flex; border-radius:999px; padding:7px 11px; font-size:13px; font-weight:950; margin-bottom:12px; }
+    .status.activo { background:rgba(16,185,129,.16); color:#86EFAC; }
+    .status.vencido { background:rgba(239,68,68,.16); color:#FCA5A5; }
+    .status.pendiente { background:rgba(255,200,87,.16); color:var(--gold); }
+    .fields { display:grid; gap:12px; margin-top:14px; }
+    .field { border:1px solid rgba(255,255,255,.1); border-radius:18px; padding:14px; background:rgba(255,255,255,.04); }
+    .field small { display:block; color:var(--muted); font-size:12px; font-weight:850; margin-bottom:6px; }
+    .field b { font-size:20px; word-break:break-word; }
+    .copy-row { display:flex; gap:8px; align-items:center; }
+    .copy-row b { flex:1; }
+    button, .btn { display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:999px; padding:11px 15px; font-weight:950; cursor:pointer; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#170B02; }
+    .copy { background:rgba(255,255,255,.08); color:var(--text); border:1px solid var(--border); padding:9px 12px; }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+    .btn.ghost { background:rgba(255,255,255,.06); color:var(--text); border:1px solid var(--border); }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    td, th { text-align:left; border-bottom:1px solid var(--border); padding:10px 4px; font-size:14px; }
+    th { color:var(--muted); font-size:12px; }
+    .empty { color:var(--muted); padding:12px 0; }
+    @media (max-width:760px) { .grid { grid-template-columns:1fr; } .nav { flex-direction:column; align-items:flex-start; padding:14px 0; } .actions .btn { width:100%; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <img class="logo" src="{{ url_for('static', filename='logo.png') }}" alt="Fénix Digital TV">
+      <a class="logout" href="{{ url_for('client_logout') }}">Salir</a>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Hola, {{ client.nombre or client.username }}</h1>
+      <p class="lead">Aquí puedes consultar tu servicio, vencimiento y credenciales de acceso para tu app.</p>
+    </section>
+    <section class="grid">
+      <div class="card">
+        <span class="status {{ status }}">{{ status|capitalize }}</span>
+        <h2>Tu servicio</h2>
+        <div class="fields">
+          <div class="field"><small>Fecha de vencimiento</small><b>{{ expires_at or 'Pendiente de asignar' }}</b></div>
+          <div class="field"><small>App recomendada</small><b>{{ service.app_name or 'Max Player' }}</b></div>
+          <div class="field"><small>Dispositivos incluidos</small><b>{{ service.devices or 3 }}</b></div>
+        </div>
+        <div class="actions">
+          <a class="btn" target="_blank" rel="noopener" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%2C%20quiero%20renovar%20mi%20servicio.%20Mi%20usuario%20es%20{{ client.username | urlencode }}">Renovar por WhatsApp</a>
+          <a class="btn ghost" href="/dispositivo/android-ios">Ver guía de instalación</a>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Credenciales de acceso</h2>
+        <div class="fields">
+          <div class="field">
+            <small>Usuario {{ service.app_name or 'Max Player' }}</small>
+            <div class="copy-row"><b id="service-user">{{ service.service_username or 'Pendiente' }}</b><button class="copy" onclick="copyText('service-user')">Copiar</button></div>
+          </div>
+          <div class="field">
+            <small>Password {{ service.app_name or 'Max Player' }}</small>
+            <div class="copy-row"><b id="service-pass">{{ service.service_password or 'Pendiente' }}</b><button class="copy" onclick="copyText('service-pass')">Copiar</button></div>
+          </div>
+        </div>
+        <p class="lead" style="margin-top:14px;font-size:14px;">Estos datos son para la app de entretenimiento. Tu contraseña del portal Fénix no se muestra por seguridad.</p>
+      </div>
+      <div class="card" style="grid-column:1/-1;">
+        <h2>Últimos pagos</h2>
+        {% if payments %}
+        <table>
+          <thead><tr><th>Mes</th><th>Monto</th><th>Registro</th></tr></thead>
+          <tbody>
+            {% for p in payments %}
+            <tr><td>{{ p.mes }}</td><td>Q {{ p.monto }}</td><td>{{ (p.fecha_registro or '')[:16] }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty">Aún no hay pagos para mostrar.</div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+  <script>
+    async function copyText(id) {
+      const text = document.getElementById(id)?.textContent || '';
+      if (!text || text === 'Pendiente') return;
+      await navigator.clipboard.writeText(text);
+      alert('Copiado');
+    }
+  </script>
+</body>
+</html>
