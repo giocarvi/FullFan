@@ -4,6 +4,7 @@ import hmac
 import json
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from datetime import date, datetime, timezone, timedelta
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -142,6 +143,15 @@ def extract_maxplayer_user_id(response):
             return str(value)
     return None
 
+def walk_dicts(payload):
+    if isinstance(payload, dict):
+        yield payload
+        for value in payload.values():
+            yield from walk_dicts(value)
+    elif isinstance(payload, list):
+        for item in payload:
+            yield from walk_dicts(item)
+
 def iter_maxplayer_users(payload):
     """Recorre respuestas comunes de Get Users sin depender de una estructura exacta."""
     if isinstance(payload, list):
@@ -160,27 +170,47 @@ def iter_maxplayer_users(payload):
         elif isinstance(value, dict):
             for item in iter_maxplayer_users(value):
                 yield item
+    for item in walk_dicts(payload):
+        if item is not payload and extract_maxplayer_user_id(item):
+            yield item
 
-def get_maxplayer_users():
-    return maxplayer_request('GET', '/users')
+def get_maxplayer_users(params=None):
+    path = '/users'
+    if params:
+        path = f"{path}?{urlencode(params)}"
+    return maxplayer_request('GET', path)
 
 def find_maxplayer_user_id(username):
     if not username:
         return None
     target = str(username).strip().lower()
-    response = get_maxplayer_users()
-    for user in iter_maxplayer_users(response):
-        possible_names = [
-            user.get('username'),
-            user.get('name'),
-            user.get('user_name'),
-            user.get('iptv_user'),
-            user.get('iptv_username'),
-            user.get('email'),
-            user.get('user_email'),
-        ]
-        if any(str(value).strip().lower() == target for value in possible_names if value not in (None, '')):
-            return extract_maxplayer_user_id(user)
+    attempts = [
+        None,
+        {'search': username},
+        {'username': username},
+        {'q': username},
+        {'iptv_user': username},
+        {'iptv_username': username},
+    ]
+    seen = set()
+    for params in attempts:
+        key = tuple(sorted((params or {}).items()))
+        if key in seen:
+            continue
+        seen.add(key)
+        response = get_maxplayer_users(params)
+        for user in iter_maxplayer_users(response):
+            possible_names = [
+                user.get('username'),
+                user.get('name'),
+                user.get('user_name'),
+                user.get('iptv_user'),
+                user.get('iptv_username'),
+                user.get('email'),
+                user.get('user_email'),
+            ]
+            if any(str(value).strip().lower() == target for value in possible_names if value not in (None, '')):
+                return extract_maxplayer_user_id(user)
     return None
 
 def create_maxplayer_user(username, iptv_user, iptv_pass, password='', fullname='', user_email=''):
@@ -208,6 +238,10 @@ def delete_maxplayer_user(user_id):
 def is_maxplayer_not_found_error(error):
     text = str(error).lower()
     return '404' in text and ('user not found' in text or 'not found' in text)
+
+def is_maxplayer_exists_error(error):
+    text = str(error).lower()
+    return '409' in text and ('already exist' in text or 'already exists' in text)
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
@@ -1566,6 +1600,15 @@ def api_update_activation_task(task_id):
         c.execute(qmark("SELECT maxplayer_user_id FROM client_service_credentials WHERE username=?"), (task['username'],))
         existing_service = fetchone(c) or {}
         try:
+            def create_current_maxplayer_user():
+                return create_maxplayer_user(
+                    username=xui_username,
+                    iptv_user=xui_username,
+                    iptv_pass=xui_password,
+                    password=xui_username,
+                    fullname=client_row.get('nombre') or task['username'],
+                    user_email=''
+                )
             if maxplayer_mode == 'recreate':
                 existing_user_id = existing_service.get('maxplayer_user_id')
                 if not existing_user_id:
@@ -1578,14 +1621,21 @@ def api_update_activation_task(task_id):
                 except MaxPlayerError as exc:
                     if not is_maxplayer_not_found_error(exc):
                         raise
-            maxplayer_response, maxplayer_user_id = create_maxplayer_user(
-                username=xui_username,
-                iptv_user=xui_username,
-                iptv_pass=xui_password,
-                password=xui_username,
-                fullname=client_row.get('nombre') or task['username'],
-                user_email=''
-            )
+            try:
+                maxplayer_response, maxplayer_user_id = create_current_maxplayer_user()
+            except MaxPlayerError as exc:
+                if maxplayer_mode == 'recreate' and is_maxplayer_exists_error(exc):
+                    existing_user_id = find_maxplayer_user_id(xui_username)
+                    if not existing_user_id:
+                        raise
+                    try:
+                        delete_maxplayer_user(existing_user_id)
+                    except MaxPlayerError as delete_exc:
+                        if not is_maxplayer_not_found_error(delete_exc):
+                            raise
+                    maxplayer_response, maxplayer_user_id = create_current_maxplayer_user()
+                else:
+                    raise
             maxplayer_synced_at = datetime.now(GT_TZ).isoformat()
             maxplayer_sync_status = 'recreated' if maxplayer_mode == 'recreate' else 'created'
             if not maxplayer_user_id:
