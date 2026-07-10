@@ -1,6 +1,9 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
 import os
 import hmac
+import json
+from urllib import request as urlrequest
+from urllib.error import HTTPError, URLError
 from datetime import date, datetime, timezone, timedelta
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,6 +15,10 @@ def today_gt():
     """Fecha actual en hora Guatemala."""
     return datetime.now(GT_TZ).date()
 
+def now_gt():
+    """Fecha y hora actual en Guatemala."""
+    return datetime.now(GT_TZ)
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or os.environ.get('FLASK_SECRET_KEY')
 if not app.secret_key:
@@ -20,6 +27,9 @@ if not app.secret_key:
 PASSWORD_HASH_PREFIXES = ('scrypt:', 'pbkdf2:', 'argon2:')
 CREDIT_COST_USD = float(os.environ.get('CREDIT_COST_USD', '1.25'))
 USD_GTQ_RATE = float(os.environ.get('USD_GTQ_RATE', '7.80'))
+MAXPLAYER_API_BASE = os.environ.get('MAXPLAYER_API_BASE', 'https://api.maxplayer.tv/v3/api/public').rstrip('/')
+MAXPLAYER_API_TOKEN = os.environ.get('MAXPLAYER_API_TOKEN', '')
+MAXPLAYER_DOMAIN_ID = os.environ.get('MAXPLAYER_DOMAIN_ID', '')
 
 def hash_password(password):
     return generate_password_hash(password)
@@ -65,6 +75,72 @@ def estimate_credits_from_amount(amount):
         return max(1, round(amount / 90))
     return nearest_credits
 
+
+class MaxPlayerError(Exception):
+    pass
+
+def maxplayer_configured():
+    return bool(MAXPLAYER_API_TOKEN and MAXPLAYER_DOMAIN_ID)
+
+def maxplayer_request(method, path, payload=None):
+    if not maxplayer_configured():
+        raise MaxPlayerError('Max Player no está configurado. Agrega MAXPLAYER_API_TOKEN y MAXPLAYER_DOMAIN_ID en Railway.')
+    url = f"{MAXPLAYER_API_BASE}{path}"
+    body = None
+    headers = {'Api-Token': MAXPLAYER_API_TOKEN, 'Accept': 'application/json'}
+    if payload is not None:
+        body = json.dumps(payload).encode('utf-8')
+        headers['Content-Type'] = 'application/json'
+    req = urlrequest.Request(url, data=body, method=method.upper(), headers=headers)
+    try:
+        with urlrequest.urlopen(req, timeout=20) as response:
+            raw = response.read().decode('utf-8') or '{}'
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return {'raw': raw}
+    except HTTPError as exc:
+        raw = exc.read().decode('utf-8', errors='replace')
+        try:
+            detail = json.loads(raw)
+        except json.JSONDecodeError:
+            detail = raw
+        raise MaxPlayerError(f"Max Player respondió HTTP {exc.code}: {detail}") from exc
+    except URLError as exc:
+        raise MaxPlayerError(f"No se pudo conectar con Max Player: {exc.reason}") from exc
+    except TimeoutError as exc:
+        raise MaxPlayerError('Max Player tardó demasiado en responder.') from exc
+
+def extract_maxplayer_user_id(response):
+    """Intenta encontrar el id del usuario sin depender de una forma exacta de respuesta."""
+    if not isinstance(response, dict):
+        return None
+    candidates = [
+        response.get('id'),
+        response.get('user_id'),
+        response.get('customer_id'),
+    ]
+    for key in ('user', 'data', 'customer'):
+        nested = response.get(key)
+        if isinstance(nested, dict):
+            candidates.extend([nested.get('id'), nested.get('user_id'), nested.get('customer_id')])
+    for value in candidates:
+        if value not in (None, ''):
+            return str(value)
+    return None
+
+def create_maxplayer_user(username, iptv_user, iptv_pass, password='', fullname='', user_email=''):
+    payload = {
+        'domain_id': str(MAXPLAYER_DOMAIN_ID),
+        'iptv_user': iptv_user,
+        'iptv_pass': iptv_pass,
+        'username': username,
+        'password': password or iptv_pass,
+        'fullname': fullname or username,
+        'user_email': user_email or '',
+    }
+    response = maxplayer_request('POST', '/users', payload)
+    return response, extract_maxplayer_user_id(response)
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
@@ -301,8 +377,14 @@ def init_db():
             expires_at TEXT,
             devices INTEGER DEFAULT 3,
             notes TEXT,
+            maxplayer_user_id TEXT,
+            maxplayer_synced_at TEXT,
+            maxplayer_sync_status TEXT,
             updated_at TEXT DEFAULT (NOW()::text)
         )''')
+        c.execute("ALTER TABLE client_service_credentials ADD COLUMN IF NOT EXISTS maxplayer_user_id TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE client_service_credentials ADD COLUMN IF NOT EXISTS maxplayer_synced_at TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE client_service_credentials ADD COLUMN IF NOT EXISTS maxplayer_sync_status TEXT DEFAULT NULL")
         c.execute('''CREATE TABLE IF NOT EXISTS device_apps (
             id SERIAL PRIMARY KEY,
             device_type TEXT NOT NULL,
@@ -401,6 +483,9 @@ def init_db():
                 expires_at TEXT,
                 devices INTEGER DEFAULT 3,
                 notes TEXT,
+                maxplayer_user_id TEXT,
+                maxplayer_synced_at TEXT,
+                maxplayer_sync_status TEXT,
                 updated_at TEXT DEFAULT (datetime('now'))
             );
             CREATE TABLE IF NOT EXISTS device_apps (
@@ -459,6 +544,15 @@ def init_db():
             c.execute("ALTER TABLE activation_tasks ADD COLUMN xui_password TEXT DEFAULT NULL")
         except Exception:
             pass
+        for ddl in (
+            "ALTER TABLE client_service_credentials ADD COLUMN maxplayer_user_id TEXT DEFAULT NULL",
+            "ALTER TABLE client_service_credentials ADD COLUMN maxplayer_synced_at TEXT DEFAULT NULL",
+            "ALTER TABLE client_service_credentials ADD COLUMN maxplayer_sync_status TEXT DEFAULT NULL",
+        ):
+            try:
+                c.execute(ddl)
+            except Exception:
+                pass
 
     conn.commit()
 
@@ -1383,6 +1477,7 @@ def api_update_activation_task(task_id):
     notes = data.get('notes') or ''
     blocked_reason = data.get('blocked_reason') or ''
     register_payment = data.get('register_payment', True)
+    maxplayer_sync = bool(data.get('maxplayer_sync', False))
     db = get_db()
     c = db.cursor()
     c.execute(qmark("SELECT * FROM activation_tasks WHERE id=?"), (task_id,))
@@ -1390,6 +1485,32 @@ def api_update_activation_task(task_id):
     if not task:
         db.close()
         return jsonify({'error': 'Tarea no encontrada'}), 404
+
+    maxplayer_user_id = None
+    maxplayer_synced_at = None
+    maxplayer_sync_status = None
+    if status == 'done' and maxplayer_sync:
+        if not xui_username or not xui_password:
+            db.close()
+            return jsonify({'error': 'Para crear en Max Player se requiere Usuario XUI y Password IPTV.'}), 400
+        c.execute(qmark("SELECT nombre, contacto FROM clientes WHERE username=?"), (task['username'],))
+        client_row = fetchone(c) or {}
+        try:
+            maxplayer_response, maxplayer_user_id = create_maxplayer_user(
+                username=xui_username,
+                iptv_user=xui_username,
+                iptv_pass=xui_password,
+                password=xui_password,
+                fullname=client_row.get('nombre') or task['username'],
+                user_email=''
+            )
+            maxplayer_synced_at = datetime.now(GT_TZ).isoformat()
+            maxplayer_sync_status = 'created'
+            if not maxplayer_user_id:
+                maxplayer_sync_status = 'created_no_id'
+        except MaxPlayerError as exc:
+            db.close()
+            return jsonify({'error': str(exc)}), 400
 
     completed_at = datetime.now(GT_TZ).isoformat() if status == 'done' else None
     if status in {'pending', 'in_progress', 'cancelled'}:
@@ -1442,8 +1563,9 @@ def api_update_activation_task(task_id):
         if PG:
             c.execute("""
                 INSERT INTO client_service_credentials
-                    (username, app_name, service_username, service_password, expires_at, devices, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                    (username, app_name, service_username, service_password, expires_at, devices,
+                     maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (username) DO UPDATE SET
                     app_name=EXCLUDED.app_name,
                     service_username=EXCLUDED.service_username,
@@ -1454,8 +1576,12 @@ def api_update_activation_task(task_id):
                     END,
                     expires_at=EXCLUDED.expires_at,
                     devices=EXCLUDED.devices,
+                    maxplayer_user_id=COALESCE(EXCLUDED.maxplayer_user_id, client_service_credentials.maxplayer_user_id),
+                    maxplayer_synced_at=COALESCE(EXCLUDED.maxplayer_synced_at, client_service_credentials.maxplayer_synced_at),
+                    maxplayer_sync_status=COALESCE(EXCLUDED.maxplayer_sync_status, client_service_credentials.maxplayer_sync_status),
                     updated_at=EXCLUDED.updated_at
-            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, 3, completed_at))
+            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, 3,
+                  maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status, completed_at))
             if portal_password:
                 c.execute("""
                     INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
@@ -1468,8 +1594,9 @@ def api_update_activation_task(task_id):
         else:
             c.execute("""
                 INSERT INTO client_service_credentials
-                    (username, app_name, service_username, service_password, expires_at, devices, updated_at)
-                VALUES (?,?,?,?,?,?,?)
+                    (username, app_name, service_username, service_password, expires_at, devices,
+                     maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(username) DO UPDATE SET
                     app_name=excluded.app_name,
                     service_username=excluded.service_username,
@@ -1480,8 +1607,12 @@ def api_update_activation_task(task_id):
                     END,
                     expires_at=excluded.expires_at,
                     devices=excluded.devices,
+                    maxplayer_user_id=COALESCE(excluded.maxplayer_user_id, client_service_credentials.maxplayer_user_id),
+                    maxplayer_synced_at=COALESCE(excluded.maxplayer_synced_at, client_service_credentials.maxplayer_synced_at),
+                    maxplayer_sync_status=COALESCE(excluded.maxplayer_sync_status, client_service_credentials.maxplayer_sync_status),
                     updated_at=excluded.updated_at
-            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, 3, completed_at))
+            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, 3,
+                  maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status, completed_at))
             if portal_password:
                 c.execute("""
                     INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)

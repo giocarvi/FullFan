@@ -896,6 +896,13 @@ body {
         <input id="activation-modal-register-payment" type="checkbox" checked style="width:auto;">
         Registrar pago en historial al completar
       </label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;">
+        <input id="activation-modal-maxplayer-sync" type="checkbox" checked style="width:auto;">
+        Crear usuario automáticamente en Max Player
+      </label>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px;">
+        Usa el usuario y password XUI como acceso Max Player. Si Max Player responde error, no se completa la activación.
+      </div>
       <div id="activation-payment-hint" style="font-size:12px;color:var(--muted);margin-top:6px;"></div>
     </div>
     <label id="activation-notes-label">Notas internas</label>
@@ -1142,6 +1149,7 @@ function openCompleteActivationModal(id, username, amount = 0, currency = 'GTQ')
   document.getElementById('activation-modal-portal-password').value = '';
   document.getElementById('activation-modal-expires').value = localDateStr();
   document.getElementById('activation-modal-notes').value = '';
+  document.getElementById('activation-modal-maxplayer-sync').checked = true;
   const registerPayment = document.getElementById('activation-modal-register-payment');
   const paymentHint = document.getElementById('activation-payment-hint');
   const hasAmount = Number(amount || 0) > 0;
@@ -1161,6 +1169,7 @@ function openBlockActivationModal(id) {
   document.getElementById('activation-notes-label').textContent = 'Motivo del bloqueo';
   document.getElementById('activation-modal-notes').value = '';
   document.getElementById('activation-modal-register-payment').checked = false;
+  document.getElementById('activation-modal-maxplayer-sync').checked = false;
   document.getElementById('activation-action-modal').classList.add('open');
 }
 
@@ -1180,6 +1189,7 @@ async function submitActivationActionModal() {
     body.portal_password = document.getElementById('activation-modal-portal-password').value.trim();
     body.notes = notes;
     body.register_payment = document.getElementById('activation-modal-register-payment').checked;
+    body.maxplayer_sync = document.getElementById('activation-modal-maxplayer-sync').checked;
     if (!body.xui_username || !body.xui_expires_at) {
       alert('Usuario XUI y vencimiento son obligatorios.');
       return;
