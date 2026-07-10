@@ -722,11 +722,19 @@ body {
         <label>📲 Nuevo número <span style="font-size:11px;color:var(--muted);font-weight:400;">(deja vacío para ocultar el botón)</span></label>
             <textarea id="cfg-wa-nuevo-numero" placeholder="Ej: Hola {nombre}, te informamos que nuestro nuevo número de Fénix Digital TV es el 41562336. ¡Gracias por preferirnos! 🔥"></textarea>
       </div>
+      <div class="config-group">
+        <label>🔥 Migración Full Fan → Fénix</label>
+        <span class="config-hint">Variables disponibles: {nombre}, {fecha}, {portal}, {usuario}, {password_portal}, {app_usuario}, {app_password}</span>
+        <textarea id="cfg-wa-migracion"></textarea>
+      </div>
     </div>
 
     <button class="config-save-btn" onclick="saveConfig()">💾 Guardar cambios</button>
     <input type="file" id="excel-upload" accept=".xlsx,.xls" style="display:none" onchange="reimportarExcel(this)">
     <button class="config-save-btn" style="background:#6c3483;margin-top:8px" onclick="document.getElementById('excel-upload').click()">🔄 Reimportar desde Excel</button>
+    <input type="file" id="xui-credentials-upload" accept=".xlsx,.xls" style="display:none" onchange="importarCredencialesXui(this)">
+    <button class="config-save-btn" style="background:linear-gradient(135deg,#f59e0b,#ea580c);margin-top:8px" onclick="document.getElementById('xui-credentials-upload').click()">🔐 Importar credenciales XUI</button>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px;">Usa el Excel con columnas Username, Password y Vencimiento. Guarda el password XUI internamente y crea accesos de portal faltantes con password inicial igual al usuario.</p>
 
     <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:20px;">
       <h3 style="font-size:14px;color:var(--muted);margin-bottom:10px;">📤 Exportar</h3>
@@ -1403,7 +1411,19 @@ async function openModal(username) {
   const nombreCliente = c.nombre || c.username;
   const _meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const expDate = c.vencimiento ? (d => `${String(d.getUTCDate()).padStart(2,'0')}-${_meses[d.getUTCMonth()]}-${d.getUTCFullYear()}`)(new Date(c.vencimiento)) : '';
-  const waFill = (tpl) => (tpl || '').replace(/\{nombre\}/g, nombreCliente).replace(/\{fecha\}/g, expDate);
+  const portalUrl = 'https://www.fenixdigitaltv.net/cliente/login';
+  const portalUser = c.username;
+  const portalPassword = c.username;
+  const appUser = service.service_username || c.username;
+  const appPassword = appUser;
+  const waFill = (tpl) => (tpl || '')
+    .replace(/\{nombre\}/g, nombreCliente)
+    .replace(/\{fecha\}/g, expDate)
+    .replace(/\{portal\}/g, portalUrl)
+    .replace(/\{usuario\}/g, portalUser)
+    .replace(/\{password_portal\}/g, portalPassword)
+    .replace(/\{app_usuario\}/g, appUser)
+    .replace(/\{app_password\}/g, appPassword);
   const waSection = waBase ? `
     <div class="wa-section">
       <div class="wa-section-title">💬 WhatsApp</div>
@@ -1411,9 +1431,10 @@ async function openModal(username) {
         <a class="wa-btn primary" href="${waBase}" target="_blank" rel="noopener">📞 Abrir chat</a>
       <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_saludo || 'Hola {nombre}, te saludamos de Fénix Digital TV 👋 Tu entretenimiento, sin fronteras.'))}" target="_blank" rel="noopener">👋 Saludo</a>
         <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_recordatorio || 'Hola {nombre}, tu servicio vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'))}" target="_blank" rel="noopener">⚠️ Recordatorio</a>
-      <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'))}" target="_blank" rel="noopener">✅ Confirmar pago</a>
+        <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'))}" target="_blank" rel="noopener">✅ Confirmar pago</a>
         <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_vencido || 'Hola {nombre}, tu servicio ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'))}" target="_blank" rel="noopener">❌ Servicio vencido</a>
         ${cfg.wa_nuevo_numero ? '<a class="wa-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border-color:rgba(245,158,11,0.35);" href="' + waBase + '?text=' + encMsg(waFill(cfg.wa_nuevo_numero)) + '" target="_blank" rel="noopener">📲 Nuevo número</a>' : ''}
+        <a class="wa-btn" style="background:rgba(249,115,22,0.16);color:#fb923c;border-color:rgba(249,115,22,0.38);" href="${waBase}?text=${encMsg(waFill(cfg.wa_migracion || 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\\n\\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\\n\\nPortal: {portal}\\nUsuario portal: {usuario}\\nPassword inicial: {password_portal}\\n\\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\\n\\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.'))}" target="_blank" rel="noopener">🔥 Migración Fénix</a>
       </div>
     </div>` : '';
 
@@ -1783,6 +1804,7 @@ function loadConfigView() {
   set('cfg-wa-confirmar-pago', 'wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥');
   set('cfg-wa-vencido', 'wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥');
   set('cfg-wa-nuevo-numero', 'wa_nuevo_numero', '');
+  set('cfg-wa-migracion', 'wa_migracion', 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.');
 }
 
 function cerrarModalPassword() {
@@ -1848,6 +1870,33 @@ async function reimportarExcel(input) {
   }
 }
 
+async function importarCredencialesXui(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!confirm(`¿Importar credenciales XUI desde "${file.name}"?\n\nEsto guardará Username/Password/Vencimiento para Max Player, creará accesos de portal faltantes con password inicial igual al usuario y NO modificará el historial de pagos.`)) {
+    input.value = ''; return;
+  }
+  const btn = document.querySelector('[onclick="document.getElementById(\'xui-credentials-upload\').click()"]');
+  btn.disabled = true; btn.textContent = '⏳ Importando...';
+  try {
+    const fd = new FormData();
+    fd.append('archivo', file);
+    const r = await fetch('/api/admin/importar-xui-credenciales', {method:'POST', body: fd});
+    const d = await r.json();
+    if (d.ok) {
+      const extra = d.no_encontrados_total ? `\n${d.no_encontrados_total} usuarios del Excel no existen aún en Fénix.` : '';
+      alert(`✅ Credenciales XUI importadas\n${d.filas_procesadas} filas procesadas\n${d.clientes_actualizados} clientes actualizados\n${d.portal_creados_si_faltaban} accesos de portal creados si faltaban${extra}`);
+    } else {
+      alert('Error: ' + (d.error || 'desconocido'));
+    }
+  } catch(e) {
+    alert('Error de conexión: ' + e);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔐 Importar credenciales XUI';
+    input.value = '';
+  }
+}
+
 async function saveConfig() {
   const get = id => (document.getElementById(id)?.value || '').trim();
   const data = {
@@ -1857,6 +1906,7 @@ async function saveConfig() {
     wa_confirmar_pago: get('cfg-wa-confirmar-pago'),
     wa_vencido: get('cfg-wa-vencido'),
     wa_nuevo_numero: get('cfg-wa-nuevo-numero'),
+    wa_migracion: get('cfg-wa-migracion'),
   };
   const r = await fetch('/api/config', {
     method: 'POST',

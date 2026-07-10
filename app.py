@@ -384,6 +384,7 @@ def init_db():
             ('wa_recordatorio', 'Hola {nombre}, tu servicio de Fénix Digital TV vence el {fecha}. Puedes renovar antes de la fecha para evitar interrupciones. ¡Gracias! 🔥'),
             ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'),
             ('wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥'),
+            ('wa_migracion', 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.'),
         ]
         for clave, valor in defaults:
             c.execute("INSERT INTO configuracion (clave, valor) VALUES (%s, %s) ON CONFLICT DO NOTHING", (clave, valor))
@@ -398,6 +399,7 @@ def init_db():
             ('wa_recordatorio', 'Hola {nombre}, tu servicio de Fénix Digital TV vence el {fecha}. Puedes renovar antes de la fecha para evitar interrupciones. ¡Gracias! 🔥'),
             ('wa_confirmar_pago', 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'),
             ('wa_vencido', 'Hola {nombre}, tu servicio de Fénix Digital TV ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 🔥'),
+            ('wa_migracion', 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.'),
         ]
         for clave, valor in defaults:
             c.execute("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)", (clave, valor))
@@ -2344,6 +2346,124 @@ def reimportar_excel():
         return jsonify({'ok': False, 'error': str(e)})
     finally:
         if usar_tmp and os.path.exists(excel_path):
+            os.unlink(excel_path)
+
+@app.route('/api/admin/importar-xui-credenciales', methods=['POST'])
+@login_required
+def importar_xui_credenciales():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    if 'archivo' not in request.files:
+        return jsonify({'ok': False, 'error': 'Sube un archivo Excel con columnas Username, Password y Vencimiento.'}), 400
+    import tempfile
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        import subprocess, sys
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'openpyxl'])
+        from openpyxl import load_workbook
+
+    f = request.files['archivo']
+    suffix = '.xlsx' if f.filename.lower().endswith('.xlsx') else '.xls'
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    f.save(tmp.name)
+    excel_path = tmp.name
+    processed = matched = portal_created = 0
+    missing_clients = []
+    try:
+        wb = load_workbook(excel_path, read_only=True, data_only=True)
+        ws = wb.active
+        rows = list(ws.iter_rows(values_only=True))
+        wb.close()
+        if not rows:
+            return jsonify({'ok': False, 'error': 'El Excel está vacío.'}), 400
+        headers = [str(h or '').strip().lower() for h in rows[0]]
+        def col(*names):
+            for name in names:
+                key = name.lower()
+                if key in headers:
+                    return headers.index(key)
+            return None
+        user_col = col('username', 'usuario', 'user')
+        pass_col = col('password', 'contraseña', 'contrasena', 'pass')
+        exp_col = col('vencimiento', 'expires', 'expiration', 'fecha vencimiento')
+        if user_col is None or pass_col is None:
+            return jsonify({'ok': False, 'error': 'No encontré columnas Username y Password.'}), 400
+
+        db = get_db()
+        c = db.cursor()
+        now = datetime.now(GT_TZ).isoformat()
+        for row in rows[1:]:
+            username = str(row[user_col] or '').strip() if len(row) > user_col else ''
+            password = str(row[pass_col] or '').strip() if len(row) > pass_col else ''
+            if not username or not password:
+                continue
+            processed += 1
+            expires_at = None
+            if exp_col is not None and len(row) > exp_col and row[exp_col]:
+                value = row[exp_col]
+                if hasattr(value, 'date'):
+                    expires_at = value.date().isoformat()
+                else:
+                    expires_at = str(value).strip()
+            c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
+            if not fetchone(c):
+                missing_clients.append(username)
+                continue
+            matched += 1
+            if expires_at:
+                c.execute(qmark("UPDATE clientes SET vencimiento=? WHERE username=?"), (expires_at, username))
+            if PG:
+                c.execute("""
+                    INSERT INTO client_service_credentials
+                        (username, app_name, service_username, service_password, expires_at, devices, updated_at)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (username) DO UPDATE SET
+                        app_name=EXCLUDED.app_name,
+                        service_username=EXCLUDED.service_username,
+                        service_password=EXCLUDED.service_password,
+                        expires_at=COALESCE(EXCLUDED.expires_at, client_service_credentials.expires_at),
+                        devices=EXCLUDED.devices,
+                        updated_at=EXCLUDED.updated_at
+                """, (username, 'Max Player', username, password, expires_at, 3, now))
+                c.execute("""
+                    INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
+                    VALUES (%s,%s,TRUE,%s)
+                    ON CONFLICT (username) DO NOTHING
+                """, (username, hash_password(username), now))
+            else:
+                c.execute("""
+                    INSERT INTO client_service_credentials
+                        (username, app_name, service_username, service_password, expires_at, devices, updated_at)
+                    VALUES (?,?,?,?,?,?,?)
+                    ON CONFLICT(username) DO UPDATE SET
+                        app_name=excluded.app_name,
+                        service_username=excluded.service_username,
+                        service_password=excluded.service_password,
+                        expires_at=COALESCE(excluded.expires_at, client_service_credentials.expires_at),
+                        devices=excluded.devices,
+                        updated_at=excluded.updated_at
+                """, (username, 'Max Player', username, password, expires_at, 3, now))
+                c.execute("""
+                    INSERT OR IGNORE INTO client_portal_accounts (username, password, is_enabled, updated_at)
+                    VALUES (?,?,1,?)
+                """, (username, hash_password(username), now))
+            if c.rowcount:
+                portal_created += 1
+        db.commit()
+        db.close()
+        return jsonify({
+            'ok': True,
+            'filas_procesadas': processed,
+            'clientes_actualizados': matched,
+            'portal_creados_si_faltaban': portal_created,
+            'no_encontrados': missing_clients[:50],
+            'no_encontrados_total': len(missing_clients)
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+    finally:
+        if os.path.exists(excel_path):
             os.unlink(excel_path)
 
 
