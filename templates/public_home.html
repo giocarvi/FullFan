@@ -95,24 +95,37 @@
     .currency-box select { width:auto; min-width:190px; padding:10px 12px; }
     .plan ul { padding:0; list-style:none; margin:0 0 18px; color:var(--muted); display:grid; gap:8px; font-size:14px; }
     .plan li:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
-    .devices { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-    .device { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:18px; padding:15px; color:var(--muted); transition:.16s; display:flex; flex-direction:column; min-height:224px; overflow:hidden; position:relative; }
-    .device:hover { transform:translateY(-2px); border-color:rgba(255,200,87,.45); background:rgba(255,255,255,.07); }
-    .device b { color:var(--text); display:block; margin-bottom:4px; }
-    .device small { color:#C9D7FF; font-size:14px; }
-    .device span { display:block; font-size:12px; color:var(--gold); margin-top:auto; font-weight:800; }
-    .device-scene { min-height:116px; position:relative; margin:-2px -2px 14px; border-radius:16px; background:
-      radial-gradient(circle at 18% 18%,rgba(255,200,87,.18),transparent 30%),
-      linear-gradient(135deg,rgba(255,106,0,.08),rgba(124,58,237,.16)),
-      rgba(7,11,24,.62); border:1px solid rgba(255,255,255,.09); overflow:hidden; }
+    .devices-shell { padding:22px; border:1px solid var(--border); border-radius:30px; background:
+      radial-gradient(circle at 8% 0%,rgba(255,106,0,.16),transparent 30%),
+      radial-gradient(circle at 92% 10%,rgba(124,58,237,.18),transparent 34%),
+      rgba(255,255,255,.025); box-shadow:0 24px 70px rgba(0,0,0,.22); }
+    .devices-head { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:18px; }
+    .devices-head .section-title { margin-bottom:8px; }
+    .device-chips { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; min-width:260px; }
+    .device-chip { color:#DDE7FF; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); border-radius:999px; padding:8px 10px; font-size:12px; font-weight:800; }
+    .devices { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+    .device { background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.028)); border:1px solid rgba(255,255,255,.12); border-radius:22px; padding:14px; color:var(--muted); transition:.18s; display:flex; flex-direction:column; min-height:244px; overflow:hidden; position:relative; box-shadow:0 16px 34px rgba(0,0,0,.18); }
+    .device:before { content:""; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,200,87,.08),transparent 38%); opacity:0; transition:.18s; pointer-events:none; }
+    .device:hover { transform:translateY(-4px); border-color:rgba(255,200,87,.5); background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.04)); box-shadow:0 20px 48px rgba(0,0,0,.28); }
+    .device:hover:before { opacity:1; }
+    .device b { color:var(--text); display:block; margin-bottom:8px; font-size:16px; line-height:1.2; letter-spacing:-.01em; }
+    .device small { display:inline-flex; width:max-content; max-width:100%; color:#C9D7FF; font-size:12px; font-weight:850; border:1px solid rgba(124,58,237,.34); background:rgba(124,58,237,.14); border-radius:999px; padding:6px 9px; margin-bottom:10px; }
+    .device span { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--gold); margin-top:auto; font-weight:900; }
+    .device span:after { content:""; width:22px; height:1px; background:linear-gradient(90deg,var(--gold),transparent); display:inline-block; }
+    .device-scene { min-height:128px; position:relative; margin:0 0 14px; border-radius:18px; background:
+      radial-gradient(circle at 16% 16%,rgba(255,200,87,.2),transparent 30%),
+      radial-gradient(circle at 86% 86%,rgba(124,58,237,.2),transparent 34%),
+      linear-gradient(135deg,rgba(255,106,0,.1),rgba(124,58,237,.18)),
+      rgba(7,11,24,.72); border:1px solid rgba(255,255,255,.12); overflow:hidden; }
+    .device-scene:before { content:""; position:absolute; left:12px; right:12px; bottom:10px; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent); }
     .device-art { position:absolute; inset:18px auto auto 18px; opacity:.92; }
-    .mobile-pair .phone { position:absolute; left:4px; top:22px; width:30px; height:56px; border:3px solid rgba(255,255,255,.88); border-radius:10px; background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.03)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
-    .mobile-pair .tablet { position:absolute; left:36px; top:10px; width:66px; height:74px; border:3px solid rgba(255,255,255,.88); border-radius:14px; background:linear-gradient(135deg,rgba(255,106,0,.18),rgba(124,58,237,.18)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
-    .tv-art { left:18px; top:20px; width:104px; height:66px; border:4px solid rgba(255,255,255,.86); border-radius:12px; background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.02)); box-shadow:0 18px 32px rgba(0,0,0,.28); }
+    .mobile-pair .phone { position:absolute; left:6px; top:26px; width:30px; height:58px; border:3px solid rgba(255,255,255,.88); border-radius:10px; background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.03)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
+    .mobile-pair .tablet { position:absolute; left:40px; top:14px; width:68px; height:78px; border:3px solid rgba(255,255,255,.88); border-radius:14px; background:linear-gradient(135deg,rgba(255,106,0,.18),rgba(124,58,237,.18)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
+    .tv-art { left:18px; top:24px; width:106px; height:66px; border:4px solid rgba(255,255,255,.86); border-radius:12px; background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.02)); box-shadow:0 18px 32px rgba(0,0,0,.28); }
     .tv-art:after { content:""; position:absolute; left:40px; right:40px; bottom:-13px; height:4px; background:rgba(255,255,255,.78); border-radius:999px; box-shadow:0 10px 0 8px rgba(255,255,255,.16); }
-    .computer-art { left:18px; top:19px; width:104px; height:66px; border:4px solid rgba(255,255,255,.84); border-radius:10px; background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(37,99,235,.15)); }
+    .computer-art { left:18px; top:23px; width:106px; height:66px; border:4px solid rgba(255,255,255,.84); border-radius:10px; background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(37,99,235,.15)); }
     .computer-art:after { content:""; position:absolute; left:18px; right:18px; bottom:-17px; height:6px; border-radius:999px; background:rgba(255,255,255,.78); }
-    .stick-art { left:20px; top:38px; width:110px; height:34px; border-radius:999px; background:linear-gradient(135deg,#222,#0b1020); border:1px solid rgba(255,255,255,.22); box-shadow:0 15px 28px rgba(0,0,0,.3); }
+    .stick-art { left:20px; top:46px; width:110px; height:34px; border-radius:999px; background:linear-gradient(135deg,#222,#0b1020); border:1px solid rgba(255,255,255,.22); box-shadow:0 15px 28px rgba(0,0,0,.3); }
     .stick-art:after { content:""; position:absolute; right:-18px; top:9px; width:26px; height:16px; border-radius:5px; background:#151925; border:1px solid rgba(255,255,255,.15); }
     .brand-strip { position:absolute; right:10px; top:10px; bottom:10px; width:74px; display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:7px; }
     .brand-logo { width:74px; height:42px; object-fit:contain; padding:6px 7px; border-radius:12px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12); box-shadow:0 10px 22px rgba(0,0,0,.16); }
@@ -184,6 +197,8 @@
       .hero, .formbox { grid-template-columns:1fr; }
       .cards, .plans { grid-template-columns:1fr 1fr; }
       .plan-modes { grid-template-columns:1fr; }
+      .devices-head { align-items:flex-start; flex-direction:column; }
+      .device-chips { justify-content:flex-start; min-width:0; }
       .devices { grid-template-columns:1fr 1fr; }
       .stats, .steps { grid-template-columns:1fr 1fr; }
       .sports-grid { grid-template-columns:1fr; }
@@ -193,6 +208,7 @@
     }
     @media (max-width:560px) {
       .nav { align-items:flex-start; flex-direction:column; padding:12px 0; }
+      .devices-shell { padding:16px; border-radius:24px; }
       .cards, .plans, .devices, .mini-grid { grid-template-columns:1fr; }
       .stats, .steps, .event-grid { grid-template-columns:1fr; }
       .cta-band { flex-direction:column; align-items:flex-start; }
@@ -384,9 +400,20 @@
     </section>
 
     <section class="wrap" id="dispositivos">
-      <h2 class="section-title">Compatible con tus dispositivos</h2>
-      <p class="section-sub">Te indicamos la app correcta según tu equipo. Haz clic en tu dispositivo para ver la guía de instalación.</p>
-      <div class="devices">
+      <div class="devices-shell">
+        <div class="devices-head">
+          <div>
+            <h2 class="section-title">Compatible con tus dispositivos</h2>
+            <p class="section-sub">Elige tu equipo, revisa la app recomendada y abre una guía rápida de instalación para empezar sin complicarte.</p>
+          </div>
+          <div class="device-chips" aria-label="Beneficios de compatibilidad">
+            <span class="device-chip">📱 Celulares</span>
+            <span class="device-chip">📺 Smart TV</span>
+            <span class="device-chip">💻 Computadora</span>
+            <span class="device-chip">💬 Soporte guiado</span>
+          </div>
+        </div>
+        <div class="devices">
         <a class="device" href="/dispositivo/android-ios">
           <div class="device-scene">
             <div class="device-art mobile-pair"><i class="phone"></i><i class="tablet"></i></div>
@@ -452,6 +479,7 @@
           </div>
           <b>Demo</b><small>3 horas gratis</small><span>Ver instrucciones →</span>
         </a>
+        </div>
       </div>
     </section>
 
