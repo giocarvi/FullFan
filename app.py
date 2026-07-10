@@ -966,10 +966,49 @@ def client_login():
             WHERE a.username=?
         """), (username,))
         account = fetchone(c)
+        if not account:
+            c.execute(qmark("""
+                SELECT a.username, a.password, a.is_enabled, cl.nombre
+                FROM client_portal_accounts a
+                LEFT JOIN clientes cl ON cl.username = a.username
+                WHERE LOWER(a.username)=LOWER(?)
+            """), (username,))
+            account = fetchone(c)
         if account and account.get('is_enabled') and verify_password(account.get('password'), password):
             session.clear()
             session['client_username'] = account['username']
             session['client_name'] = account.get('nombre') or account['username']
+            db.close()
+            return redirect(url_for('client_portal'))
+        c.execute(qmark("SELECT username, nombre FROM clientes WHERE username=?"), (username,))
+        client = fetchone(c)
+        if not client:
+            c.execute(qmark("SELECT username, nombre FROM clientes WHERE LOWER(username)=LOWER(?)"), (username,))
+            client = fetchone(c)
+        if client and password == client['username']:
+            now = now_gt().isoformat(timespec='seconds')
+            if PG:
+                c.execute("""
+                    INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
+                    VALUES (%s,%s,TRUE,%s)
+                    ON CONFLICT (username) DO UPDATE SET
+                        password=EXCLUDED.password,
+                        is_enabled=TRUE,
+                        updated_at=EXCLUDED.updated_at
+                """, (client['username'], hash_password(client['username']), now))
+            else:
+                c.execute("""
+                    INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
+                    VALUES (?,?,1,?)
+                    ON CONFLICT(username) DO UPDATE SET
+                        password=excluded.password,
+                        is_enabled=1,
+                        updated_at=excluded.updated_at
+                """, (client['username'], hash_password(client['username']), now))
+            db.commit()
+            session.clear()
+            session['client_username'] = client['username']
+            session['client_name'] = client.get('nombre') or client['username']
             db.close()
             return redirect(url_for('client_portal'))
         db.close()
