@@ -1703,6 +1703,7 @@ async function loadMigrationClients() {
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <button class="ops-btn-secondary" onclick="openModal('${item.username}')">Perfil</button>
+          <button class="ops-btn-secondary" onclick="copiarMensajeMigracion('${item.username}')">Copiar mensaje</button>
           <button class="ops-btn-primary" onclick="migrarClienteDesdeLista('${item.username}', ${item.has_service_password ? 'true' : 'false'})">Migrar + Max Player</button>
         </div>
       </div>
@@ -1710,20 +1711,16 @@ async function loadMigrationClients() {
   }).join('');
 }
 
-function buildMigrationUrlFromDetail(d) {
+function buildMigrationMessageFromDetail(d) {
   const c = d.cliente || {};
   const service = d.service || {};
   const cfg = window._appConfig || {};
-  const phone = (c.contacto || '').replace(/\D/g, '');
-  if (phone.length < 8) return '';
-  const prefijo = cfg.wa_prefijo || '502';
-  const waBase = `https://wa.me/${prefijo + phone.slice(-8)}`;
   const nombreCliente = c.nombre || c.username;
   const _meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const expDate = c.vencimiento ? (date => `${String(date.getUTCDate()).padStart(2,'0')}-${_meses[date.getUTCMonth()]}-${date.getUTCFullYear()}`)(new Date(c.vencimiento)) : '';
   const appUser = service.service_username || c.username;
   const tpl = cfg.wa_migracion || DEFAULT_MIGRATION_MESSAGE;
-  const msg = tpl
+  return tpl
     .replace(/\{nombre\}/g, nombreCliente)
     .replace(/\{fecha\}/g, expDate)
     .replace(/\{portal\}/g, 'https://www.fenixdigitaltv.net/cliente/login')
@@ -1731,7 +1728,33 @@ function buildMigrationUrlFromDetail(d) {
     .replace(/\{password_portal\}/g, c.username)
     .replace(/\{app_usuario\}/g, appUser)
     .replace(/\{app_password\}/g, appUser);
+}
+
+function buildMigrationUrlFromDetail(d) {
+  const c = d.cliente || {};
+  const cfg = window._appConfig || {};
+  const phone = (c.contacto || '').replace(/\D/g, '');
+  if (phone.length < 8) return '';
+  const prefijo = cfg.wa_prefijo || '502';
+  const waBase = `https://wa.me/${prefijo + phone.slice(-8)}`;
+  const msg = buildMigrationMessageFromDetail(d);
   return `${waBase}?text=${encodeURIComponent(msg)}`;
+}
+
+async function copiarMensajeMigracion(username) {
+  const detailR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
+  const detail = await detailR.json();
+  if (!detailR.ok) {
+    alert(detail.error || 'No se pudo cargar el cliente.');
+    return;
+  }
+  const msg = buildMigrationMessageFromDetail(detail);
+  try {
+    await navigator.clipboard.writeText(msg);
+    showToast('Mensaje copiado');
+  } catch(e) {
+    prompt('Copia este mensaje:', msg);
+  }
 }
 
 async function migrarClienteDesdeLista(username, hasSavedPassword = false) {
