@@ -1424,6 +1424,9 @@ async function openModal(username) {
     .replace(/\{password_portal\}/g, portalPassword)
     .replace(/\{app_usuario\}/g, appUser)
     .replace(/\{app_password\}/g, appPassword);
+  const migrationTemplate = cfg.wa_migracion || 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\n\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\n\nPortal: {portal}\nUsuario portal: {usuario}\nPassword inicial: {password_portal}\n\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.';
+  window._migrationWaUrls = window._migrationWaUrls || {};
+  window._migrationWaUrls[username] = waBase ? `${waBase}?text=${encMsg(waFill(migrationTemplate))}` : '';
   const waSection = waBase ? `
     <div class="wa-section">
       <div class="wa-section-title">💬 WhatsApp</div>
@@ -1434,7 +1437,7 @@ async function openModal(username) {
         <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'))}" target="_blank" rel="noopener">✅ Confirmar pago</a>
         <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_vencido || 'Hola {nombre}, tu servicio ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'))}" target="_blank" rel="noopener">❌ Servicio vencido</a>
         ${cfg.wa_nuevo_numero ? '<a class="wa-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border-color:rgba(245,158,11,0.35);" href="' + waBase + '?text=' + encMsg(waFill(cfg.wa_nuevo_numero)) + '" target="_blank" rel="noopener">📲 Nuevo número</a>' : ''}
-        <a class="wa-btn" style="background:rgba(249,115,22,0.16);color:#fb923c;border-color:rgba(249,115,22,0.38);" href="${waBase}?text=${encMsg(waFill(cfg.wa_migracion || 'Hola {nombre}, te saludamos de Fenix Digital TV 🔥\\n\\nTe informamos que el antiguo Full Fan Digital TV ahora forma parte de Fenix Digital TV: tu entretenimiento, sin fronteras.\\n\\nPortal: {portal}\\nUsuario portal: {usuario}\\nPassword inicial: {password_portal}\\n\\nEn el portal podras ver tu usuario y password de Max Player, fecha de vencimiento e historial de pagos.\\n\\nTu servicio vence el {fecha}. Gracias por seguir con nosotros.'))}" target="_blank" rel="noopener">🔥 Migración Fénix</a>
+        <button class="wa-btn" style="background:rgba(249,115,22,0.16);color:#fb923c;border-color:rgba(249,115,22,0.38);" onclick="migrarFenixConMaxPlayer('${username}', ${service.service_password ? 'true' : 'false'})">🔥 Migración Fénix + Max Player</button>
       </div>
     </div>` : '';
 
@@ -1542,12 +1545,11 @@ async function openModal(username) {
   `;
 }
 
-async function restaurarMaxPlayer(username, hasSavedPassword = false) {
-  if (!confirm(`Restaurar usuario Max Player para ${username}?\n\nSe buscara/borrara el usuario anterior si existe y se creara nuevamente.`)) return;
+async function ejecutarRestauracionMaxPlayer(username, hasSavedPassword = false) {
   const body = {};
   if (!hasSavedPassword) {
     const password = prompt(`Fenix no tiene guardado el password XUI/IPTV de ${username}.\n\nIngresa el password XUI/IPTV para guardarlo y restaurar Max Player:`);
-    if (!password) return;
+    if (!password) return false;
     body.service_password = password.trim();
   }
   const r = await fetch(`/api/clientes/${username}/maxplayer/restore`, {
@@ -1558,9 +1560,26 @@ async function restaurarMaxPlayer(username, hasSavedPassword = false) {
   const d = await r.json();
   if (!r.ok) {
     alert(d.error || 'No se pudo restaurar Max Player.');
-    return;
+    return false;
   }
+  return true;
+}
+
+async function restaurarMaxPlayer(username, hasSavedPassword = false) {
+  if (!confirm(`Restaurar usuario Max Player para ${username}?\n\nSe buscara/borrara el usuario anterior si existe y se creara nuevamente.`)) return;
+  const ok = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
+  if (!ok) return;
   showToast('Max Player restaurado');
+  openModal(username);
+}
+
+async function migrarFenixConMaxPlayer(username, hasSavedPassword = false) {
+  if (!confirm(`Enviar migracion Fenix para ${username}?\n\nPrimero se restaurara/creara Max Player. Si todo sale bien, se abrira WhatsApp con el mensaje listo.`)) return;
+  const ok = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
+  if (!ok) return;
+  showToast('Max Player listo. Abriendo WhatsApp...');
+  const url = window._migrationWaUrls && window._migrationWaUrls[username];
+  if (url) window.open(url, '_blank', 'noopener');
   openModal(username);
 }
 
