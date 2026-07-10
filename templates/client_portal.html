@@ -29,6 +29,8 @@
     .field b { font-size:20px; word-break:break-word; }
     .copy-row { display:flex; gap:8px; align-items:center; }
     .copy-row b { flex:1; }
+    label { display:block; color:var(--muted); font-size:12px; font-weight:850; margin:12px 0 6px; }
+    input { width:100%; border:1px solid var(--border); background:rgba(7,11,24,.74); color:var(--text); border-radius:14px; padding:12px; font:inherit; }
     button, .btn { display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:999px; padding:11px 15px; font-weight:950; cursor:pointer; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#170B02; }
     .copy { background:rgba(255,255,255,.08); color:var(--text); border:1px solid var(--border); padding:9px 12px; }
     .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
@@ -37,6 +39,9 @@
     td, th { text-align:left; border-bottom:1px solid var(--border); padding:10px 4px; font-size:14px; }
     th { color:var(--muted); font-size:12px; }
     .empty { color:var(--muted); padding:12px 0; }
+    .message { display:none; border-radius:14px; padding:12px; margin-top:12px; font-size:14px; }
+    .message.ok { display:block; background:rgba(16,185,129,.14); color:#86EFAC; border:1px solid rgba(16,185,129,.25); }
+    .message.error { display:block; background:rgba(239,68,68,.14); color:#FCA5A5; border:1px solid rgba(239,68,68,.25); }
     @media (max-width:760px) { .grid { grid-template-columns:1fr; } .nav { flex-direction:column; align-items:flex-start; padding:14px 0; } .actions .btn { width:100%; } }
   </style>
 </head>
@@ -81,6 +86,20 @@
         <p class="lead" style="margin-top:14px;font-size:14px;">Estos datos son para la app de entretenimiento. Tu contraseña del portal Fénix no se muestra por seguridad.</p>
       </div>
       <div class="card" style="grid-column:1/-1;">
+        <h2>Cambiar contraseña del portal</h2>
+        <p class="lead" style="font-size:14px;">Usa esta opción para reemplazar la contraseña temporal que te compartimos por WhatsApp.</p>
+        <form onsubmit="changePortalPassword(event)">
+          <label>Contraseña actual</label>
+          <input id="pwd-current" type="password" autocomplete="current-password" required>
+          <label>Nueva contraseña</label>
+          <input id="pwd-new" type="password" autocomplete="new-password" minlength="6" required>
+          <label>Confirmar nueva contraseña</label>
+          <input id="pwd-confirm" type="password" autocomplete="new-password" minlength="6" required>
+          <div class="actions"><button type="submit">Actualizar contraseña</button></div>
+          <div id="pwd-message" class="message"></div>
+        </form>
+      </div>
+      <div class="card" style="grid-column:1/-1;">
         <h2>Últimos pagos</h2>
         {% if payments %}
         <table>
@@ -103,6 +122,36 @@
       if (!text || text === 'Pendiente') return;
       await navigator.clipboard.writeText(text);
       alert('Copiado');
+    }
+    async function changePortalPassword(event) {
+      event.preventDefault();
+      const msg = document.getElementById('pwd-message');
+      msg.className = 'message';
+      msg.textContent = '';
+      const current = document.getElementById('pwd-current').value;
+      const next = document.getElementById('pwd-new').value;
+      const confirm = document.getElementById('pwd-confirm').value;
+      if (next.length < 6 || next !== confirm) {
+        msg.className = 'message error';
+        msg.textContent = 'La nueva contraseña debe tener al menos 6 caracteres y coincidir con la confirmación.';
+        return;
+      }
+      const r = await fetch('/api/cliente/cambiar-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password_actual: current, password_nueva: next, password_confirmar: confirm})
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        msg.className = 'message error';
+        msg.textContent = d.error || 'No se pudo actualizar la contraseña.';
+        return;
+      }
+      document.getElementById('pwd-current').value = '';
+      document.getElementById('pwd-new').value = '';
+      document.getElementById('pwd-confirm').value = '';
+      msg.className = 'message ok';
+      msg.textContent = 'Contraseña actualizada correctamente.';
     }
   </script>
 </body>
