@@ -28,6 +28,9 @@
     .tips { display:grid; gap:10px; margin-top:14px; }
     .tip { color:var(--muted); border:1px solid var(--border); border-radius:16px; padding:12px; background:rgba(255,255,255,.04); }
     .tip:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
+    .store-links { display:grid; gap:10px; margin-top:16px; }
+    .store-link { display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid var(--border); border-radius:16px; padding:12px 14px; background:rgba(255,255,255,.05); color:var(--text); font-weight:900; }
+    .store-link span { color:var(--gold); }
     .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
     footer { border-top:1px solid var(--border); color:var(--muted); padding:24px 0 36px; font-size:13px; }
     @media (max-width:760px) { .grid { grid-template-columns:1fr; } .nav { flex-direction:column; align-items:flex-start; padding:12px 0; } .btn { width:100%; } }
@@ -73,6 +76,13 @@
           <div class="tip">{{ tip }}</div>
           {% endfor %}
         </div>
+        {% if guide.links %}
+        <div class="store-links">
+          {% for link in guide.links %}
+          <a class="store-link" href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }} <span>↗</span></a>
+          {% endfor %}
+        </div>
+        {% endif %}
         <div class="actions">
           <a class="btn" target="_blank" rel="noopener" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%2C%20quiero%20una%20demo%20para%20{{ guide.title | urlencode }}">Demo gratis 3 horas</a>
         </div>

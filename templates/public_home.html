@@ -125,14 +125,15 @@
     .tv-art:after { content:""; position:absolute; left:40px; right:40px; bottom:-13px; height:4px; background:rgba(255,255,255,.78); border-radius:999px; box-shadow:0 10px 0 8px rgba(255,255,255,.16); }
     .computer-art { left:18px; top:23px; width:106px; height:66px; border:4px solid rgba(255,255,255,.84); border-radius:10px; background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(37,99,235,.15)); }
     .computer-art:after { content:""; position:absolute; left:18px; right:18px; bottom:-17px; height:6px; border-radius:999px; background:rgba(255,255,255,.78); }
-    .stick-art { left:20px; top:46px; width:110px; height:34px; border-radius:999px; background:linear-gradient(135deg,#222,#0b1020); border:1px solid rgba(255,255,255,.22); box-shadow:0 15px 28px rgba(0,0,0,.3); }
+    .stick-art { left:18px; top:46px; width:96px; height:34px; border-radius:999px; background:linear-gradient(135deg,#222,#0b1020); border:1px solid rgba(255,255,255,.22); box-shadow:0 15px 28px rgba(0,0,0,.3); }
     .stick-art:after { content:""; position:absolute; right:-18px; top:9px; width:26px; height:16px; border-radius:5px; background:#151925; border:1px solid rgba(255,255,255,.15); }
     .brand-strip { position:absolute; right:10px; top:10px; bottom:10px; width:74px; display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:7px; }
     .brand-logo { width:74px; height:42px; object-fit:contain; padding:6px 7px; border-radius:12px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12); box-shadow:0 10px 22px rgba(0,0,0,.16); }
-    .brand-logo.single { width:112px; height:52px; }
+    .brand-logo.single { width:122px; height:56px; }
     .brand-strip.single-center { inset:0; width:auto; align-items:center; justify-content:center; }
+    .brand-strip.single-right { inset:0 14px 0 auto; width:126px; align-items:center; justify-content:center; }
     .support-icons { height:100%; display:flex; align-items:center; justify-content:center; gap:14px; }
-    .support-logo { width:72px; height:72px; object-fit:contain; padding:8px; border-radius:22px; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.12); box-shadow:0 14px 30px rgba(0,0,0,.24); }
+    .support-logo { width:86px; height:86px; object-fit:contain; padding:9px; border-radius:24px; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.12); box-shadow:0 14px 30px rgba(0,0,0,.24); }
     .support-logo.round { border-radius:50%; }
     .demo-card { display:grid; place-items:center; text-align:center; width:148px; min-height:76px; border-radius:20px; background:linear-gradient(135deg,rgba(255,106,0,.92),rgba(255,200,87,.94)); color:#170B02; font-weight:950; box-shadow:0 16px 34px rgba(0,0,0,.26); }
     .demo-card b { display:block; color:#170B02; font-size:28px; line-height:1; margin:0; }
@@ -158,8 +159,8 @@
     .tile:before { content:""; position:absolute; width:90px; height:90px; border-radius:50%; top:-28px; right:-26px; background:radial-gradient(circle,rgba(255,255,255,.28),transparent 68%); }
     .tile:after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.72)); }
     .tile b, .tile small, .tile .tile-icon { position:relative; z-index:1; }
-    .tile b { font-size:14px; }
-    .tile small { color:rgba(255,255,255,.78); line-height:1.35; font-weight:600; }
+    .tile b { display:block; font-size:14px; margin-bottom:6px; }
+    .tile small { display:block; color:rgba(255,255,255,.78); line-height:1.35; font-weight:600; }
     .tile-icon { width:48px; height:48px; display:grid; place-items:center; border-radius:16px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.18); font-size:25px; box-shadow:0 10px 22px rgba(0,0,0,.22); }
     .tile:nth-child(2n) { background:linear-gradient(135deg,rgba(16,185,129,.65),rgba(37,99,235,.45)); }
     .tile:nth-child(3n) { background:linear-gradient(135deg,rgba(239,68,68,.65),rgba(245,158,11,.45)); }
@@ -427,7 +428,7 @@
         <a class="device" href="/dispositivo/firestick">
           <div class="device-scene">
             <div class="device-art stick-art"></div>
-            <div class="brand-strip single-center"><img class="brand-logo single" src="{{ url_for('static', filename='devices/fire-tv.webp') }}" alt="Amazon Fire TV"></div>
+            <div class="brand-strip single-right"><img class="brand-logo single" src="{{ url_for('static', filename='devices/fire-tv.webp') }}" alt="Amazon Fire TV"></div>
           </div>
           <b>Firestick</b><small>Max Player</small><span>Ver instrucciones →</span>
         </a>
@@ -454,7 +455,7 @@
         <a class="device" href="/dispositivo/hisense">
           <div class="device-scene">
             <div class="device-art tv-art"></div>
-            <div class="brand-strip single-center"><img class="brand-logo single" src="{{ url_for('static', filename='devices/hisense.webp') }}" alt="Hisense"></div>
+            <div class="brand-strip single-right"><img class="brand-logo single" src="{{ url_for('static', filename='devices/hisense.webp') }}" alt="Hisense"></div>
           </div>
           <b>Hisense Smart TV</b><small>Smart One</small><span>Ver instrucciones →</span>
         </a>
@@ -531,7 +532,6 @@
             <div class="reseller-price">US$37.99</div>
             <div class="usd">10 créditos · aprox. Q300</div>
             <ul>
-              <li>Equivale a 10 meses de servicio</li>
               <li>Ideal para vendedores nuevos</li>
               <li>Soporte por WhatsApp</li>
               <li>Inversión inicial accesible</li>
@@ -543,7 +543,6 @@
             <div class="reseller-price">US$105.99</div>
             <div class="usd">30 créditos · aprox. Q825</div>
             <ul>
-              <li>Equivale a 30 meses de servicio</li>
               <li>Mejor costo por volumen</li>
               <li>Ideal para cartera en crecimiento</li>
               <li>Material comercial base</li>
@@ -568,7 +567,6 @@
             <div class="reseller-price">US$255.99</div>
             <div class="usd">100 créditos · aprox. Q2,000</div>
             <ul>
-              <li>Equivale a 100 meses de servicio</li>
               <li>Enfoque para tiendas o equipos</li>
               <li>Mejor margen por volumen</li>
               <li>Acompañamiento comercial</li>
@@ -599,7 +597,7 @@
             <details><summary>¿Qué métodos de pago aceptan?</summary><p>En Guatemala manejamos transferencia bancaria. Para otros países podemos coordinar opciones disponibles por WhatsApp.</p></details>
             <details><summary>¿Funciona en Roku?</summary><p>Sí. Para Roku usamos Premium Player. Te guiamos con los pasos al solicitar demo o contratación.</p></details>
             <details><summary>¿Tienen programa para revendedores?</summary><p>Sí. Trabajamos con paquetes de créditos para personas o negocios que desean revender el servicio a su propia cartera de clientes. Escríbenos para evaluar volumen, país y condiciones.</p></details>
-            <details><summary>¿El revendedor tiene panel propio?</summary><p>Por ahora el proceso es asistido por el equipo Fénix. Estamos preparando una operación más automatizada; mientras tanto, manejamos activaciones, renovaciones y soporte por WhatsApp.</p></details>
+            <details><summary>¿El revendedor tiene panel propio?</summary><p>Sí. El revendedor cuenta con panel propio para crear sus usuarios, gestionar créditos y activar accesos de Max Player, con acompañamiento del equipo Fénix cuando necesite soporte operativo.</p></details>
           </div>
         </div>
         <form class="form" onsubmit="sendLead(event)">
