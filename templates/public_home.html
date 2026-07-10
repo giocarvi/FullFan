@@ -80,6 +80,11 @@
     .feature strong { color:var(--text); }
     .feature span:first-child { color:var(--gold); font-weight:900; }
     .plans { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+    .plan-modes { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin:0 0 18px; }
+    .plan-mode { border:1px solid var(--border); border-radius:18px; padding:15px; background:rgba(255,255,255,.04); color:var(--muted); }
+    .plan-mode.active { border-color:rgba(255,200,87,.55); background:linear-gradient(135deg,rgba(255,106,0,.12),rgba(255,200,87,.06)); }
+    .plan-mode b { display:block; color:var(--text); margin-bottom:5px; }
+    .plan-mode small { color:var(--gold); font-weight:900; }
     .plan { position:relative; background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); border:1px solid var(--border); border-radius:22px; padding:20px; }
     .plan.featured { border-color:rgba(255,200,87,.58); box-shadow:0 18px 50px rgba(255,106,0,.16); }
     .badge { position:absolute; right:14px; top:14px; font-size:11px; color:#160B02; background:var(--gold); border-radius:999px; padding:5px 8px; font-weight:900; }
@@ -91,10 +96,13 @@
     .plan ul { padding:0; list-style:none; margin:0 0 18px; color:var(--muted); display:grid; gap:8px; font-size:14px; }
     .plan li:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
     .devices { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-    .device { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:18px; padding:15px; color:var(--muted); transition:.16s; display:block; }
+    .device { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:18px; padding:15px; color:var(--muted); transition:.16s; display:flex; flex-direction:column; min-height:172px; }
     .device:hover { transform:translateY(-2px); border-color:rgba(255,200,87,.45); background:rgba(255,255,255,.07); }
     .device b { color:var(--text); display:block; margin-bottom:4px; }
-    .device span { display:block; font-size:12px; color:var(--gold); margin-top:8px; font-weight:800; }
+    .device span { display:block; font-size:12px; color:var(--gold); margin-top:auto; font-weight:800; }
+    .device-logo { height:72px; display:grid; place-items:center; margin-bottom:12px; border-radius:14px; background:rgba(7,11,24,.54); border:1px solid rgba(255,255,255,.08); overflow:hidden; }
+    .device-logo img { max-width:86%; max-height:58px; object-fit:contain; display:block; }
+    .device-logo.fallback { font-size:34px; color:var(--gold); }
     .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; counter-reset:steps; }
     .step { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:22px; padding:18px; position:relative; }
     .step:before { counter-increment:steps; content:counter(steps); display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#190C02; font-weight:900; margin-bottom:14px; }
@@ -154,6 +162,7 @@
     @media (max-width:900px) {
       .hero, .formbox { grid-template-columns:1fr; }
       .cards, .plans { grid-template-columns:1fr 1fr; }
+      .plan-modes { grid-template-columns:1fr; }
       .devices { grid-template-columns:1fr 1fr; }
       .stats, .steps { grid-template-columns:1fr 1fr; }
       .sports-grid { grid-template-columns:1fr; }
@@ -293,6 +302,18 @@
     <section class="wrap" id="planes">
       <h2 class="section-title">Planes Fénix</h2>
       <p class="section-sub">Elige el tiempo que prefieras. Todos los planes incluyen hasta 3 dispositivos simultáneos, soporte de instalación y acceso al ecosistema de entretenimiento Fénix.</p>
+      <div class="plan-modes">
+        <div class="plan-mode">
+          <b>Plan individual</b>
+          1 dispositivo para clientes que quieren una opción más sencilla.
+          <small>Disponible por WhatsApp</small>
+        </div>
+        <div class="plan-mode active">
+          <b>Plan familiar</b>
+          Hasta 3 dispositivos simultáneos con los precios publicados abajo.
+          <small>Modalidad actual</small>
+        </div>
+      </div>
       <div class="currency-box">
         <span>Conversión local aproximada:</span>
         <select id="currency-country" onchange="updateLocalPrices()">
@@ -345,14 +366,14 @@
       <h2 class="section-title">Compatible con tus dispositivos</h2>
       <p class="section-sub">Te indicamos la app correcta según tu equipo. Haz clic en tu dispositivo para ver la guía de instalación.</p>
       <div class="devices">
-        <a class="device" href="/dispositivo/android-ios"><b>Android / iOS</b>Max Player<span>Ver instrucciones →</span></a>
-        <a class="device" href="/dispositivo/firestick"><b>Firestick</b>Max Player<span>Ver instrucciones →</span></a>
-        <a class="device" href="/dispositivo/samsung-lg"><b>Samsung / LG Smart TV</b>Max Player<span>Ver instrucciones →</span></a>
-        <a class="device" href="/dispositivo/windows-mac"><b>Windows / Mac</b>Max Player<span>Ver instrucciones →</span></a>
-        <a class="device" href="/dispositivo/hisense"><b>Hisense Smart TV</b>Smart One<span>Ver instrucciones →</span></a>
-        <a class="device" href="/dispositivo/roku"><b>Roku</b>Premium Player<span>Ver instrucciones →</span></a>
-        <a class="device" href="/dispositivo/whatsapp"><b>Atención</b>WhatsApp<span>Ver instrucciones →</span></a>
-        <a class="device" href="/dispositivo/demo"><b>Demo</b>3 horas gratis<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/android-ios"><div class="device-logo"><img src="{{ url_for('static', filename='apps/max-player.webp') }}" alt="Max Player TV"></div><b>Android / iOS</b>Max Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/firestick"><div class="device-logo"><img src="{{ url_for('static', filename='apps/max-player.webp') }}" alt="Max Player TV"></div><b>Firestick</b>Max Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/samsung-lg"><div class="device-logo"><img src="{{ url_for('static', filename='apps/max-player.webp') }}" alt="Max Player TV"></div><b>Samsung / LG Smart TV</b>Max Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/windows-mac"><div class="device-logo"><img src="{{ url_for('static', filename='apps/max-player.webp') }}" alt="Max Player TV"></div><b>Windows / Mac</b>Max Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/hisense"><div class="device-logo"><img src="{{ url_for('static', filename='apps/smart-one.webp') }}" alt="SmartOne IPTV"></div><b>Hisense Smart TV</b>Smart One<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/roku"><div class="device-logo"><img src="{{ url_for('static', filename='apps/premium-player.webp') }}" alt="Premium Player"></div><b>Roku</b>Premium Player<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/whatsapp"><div class="device-logo fallback">💬</div><b>Atención</b>WhatsApp<span>Ver instrucciones →</span></a>
+        <a class="device" href="/dispositivo/demo"><div class="device-logo fallback">⏱️</div><b>Demo</b>3 horas gratis<span>Ver instrucciones →</span></a>
       </div>
     </section>
 
