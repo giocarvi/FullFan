@@ -326,16 +326,16 @@ def init_db():
     conn = get_db()
     c = conn.cursor()
     migration_wa_message = (
-        'Hola {nombre}, le saludamos de Fenix Digital TV 🔥\n\n'
-        'Le informamos que Full Fan Digital TV ya no opera, debido a la situacion que se dio en Guatemala a principios de junio. '
-        'Ahora es parte del grupo internacional Fenix Digital TV: su entretenimiento, sin fronteras.\n\n'
-        'Seguimos con la misma atencion, experiencia de 7 años y hoy lanzamos un nuevo servidor con nuevas opciones 😉\n\n'
+        'Hola {nombre}, le saludamos de Fénix Digital TV 🔥\n\n'
+        'Le informamos que Full Fan Digital TV ya no opera, debido a la situación que se dio en Guatemala a principios de junio. '
+        'Ahora es parte del grupo internacional Fénix Digital TV: su entretenimiento, sin fronteras.\n\n'
+        'Seguimos con la misma atención, experiencia de 7 años y hoy lanzamos un nuevo servidor con nuevas opciones 😉\n\n'
         'Le invitamos a ingresar a nuestro portal de clientes:\n'
         '{portal}\n\n'
         'Usuario: {usuario}\n'
         'Password: {password_portal}\n\n'
-        'En el portal podra ver apps recomendadas, su usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\n'
-        'Para Smart One el cambio se hara automatico.\n\n'
+        'En el portal podrá ver apps recomendadas, su usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\n'
+        'Para Smart One el cambio se hará automático.\n\n'
         'Su servicio vence el {fecha}. Gracias por seguir con nosotros 🖐🏻'
     )
 

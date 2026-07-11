@@ -990,7 +990,7 @@ let activationPlansLoaded = false;
 let currentActivationStatus = 'open';
 const IS_ADMIN = {{ 'true' if rol == 'admin' else 'false' }};
 window._appConfig = {};
-const DEFAULT_MIGRATION_MESSAGE = 'Hola {nombre}, le saludamos de Fenix Digital TV 🔥\n\nLe informamos que Full Fan Digital TV ya no opera, debido a la situacion que se dio en Guatemala a principios de junio. Ahora es parte del grupo internacional Fenix Digital TV: su entretenimiento, sin fronteras.\n\nSeguimos con la misma atencion, experiencia de 7 años y hoy lanzamos un nuevo servidor con nuevas opciones 😉\n\nLe invitamos a ingresar a nuestro portal de clientes:\n{portal}\n\nUsuario: {usuario}\nPassword: {password_portal}\n\nEn el portal podra ver apps recomendadas, su usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nPara Smart One el cambio se hara automatico.\n\nSu servicio vence el {fecha}. Gracias por seguir con nosotros 🖐🏻';
+const DEFAULT_MIGRATION_MESSAGE = 'Hola {nombre}, le saludamos de Fénix Digital TV 🔥\n\nLe informamos que Full Fan Digital TV ya no opera, debido a la situación que se dio en Guatemala a principios de junio. Ahora es parte del grupo internacional Fénix Digital TV: su entretenimiento, sin fronteras.\n\nSeguimos con la misma atención, experiencia de 7 años y hoy lanzamos un nuevo servidor con nuevas opciones 😉\n\nLe invitamos a ingresar a nuestro portal de clientes:\n{portal}\n\nUsuario: {usuario}\nPassword: {password_portal}\n\nEn el portal podrá ver apps recomendadas, su usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nPara Smart One el cambio se hará automático.\n\nSu servicio vence el {fecha}. Gracias por seguir con nosotros 🖐🏻';
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────────
 function switchView(view, estado) {
@@ -1649,7 +1649,7 @@ async function restaurarMaxPlayer(username, hasSavedPassword = false) {
 }
 
 async function migrarFenixConMaxPlayer(username, hasSavedPassword = false) {
-  if (!confirm(`Enviar migracion Fenix para ${username}?\n\nPrimero se restaurara/creara Max Player. Si todo sale bien, se abrira WhatsApp con el mensaje listo.`)) return;
+  if (!confirm(`Enviar migración Fénix para ${username}?\n\nPrimero se restaurará/creará Max Player. Si todo sale bien, se abrirá WhatsApp con el mensaje listo.`)) return;
   const ok = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
   if (!ok) return;
   showToast('Max Player listo. Abriendo WhatsApp...');
