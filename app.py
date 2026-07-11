@@ -351,6 +351,7 @@ def init_db():
             contacto TEXT,
             vencimiento TEXT,
             referido TEXT DEFAULT 'NO',
+            parent_username TEXT DEFAULT NULL,
             total_pagado REAL DEFAULT 0,
             notas TEXT DEFAULT '',
             created_at TEXT DEFAULT (NOW()::text)
@@ -385,6 +386,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS clientes (
                 username TEXT PRIMARY KEY, nombre TEXT, contacto TEXT,
                 vencimiento TEXT, referido TEXT DEFAULT 'NO',
+                parent_username TEXT DEFAULT NULL,
                 total_pagado REAL DEFAULT 0, notas TEXT DEFAULT '',
                 created_at TEXT DEFAULT (datetime('now'))
             );
@@ -418,6 +420,7 @@ def init_db():
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS contacto_secundario TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS datos_actualizados_at TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS parent_username TEXT DEFAULT NULL")
     else:
         try:
             c.execute("ALTER TABLE pagos ADD COLUMN comprobante TEXT DEFAULT NULL")
@@ -431,6 +434,7 @@ def init_db():
             "ALTER TABLE clientes ADD COLUMN contacto_secundario TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN email TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN datos_actualizados_at TEXT DEFAULT NULL",
+            "ALTER TABLE clientes ADD COLUMN parent_username TEXT DEFAULT NULL",
         ):
             try:
                 c.execute(ddl)
@@ -1310,7 +1314,7 @@ def clientes():
     c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes {where_sql}"), params)
     total = fetchone(c)['c']
     c.execute(qmark(f"""
-        SELECT username, nombre, contacto, vencimiento, referido, total_pagado, notas
+        SELECT username, nombre, contacto, vencimiento, referido, parent_username, total_pagado, notas
         FROM clientes {where_sql} ORDER BY vencimiento DESC, username ASC LIMIT ? OFFSET ?
     """), params + [per_page, offset])
     rows = fetchall(c)
@@ -1330,11 +1334,20 @@ def crear_cliente():
     if fetchone(c):
         db.close()
         return jsonify({'error': 'Ese username ya existe'}), 409
+    parent_username = (data.get('parent_username') or '').strip() or None
+    if parent_username:
+        if parent_username == username:
+            db.close()
+            return jsonify({'error': 'Un cliente no puede ser su propio titular'}), 400
+        c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (parent_username,))
+        if not fetchone(c):
+            db.close()
+            return jsonify({'error': 'El usuario titular/principal no existe'}), 400
     c.execute(qmark("""
-        INSERT INTO clientes (username, nombre, contacto, vencimiento, referido, notas, total_pagado)
-        VALUES (?,?,?,?,?,?,0)
+        INSERT INTO clientes (username, nombre, contacto, vencimiento, referido, parent_username, notas, total_pagado)
+        VALUES (?,?,?,?,?,?,?,0)
     """), (username, data.get('nombre',''), data.get('contacto',''),
-           data.get('vencimiento') or None, data.get('referido','NO'), data.get('notas','')))
+           data.get('vencimiento') or None, data.get('referido','NO'), parent_username, data.get('notas','')))
     db.commit()
     db.close()
     return jsonify({'ok': True})
@@ -1360,8 +1373,22 @@ def cliente_detalle(username):
         FROM client_service_credentials WHERE username=?
     """), (username,))
     service = fetchone(c) or {}
+    parent = None
+    if cliente.get('parent_username'):
+        c.execute(qmark("""
+            SELECT username, nombre, contacto, vencimiento, total_pagado
+            FROM clientes WHERE username=?
+        """), (cliente.get('parent_username'),))
+        parent = fetchone(c)
+    c.execute(qmark("""
+        SELECT username, nombre, contacto, vencimiento, total_pagado
+        FROM clientes
+        WHERE parent_username=?
+        ORDER BY nombre ASC, username ASC
+    """), (username,))
+    asociados = fetchall(c)
     db.close()
-    return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol, 'service': service})
+    return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol, 'service': service, 'parent': parent, 'asociados': asociados})
 
 
 @app.route('/api/clientes/<username>/portal', methods=['POST'])
@@ -1535,6 +1562,7 @@ def actualizar_cliente(username):
     data = request.json
     db = get_db()
     c = db.cursor()
+    original_username = username
 
     # Cambio de username (solo admin)
     nuevo_username = data.get('nuevo_username', '').strip()
@@ -1552,15 +1580,32 @@ def actualizar_cliente(username):
         c.execute(qmark("UPDATE client_portal_accounts SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE client_service_credentials SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE activation_tasks SET username=? WHERE username=?"), (nuevo_username, username))
+        c.execute(qmark("UPDATE clientes SET parent_username=? WHERE parent_username=?"), (nuevo_username, username))
         # Actualizar cliente
         c.execute(qmark("UPDATE clientes SET username=? WHERE username=?"), (nuevo_username, username))
         username = nuevo_username  # usar el nuevo para el resto de campos
 
     fields, params = [], []
-    for field in ['nombre', 'contacto', 'vencimiento', 'referido', 'notas']:
+    for field in ['nombre', 'contacto', 'vencimiento', 'referido', 'notas', 'parent_username']:
         if field in data:
+            value = data[field]
+            if field == 'parent_username':
+                value = (value or '').strip() or None
+                if value == username:
+                    db.close()
+                    return jsonify({'error': 'Un cliente no puede ser su propio titular'}), 400
+                if value:
+                    c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (value,))
+                    if not fetchone(c):
+                        db.close()
+                        return jsonify({'error': 'El usuario titular/principal no existe'}), 400
+                    c.execute(qmark("SELECT parent_username FROM clientes WHERE username=?"), (value,))
+                    titular = fetchone(c)
+                    if titular and titular.get('parent_username') == username:
+                        db.close()
+                        return jsonify({'error': 'No se puede crear una relación circular entre clientes'}), 400
             fields.append(f"{field}=?")
-            params.append(data[field])
+            params.append(value)
     if fields:
         params.append(username)
         c.execute(qmark(f"UPDATE clientes SET {', '.join(fields)} WHERE username=?"), params)
@@ -1636,6 +1681,7 @@ def eliminar_cliente(username):
     if not fetchone(c):
         db.close()
         return jsonify({'error': 'Cliente no encontrado'}), 404
+    c.execute(qmark("UPDATE clientes SET parent_username=NULL WHERE parent_username=?"), (username,))
     # Eliminar pagos asociados primero
     c.execute(qmark("DELETE FROM pagos WHERE username=?"), (username,))
     # Luego eliminar el cliente

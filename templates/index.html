@@ -906,6 +906,11 @@ body {
       </div>
 
       <div class="form-group">
+        <label>Usuario titular / cliente principal</label>
+        <input type="text" id="nc-parent-username" placeholder="Opcional, ej: FranciscoNatareno">
+      </div>
+
+      <div class="form-group">
         <label>Notas</label>
         <input type="text" id="nc-notas" placeholder="Plan, observaciones...">
       </div>
@@ -1440,6 +1445,8 @@ async function openModal(username) {
 
   const c = d.cliente;
   const service = d.service || {};
+  const parent = d.parent || null;
+  const asociados = d.asociados || [];
   const status = clienteStatus(c.vencimiento);
   const initial = (c.nombre || c.username || '?')[0].toUpperCase();
 
@@ -1456,6 +1463,31 @@ async function openModal(username) {
         </div>
       </div>`).join('')
     : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
+
+  const asociadosHtml = `
+    <div class="pago-form">
+      <h3>👥 Usuarios asociados</h3>
+      ${parent ? `
+        <div class="info-row" style="margin-bottom:12px;">
+          <div class="info-icon">⭐</div>
+          <div class="info-data">
+            <div class="lbl">Titular / cliente principal</div>
+            <div class="val"><button class="ops-btn-secondary" onclick="openModal('${parent.username}')">${parent.nombre || parent.username} · ${parent.username}</button></div>
+          </div>
+        </div>
+      ` : `
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Este cliente puede funcionar como titular. Los usuarios asociados aparecerán aquí.</div>
+      `}
+      ${asociados.length ? asociados.map(a => `
+        <div class="pay-row" style="cursor:pointer;" onclick="openModal('${a.username}')">
+          <div>
+            <div style="font-weight:800;">${a.nombre || a.username}</div>
+            <div style="font-size:12px;color:var(--muted);font-family:monospace;">${a.username} · vence ${a.vencimiento || 'sin fecha'}</div>
+          </div>
+          <span class="pay-amount">Q${parseFloat(a.total_pagado || 0).toLocaleString()}</span>
+        </div>
+      `).join('') : '<div class="empty-state" style="padding:14px"><p>Sin usuarios asociados.</p></div>'}
+    </div>`;
 
   // WhatsApp section
   const cfg = window._appConfig;
@@ -1521,6 +1553,8 @@ async function openModal(username) {
       ${c.notas ? `<div class="info-row"><div class="info-icon">📝</div><div class="info-data"><div class="lbl">Notas</div><div class="val">${c.notas}</div></div></div>` : ''}
     </div>
 
+    ${asociadosHtml}
+
     ${waSection}
 
     <div class="pago-form">
@@ -1567,6 +1601,11 @@ async function openModal(username) {
             <option value="SI" ${(c.referido||'')==='SI'?'selected':''}>Sí</option>
           </select>
         </div>
+      </div>
+      <div class="form-group">
+        <label>Usuario titular / cliente principal</label>
+        <input type="text" id="edit-parent-username" value="${c.parent_username || ''}" placeholder="Ej: FranciscoNatareno">
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;">Déjalo vacío si este cliente es titular o no pertenece a un grupo.</div>
       </div>
       <div class="form-group">
         <label>Notas</label>
@@ -1792,6 +1831,7 @@ async function guardarEdicion(username) {
   const vencimiento= document.getElementById('edit-vencimiento').value || null;
   const referido   = document.getElementById('edit-referido').value;
   const notas      = document.getElementById('edit-notas').value.trim();
+  const parent_username = document.getElementById('edit-parent-username')?.value.trim() || '';
   const serviceUsernameEl = document.getElementById('edit-service-username');
   const servicePasswordEl = document.getElementById('edit-service-password');
   const service_username = serviceUsernameEl ? serviceUsernameEl.value.trim() : '';
@@ -1804,7 +1844,7 @@ async function guardarEdicion(username) {
     if (!confirm(`¿Cambiar el username de "${username}" a "${nuevo_username}"?\n\nEsto actualizará también todo el historial de pagos.`)) return;
   }
 
-  const body = { nombre, contacto, vencimiento, referido, notas, service_username, service_password };
+  const body = { nombre, contacto, vencimiento, referido, notas, parent_username, service_username, service_password };
   if (nuevo_username && nuevo_username !== username) body.nuevo_username = nuevo_username;
 
   const r = await fetch(`/api/clientes/${username}`, {
@@ -1952,6 +1992,7 @@ function openNuevoCliente() {
   document.getElementById('nc-referido').value = 'NO';
   document.getElementById('nc-vencimiento').value = '';
   document.getElementById('nc-pago').value = '';
+  document.getElementById('nc-parent-username').value = '';
   document.getElementById('nc-notas').value = '';
   document.getElementById('nc-username-error').style.display = 'none';
   document.getElementById('nuevo-modal-overlay').classList.add('open');
@@ -1973,6 +2014,7 @@ async function guardarNuevoCliente() {
   const referido = document.getElementById('nc-referido').value;
   const vencimiento = document.getElementById('nc-vencimiento').value;
   const pago     = parseFloat(document.getElementById('nc-pago').value) || 0;
+  const parent_username = document.getElementById('nc-parent-username').value.trim();
   const notas    = document.getElementById('nc-notas').value.trim();
   const errEl    = document.getElementById('nc-username-error');
 
@@ -1981,7 +2023,7 @@ async function guardarNuevoCliente() {
   const r = await fetch('/api/clientes', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ username, nombre, contacto, referido, vencimiento, notas })
+    body: JSON.stringify({ username, nombre, contacto, referido, vencimiento, parent_username, notas })
   });
   const d = await r.json();
 
