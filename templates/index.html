@@ -1477,6 +1477,7 @@ async function openModal(username) {
         </div>
       ` : `
         <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Este cliente puede funcionar como titular. Los usuarios asociados aparecerán aquí.</div>
+        <button class="ops-btn-secondary" style="margin-bottom:12px;" onclick="autoAsociarClientes('${c.username}')">Auto-asociar por teléfono</button>
       `}
       ${asociados.length ? asociados.map(a => `
         <div class="pay-row" style="cursor:pointer;" onclick="openModal('${a.username}')">
@@ -1823,6 +1824,23 @@ async function migrarClienteDesdeLista(username, hasSavedPassword = false) {
   if (url) window.open(url, '_blank', 'noopener');
   else alert('Max Player listo, pero este cliente no tiene teléfono válido para WhatsApp.');
   loadMigrationClients();
+}
+
+async function autoAsociarClientes(username) {
+  if (!confirm(`¿Buscar y asociar automáticamente usuarios con el mismo teléfono de ${username}?\n\nSolo se asociarán clientes que todavía no tengan titular asignado.`)) return;
+  try {
+    const r = await fetch(`/api/clientes/${encodeURIComponent(username)}/auto-asociar`, { method: 'POST' });
+    let d = {};
+    try { d = await r.json(); } catch(e) {}
+    if (!r.ok || !d.ok) {
+      showToast('❌ ' + (d.error || `Error ${r.status || ''} al asociar`));
+      return;
+    }
+    showToast(d.count ? `✅ ${d.count} usuario(s) asociado(s)` : '⚠️ No se encontraron coincidencias');
+    openModal(username);
+  } catch(e) {
+    showToast('❌ Error de conexión al asociar usuarios');
+  }
 }
 
 async function guardarEdicion(username) {

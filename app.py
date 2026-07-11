@@ -3,6 +3,7 @@ import os
 import hmac
 import json
 import time
+import re
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -20,6 +21,10 @@ def today_gt():
 def now_gt():
     """Fecha y hora actual en Guatemala."""
     return datetime.now(GT_TZ)
+
+def normalize_phone(value):
+    digits = re.sub(r'\D+', '', str(value or ''))
+    return digits[-8:] if len(digits) >= 8 else digits
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or os.environ.get('FLASK_SECRET_KEY')
@@ -1681,6 +1686,41 @@ def actualizar_cliente(username):
     db.commit()
     db.close()
     return jsonify({'ok': True, 'nuevo_username': username})
+
+@app.route('/api/clientes/<username>/auto-asociar', methods=['POST'])
+@login_required
+def auto_asociar_clientes(username):
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username, nombre, contacto FROM clientes WHERE username=?"), (username,))
+    titular = fetchone(c)
+    if not titular:
+        db.close()
+        return jsonify({'error': 'Cliente titular no encontrado'}), 404
+    titular_phone = normalize_phone(titular.get('contacto'))
+    if len(titular_phone) < 8:
+        db.close()
+        return jsonify({'error': 'El cliente titular no tiene un teléfono válido para buscar coincidencias.'}), 400
+
+    c.execute(qmark("""
+        SELECT username, nombre, contacto, parent_username
+        FROM clientes
+        WHERE username<>?
+          AND (parent_username IS NULL OR parent_username='')
+    """), (username,))
+    candidatos = fetchall(c)
+    matches = [row for row in candidatos if normalize_phone(row.get('contacto')) == titular_phone]
+    for row in matches:
+        c.execute(qmark("UPDATE clientes SET parent_username=? WHERE username=?"), (username, row.get('username')))
+    db.commit()
+    db.close()
+    return jsonify({
+        'ok': True,
+        'titular': username,
+        'criterio': 'telefono',
+        'asociados': [{'username': r.get('username'), 'nombre': r.get('nombre'), 'contacto': r.get('contacto')} for r in matches],
+        'count': len(matches),
+    })
 
 @app.route('/api/clientes/<username>', methods=['DELETE'])
 @login_required
