@@ -1847,18 +1847,26 @@ async function guardarEdicion(username) {
   const body = { nombre, contacto, vencimiento, referido, notas, parent_username, service_username, service_password };
   if (nuevo_username && nuevo_username !== username) body.nuevo_username = nuevo_username;
 
-  const r = await fetch(`/api/clientes/${username}`, {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
-  });
-  const d = await r.json();
-  if (d.ok) {
+  try {
+    const r = await fetch(`/api/clientes/${encodeURIComponent(username)}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    let d = {};
+    try { d = await r.json(); } catch(e) {}
+    if (!r.ok || !d.ok) {
+      showToast('❌ ' + (d.error || `Error ${r.status || ''} al guardar`));
+      return;
+    }
     closeModal();
-    showToast('✅ Datos actualizados');
+    showToast(nuevo_username && nuevo_username !== username ? '✅ Username actualizado' : '✅ Datos actualizados');
     loadClientes(true);
-  } else {
-    showToast('❌ ' + (d.error || 'Error al guardar'));
+    if (nuevo_username && nuevo_username !== username) {
+      setTimeout(() => openModal(d.nuevo_username || nuevo_username), 450);
+    }
+  } catch(e) {
+    showToast('❌ Error de conexión al guardar');
   }
 }
 

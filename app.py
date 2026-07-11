@@ -1559,10 +1559,13 @@ def restaurar_maxplayer_cliente(username):
 @app.route('/api/clientes/<username>', methods=['PUT'])
 @login_required
 def actualizar_cliente(username):
-    data = request.json
+    data = request.json or {}
     db = get_db()
     c = db.cursor()
-    original_username = username
+    c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
+    if not fetchone(c):
+        db.close()
+        return jsonify({'error': 'Cliente no encontrado'}), 404
 
     # Cambio de username (solo admin)
     nuevo_username = data.get('nuevo_username', '').strip()
@@ -1575,6 +1578,15 @@ def actualizar_cliente(username):
         if fetchone(c):
             db.close()
             return jsonify({'error': 'Ese username ya está en uso'}), 409
+        related_tables = [
+            ('client_portal_accounts', 'portal del cliente'),
+            ('client_service_credentials', 'credenciales del servicio'),
+        ]
+        for table, label in related_tables:
+            c.execute(qmark(f"SELECT username FROM {table} WHERE username=?"), (nuevo_username,))
+            if fetchone(c):
+                db.close()
+                return jsonify({'error': f'El nuevo username ya existe en {label}. Revisa si ese usuario fue creado antes.'}), 409
         # Actualizar pagos primero (FK)
         c.execute(qmark("UPDATE pagos SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE client_portal_accounts SET username=? WHERE username=?"), (nuevo_username, username))
