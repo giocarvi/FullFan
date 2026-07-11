@@ -1871,16 +1871,23 @@ async function registrarPago(username) {
     try { comprobante = await fileToBase64(fileInput.files[0]); } catch(e) {}
   }
 
-  const r = await fetch('/api/pagos', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ username, monto, vencimiento, mes, comprobante })
-  });
-  const d = await r.json();
-  if (d.ok) {
-    closeModal();
-    showToast('✅ Pago registrado correctamente');
-    loadDashboard();
+  try {
+    const r = await fetch('/api/pagos', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ username, monto, vencimiento, mes, comprobante })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      closeModal();
+      showToast('✅ Pago registrado correctamente');
+      loadDashboard();
+      if (document.getElementById('view-clientes').classList.contains('active')) loadClientes(true);
+    } else {
+      showToast('❌ ' + (d.error || 'No se pudo registrar el pago'));
+    }
+  } catch(e) {
+    showToast('❌ Error de conexión al registrar pago');
   }
 }
 

@@ -379,12 +379,17 @@ def init_db():
     # Migrar: agregar columna comprobante a pagos si no existe
     if PG:
         c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS comprobante TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS created_by TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS contacto_secundario TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS datos_actualizados_at TEXT DEFAULT NULL")
     else:
         try:
             c.execute("ALTER TABLE pagos ADD COLUMN comprobante TEXT DEFAULT NULL")
+        except Exception:
+            pass
+        try:
+            c.execute("ALTER TABLE pagos ADD COLUMN created_by TEXT DEFAULT NULL")
         except Exception:
             pass
         for ddl in (
@@ -1610,9 +1615,12 @@ def eliminar_cliente(username):
 @app.route('/api/pagos', methods=['POST'])
 @login_required
 def registrar_pago():
-    data = request.json
-    username = data.get('username')
-    monto = float(data.get('monto', 0))
+    data = request.json or {}
+    username = (data.get('username') or '').strip()
+    try:
+        monto = float(data.get('monto', 0))
+    except (TypeError, ValueError):
+        monto = 0
     vencimiento_nuevo = data.get('vencimiento')
     mes = data.get('mes', today_gt().strftime('%Y-%m-01'))
     comprobante = data.get('comprobante')  # base64 data URL, optional
@@ -1620,12 +1628,32 @@ def registrar_pago():
         return jsonify({'error': 'Datos inválidos'}), 400
     db = get_db()
     c = db.cursor()
-    c.execute(qmark("INSERT INTO pagos (username, mes, monto, comprobante) VALUES (?,?,?,?)"), (username, mes, monto, comprobante))
-    c.execute(qmark("UPDATE clientes SET total_pagado = total_pagado + ?, vencimiento=? WHERE username=?"),
-              (monto, vencimiento_nuevo, username))
+    c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
+    if not fetchone(c):
+        db.close()
+        return jsonify({'error': f'Cliente no encontrado: {username}'}), 404
+    if PG:
+        c.execute("""
+            INSERT INTO pagos (username, mes, monto, comprobante, created_by)
+            VALUES (%s,%s,%s,%s,%s)
+            RETURNING id
+        """, (username, mes, monto, comprobante, session.get('user')))
+        payment_id = c.fetchone()[0]
+    else:
+        c.execute("""
+            INSERT INTO pagos (username, mes, monto, comprobante, created_by)
+            VALUES (?,?,?,?,?)
+        """, (username, mes, monto, comprobante, session.get('user')))
+        payment_id = c.lastrowid
+    if vencimiento_nuevo:
+        c.execute(qmark("UPDATE clientes SET total_pagado = total_pagado + ?, vencimiento=? WHERE username=?"),
+                  (monto, vencimiento_nuevo, username))
+    else:
+        c.execute(qmark("UPDATE clientes SET total_pagado = total_pagado + ? WHERE username=?"),
+                  (monto, username))
     db.commit()
     db.close()
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'payment_id': payment_id})
 
 @app.route('/api/admin/corregir-mes', methods=['POST'])
 @login_required
