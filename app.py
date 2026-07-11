@@ -853,17 +853,18 @@ DEVICE_GUIDES = {
     },
     'firestick': {
         'title': 'Firestick',
-        'app': 'Max Player',
+        'app': 'Max Player / XD+',
         'icon': '🔥',
         'logo': 'apps/max-player.webp',
         'steps': [
             'Conecta tu Firestick a internet.',
             'Busca Max Player desde tu tienda o método de instalación disponible.',
+            'También puedes instalar XD+ usando Downloader con el código 8813174.',
             'Instala la app y ábrela.',
             'Solicita tus datos de acceso por WhatsApp.',
             'Ingresa usuario y contraseña y prueba un canal.'
         ],
-        'tips': ['Mantén espacio libre en el Firestick.', 'Reinicia el dispositivo si una app queda congelada.'],
+        'tips': ['Mantén espacio libre en el Firestick.', 'Si usas Downloader, confirma que el código sea 8813174.', 'Reinicia el dispositivo si una app queda congelada.'],
         'links': [
             {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
         ]
@@ -901,17 +902,18 @@ DEVICE_GUIDES = {
     },
     'roku': {
         'title': 'Roku',
-        'app': 'Premium Player',
+        'app': 'Premium Player / SACNET Plus',
         'icon': '🟣',
         'logo': 'apps/premium-player.webp',
+        'alt_logo': 'apps/sacnet-plus.webp',
         'steps': [
-            'Agrega Premium Player en tu Roku.',
+            'Agrega Premium Player o SACNET Plus en tu Roku.',
             'Abre la app y revisa la pantalla inicial.',
             'Escríbenos por WhatsApp para confirmar compatibilidad.',
             'Te enviaremos los datos de acceso o instrucciones necesarias.',
             'Prueba la reproducción durante la demo.'
         ],
-        'tips': ['Roku puede variar según región/cuenta.', 'Si la app no aparece, te indicaremos alternativas disponibles.']
+        'tips': ['Roku puede variar según región/cuenta.', 'Si Premium Player no aparece, pregunta por SACNET Plus.', 'Si la app no aparece, te indicaremos alternativas disponibles.']
     },
     'windows-mac': {
         'title': 'Windows / Mac',

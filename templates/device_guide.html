@@ -23,6 +23,7 @@
     .card { background:rgba(17,24,39,.84); border:1px solid var(--border); border-radius:24px; padding:22px; }
     .icon { width:70px; height:70px; display:grid; place-items:center; border-radius:22px; background:rgba(255,255,255,.07); border:1px solid var(--border); font-size:34px; margin-bottom:14px; }
     .app-logo { width:100%; max-width:230px; height:118px; object-fit:contain; display:block; border-radius:20px; padding:16px; margin:0 0 16px; background:rgba(7,11,24,.56); border:1px solid rgba(255,255,255,.1); }
+    .app-logo.alt { max-width:320px; }
     ol { padding-left:22px; display:grid; gap:13px; color:var(--muted); line-height:1.5; }
     li::marker { color:var(--gold); font-weight:900; }
     .tips { display:grid; gap:10px; margin-top:14px; }
@@ -59,6 +60,9 @@
       <div class="card">
         {% if guide.logo %}
         <img class="app-logo" src="{{ url_for('static', filename=guide.logo) }}" alt="{{ guide.app }}">
+        {% if guide.alt_logo %}
+        <img class="app-logo alt" src="{{ url_for('static', filename=guide.alt_logo) }}" alt="{{ guide.app }}">
+        {% endif %}
         {% else %}
         <div class="icon">{{ guide.icon }}</div>
         {% endif %}
