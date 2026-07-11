@@ -241,33 +241,38 @@ def create_maxplayer_user(username, iptv_user, iptv_pass, password='', fullname=
             if user_id:
                 break
     if not user_id:
-        raise MaxPlayerError('Max Player creó el usuario, pero no devolvió/permitió ubicar el user_id para asociar la lista IPTV. Intenta nuevamente en unos segundos.')
-    try:
-        add_maxplayer_user_list(user_id, iptv_user, iptv_pass)
-    except MaxPlayerError as exc:
-        if not is_maxplayer_exists_error(exc):
-            raise
+        raise MaxPlayerError('Max Player creó el usuario, pero no devolvió/permitió ubicar el user_id para guardar la sincronización. Intenta nuevamente en unos segundos.')
     return response, user_id
-
-def add_maxplayer_user_list(user_id, iptv_username, iptv_password):
-    if not user_id:
-        raise MaxPlayerError('No hay user_id de Max Player para agregar la lista IPTV.')
-    payload = {
-        'user_id': str(user_id),
-        'domain_id': str(MAXPLAYER_DOMAIN_ID),
-        'iptv_username': iptv_username,
-        'iptv_password': iptv_password,
-    }
-    return maxplayer_request('POST', '/users/list', payload)
 
 def delete_maxplayer_user(user_id):
     if not user_id:
         raise MaxPlayerError('No hay user_id de Max Player para eliminar.')
     return maxplayer_request('DELETE', f'/users/{user_id}')
 
+def delete_maxplayer_user_devices(user_id):
+    if not user_id:
+        raise MaxPlayerError('No hay user_id de Max Player para liberar dispositivos.')
+    return maxplayer_request('DELETE', f'/users/devices/{user_id}')
+
+def purge_maxplayer_user(user_id):
+    """Libera dispositivos y elimina el usuario antes de recrearlo."""
+    if not user_id:
+        return
+    try:
+        delete_maxplayer_user_devices(user_id)
+    except MaxPlayerError as exc:
+        if not is_maxplayer_not_found_error(exc):
+            raise
+    try:
+        delete_maxplayer_user(user_id)
+    except MaxPlayerError as exc:
+        if not is_maxplayer_not_found_error(exc):
+            raise
+    time.sleep(2)
+
 def is_maxplayer_not_found_error(error):
     text = str(error).lower()
-    return '404' in text and ('user not found' in text or 'not found' in text)
+    return 'user not found' in text or 'not found' in text
 
 def is_maxplayer_exists_error(error):
     text = str(error).lower()
@@ -1471,11 +1476,7 @@ def restaurar_maxplayer_cliente(username):
     try:
         existing_user_id = service.get('maxplayer_user_id') or find_maxplayer_user_id(service_username)
         if existing_user_id:
-            try:
-                delete_maxplayer_user(existing_user_id)
-            except MaxPlayerError as exc:
-                if not is_maxplayer_not_found_error(exc):
-                    raise
+            purge_maxplayer_user(existing_user_id)
         response, maxplayer_user_id = create_maxplayer_user(
             username=service_username,
             iptv_user=service_username,
@@ -1927,11 +1928,7 @@ def api_update_activation_task(task_id):
                 if not existing_user_id:
                     db.close()
                     return jsonify({'error': f'No encontré el usuario {xui_username} en Max Player para borrarlo. Puedes usar "Crear nuevo" o revisar el username en Max Player.'}), 400
-                try:
-                    delete_maxplayer_user(existing_user_id)
-                except MaxPlayerError as exc:
-                    if not is_maxplayer_not_found_error(exc):
-                        raise
+                purge_maxplayer_user(existing_user_id)
             try:
                 maxplayer_response, maxplayer_user_id = create_current_maxplayer_user()
             except MaxPlayerError as exc:
@@ -1939,11 +1936,7 @@ def api_update_activation_task(task_id):
                     existing_user_id = find_maxplayer_user_id(xui_username)
                     if not existing_user_id:
                         raise
-                    try:
-                        delete_maxplayer_user(existing_user_id)
-                    except MaxPlayerError as delete_exc:
-                        if not is_maxplayer_not_found_error(delete_exc):
-                            raise
+                    purge_maxplayer_user(existing_user_id)
                     maxplayer_response, maxplayer_user_id = create_current_maxplayer_user()
                 else:
                     raise
