@@ -1722,6 +1722,55 @@ def auto_asociar_clientes(username):
         'count': len(matches),
     })
 
+@app.route('/api/clientes/grupos-telefono')
+@login_required
+def grupos_por_telefono():
+    today = today_gt().isoformat()
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("""
+        SELECT username, nombre, contacto, vencimiento, parent_username, total_pagado
+        FROM clientes
+        WHERE contacto IS NOT NULL
+          AND contacto <> ''
+          AND vencimiento IS NOT NULL
+          AND vencimiento <> ''
+          AND vencimiento >= ?
+        ORDER BY contacto ASC, nombre ASC, username ASC
+    """), (today,))
+    rows = fetchall(c)
+    db.close()
+
+    grouped = {}
+    for row in rows:
+        phone = normalize_phone(row.get('contacto'))
+        if len(phone) < 8:
+            continue
+        grouped.setdefault(phone, []).append(row)
+
+    groups = []
+    for phone, clientes in grouped.items():
+        if len(clientes) < 2:
+            continue
+        sin_titular = [c for c in clientes if not c.get('parent_username')]
+        sugerido = max(clientes, key=lambda c: float(c.get('total_pagado') or 0))
+        groups.append({
+            'telefono': phone,
+            'total': len(clientes),
+            'sin_titular': len(sin_titular),
+            'titular_sugerido': sugerido.get('username'),
+            'clientes': [{
+                'username': c.get('username'),
+                'nombre': c.get('nombre'),
+                'contacto': c.get('contacto'),
+                'vencimiento': c.get('vencimiento'),
+                'parent_username': c.get('parent_username') or '',
+                'total_pagado': c.get('total_pagado') or 0,
+            } for c in clientes],
+        })
+    groups.sort(key=lambda g: (g['sin_titular'], g['total']), reverse=True)
+    return jsonify({'ok': True, 'groups': groups, 'total': len(groups)})
+
 @app.route('/api/clientes/<username>', methods=['DELETE'])
 @login_required
 def eliminar_cliente(username):

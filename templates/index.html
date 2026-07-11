@@ -640,6 +640,7 @@ body {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
         <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;" onclick="loadMigrationClients()">Actualizar lista</button>
+        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#334155;" onclick="loadPhoneGroups()">Ver posibles grupos por teléfono</button>
         {% if rol == 'admin' %}
         <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#6c3483;" onclick="document.getElementById('xui-credentials-upload').click()">Importar Excel XUI</button>
         {% endif %}
@@ -654,6 +655,11 @@ body {
     <div class="analytics-chart-card">
       <h3>Clientes para migración</h3>
       <div id="migration-list"><div class="loading">Cargando...</div></div>
+    </div>
+    <div class="analytics-chart-card">
+      <h3>Posibles grupos por teléfono</h3>
+      <p class="config-hint">Muestra teléfonos con 2 o más clientes activos. Úsalo para asociar familias o clientes con varios usuarios.</p>
+      <div id="phone-groups-list"><div class="empty-state"><p>Presiona “Ver posibles grupos por teléfono”.</p></div></div>
     </div>
   </div>
 </div>
@@ -1478,6 +1484,7 @@ async function openModal(username) {
       ` : `
         <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Este cliente puede funcionar como titular. Los usuarios asociados aparecerán aquí.</div>
         <button class="ops-btn-secondary" style="margin-bottom:12px;" onclick="autoAsociarClientes('${c.username}')">Auto-asociar por teléfono</button>
+        ${asociados.length ? `<button class="ops-btn-primary" style="margin-bottom:12px;" onclick="migrarGrupoFenix('${c.username}')">Migrar titular + asociados</button>` : ''}
       `}
       ${asociados.length ? asociados.map(a => `
         <div class="pay-row" style="cursor:pointer;" onclick="openModal('${a.username}')">
@@ -1754,6 +1761,49 @@ async function loadMigrationClients() {
   }).join('');
 }
 
+async function loadPhoneGroups() {
+  const list = document.getElementById('phone-groups-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading">Buscando coincidencias...</div>';
+  const r = await fetch('/api/clientes/grupos-telefono');
+  let d = {};
+  try { d = await r.json(); } catch(e) {}
+  if (!r.ok || !d.ok) {
+    list.innerHTML = `<div class="empty-state"><p>${d.error || 'No se pudieron cargar los grupos.'}</p></div>`;
+    return;
+  }
+  const groups = d.groups || [];
+  if (!groups.length) {
+    list.innerHTML = '<div class="empty-state"><p>No encontré teléfonos repetidos con clientes activos.</p></div>';
+    return;
+  }
+  list.innerHTML = groups.map(g => `
+    <div class="ops-task">
+      <div class="ops-task-head" style="align-items:flex-start;">
+        <div style="flex:1;min-width:260px;">
+          <div class="ops-task-title">📞 ${g.telefono} · ${g.total} clientes activos</div>
+          <div class="ops-task-meta">Sin titular asignado: ${g.sin_titular} · Titular sugerido: <b>${g.titular_sugerido}</b></div>
+          <div style="margin-top:10px;display:grid;gap:7px;">
+            ${g.clientes.map(c => `
+              <div class="pay-row" style="cursor:pointer;" onclick="openModal('${c.username}')">
+                <div>
+                  <div style="font-weight:800;">${c.nombre || c.username}</div>
+                  <div style="font-size:12px;color:var(--muted);font-family:monospace;">${c.username} · vence ${c.vencimiento || 'sin fecha'}${c.parent_username ? ' · titular: ' + c.parent_username : ''}</div>
+                </div>
+                <span class="pay-amount">Q${parseFloat(c.total_pagado || 0).toLocaleString()}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+          <button class="ops-btn-secondary" onclick="openModal('${g.titular_sugerido}')">Abrir sugerido</button>
+          <button class="ops-btn-primary" onclick="autoAsociarClientes('${g.titular_sugerido}')">Asociar a sugerido</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
 function buildMigrationMessageFromDetail(d) {
   const c = d.cliente || {};
   const service = d.service || {};
@@ -1824,6 +1874,68 @@ async function migrarClienteDesdeLista(username, hasSavedPassword = false) {
   if (url) window.open(url, '_blank', 'noopener');
   else alert('Max Player listo, pero este cliente no tiene teléfono válido para WhatsApp.');
   loadMigrationClients();
+}
+
+async function migrarUsuarioTecnico(username) {
+  const detailR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
+  const detail = await detailR.json();
+  if (!detailR.ok) throw new Error(detail.error || `No se pudo cargar ${username}`);
+  const service = detail.service || {};
+  const client = detail.cliente || {};
+  await fetch(`/api/clientes/${encodeURIComponent(username)}/portal`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      portal_password: username,
+      enabled: true,
+      service_username: service.service_username || username,
+      expires_at: client.vencimiento || ''
+    })
+  });
+  if (!service.service_password) {
+    return { ok: false, skipped: true, reason: 'Sin password XUI/IPTV guardado', detail };
+  }
+  const restoreR = await fetch(`/api/clientes/${encodeURIComponent(username)}/maxplayer/restore`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({})
+  });
+  const restore = await restoreR.json();
+  if (!restoreR.ok) {
+    return { ok: false, skipped: false, reason: restore.error || 'Error Max Player', detail };
+  }
+  return { ok: true, detail };
+}
+
+async function migrarGrupoFenix(username) {
+  const detailR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
+  const detail = await detailR.json();
+  if (!detailR.ok) {
+    showToast('❌ ' + (detail.error || 'No se pudo cargar el titular'));
+    return;
+  }
+  const asociados = detail.asociados || [];
+  const users = [username, ...asociados.map(a => a.username)];
+  if (!confirm(`Migrar grupo de ${username}?\n\nSe procesarán ${users.length} usuario(s): titular + asociados. Se abrirá WhatsApp solo para el titular.`)) return;
+
+  let ok = 0;
+  const pendientes = [];
+  for (const user of users) {
+    try {
+      const result = await migrarUsuarioTecnico(user);
+      if (result.ok) ok += 1;
+      else pendientes.push(`${user}: ${result.reason}`);
+    } catch(e) {
+      pendientes.push(`${user}: ${e.message || 'error'}`);
+    }
+  }
+  showToast(`✅ ${ok} migrado(s). ${pendientes.length ? pendientes.length + ' pendiente(s)' : 'Grupo completo'}`);
+  if (pendientes.length) {
+    alert('Usuarios pendientes:\n\n' + pendientes.join('\n'));
+  }
+  const url = buildMigrationUrlFromDetail(detail);
+  if (url) window.open(url, '_blank', 'noopener');
+  openModal(username);
 }
 
 async function autoAsociarClientes(username) {
