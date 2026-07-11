@@ -618,7 +618,6 @@ body {
   </div>
 </div>
 
-{% if rol == 'admin' %}
 <!-- MIGRACION VIEW -->
 <div id="view-migracion" class="view">
   <div class="config-form">
@@ -641,7 +640,9 @@ body {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
         <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;" onclick="loadMigrationClients()">Actualizar lista</button>
+        {% if rol == 'admin' %}
         <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#6c3483;" onclick="document.getElementById('xui-credentials-upload').click()">Importar Excel XUI</button>
+        {% endif %}
       </div>
     </div>
     <div class="analytics-kpi-grid" id="migration-kpis">
@@ -656,8 +657,6 @@ body {
     </div>
   </div>
 </div>
-
-{% endif %}
 
 {% if rol == 'admin' %}
 <!-- ANALYTICS VIEW -->
@@ -841,10 +840,10 @@ body {
   <button class="nav-btn" data-view="activaciones">
     <span class="icon">🔥</span>Activar
   </button>
-  {% if rol == 'admin' %}
   <button class="nav-btn" data-view="migracion">
     <span class="icon">🚀</span>Migrar
   </button>
+  {% if rol == 'admin' %}
   <button class="nav-btn" data-view="analytics">
     <span class="icon">📈</span>Análisis
   </button>
@@ -1664,7 +1663,6 @@ function migrationBadge(ok, textOk, textBad) {
 }
 
 async function loadMigrationClients() {
-  if (!IS_ADMIN) return;
   const list = document.getElementById('migration-list');
   if (!list) return;
   list.innerHTML = '<div class="loading">Cargando...</div>';
@@ -1763,7 +1761,7 @@ async function copiarMensajeMigracion(username) {
 }
 
 async function migrarClienteDesdeLista(username, hasSavedPassword = false) {
-  if (!confirm(`Migrar ${username}?\n\nSe habilitara portal, se restaurara/creara Max Player y luego se abrira WhatsApp.`)) return;
+  if (!confirm(`Migrar ${username}?\n\nSe habilitará portal, se restaurará/creará Max Player y luego se abrirá WhatsApp.`)) return;
   const detailR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
   const detail = await detailR.json();
   if (!detailR.ok) {

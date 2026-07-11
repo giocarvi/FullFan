@@ -2445,8 +2445,6 @@ def clientes_nuevos():
 @app.route('/api/admin/migracion-clientes')
 @login_required
 def migracion_clientes():
-    if session.get('rol') != 'admin':
-        return jsonify({'error': 'Acceso denegado'}), 403
     q = request.args.get('q', '').strip()
     estado = request.args.get('estado', '').strip()
     today = today_gt().isoformat()
