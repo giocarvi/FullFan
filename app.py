@@ -2,6 +2,7 @@
 import os
 import hmac
 import json
+import time
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -110,9 +111,12 @@ def maxplayer_request(method, path, payload=None):
         with urlrequest.urlopen(req, timeout=20) as response:
             raw = response.read().decode('utf-8') or '{}'
             try:
-                return json.loads(raw)
+                parsed = json.loads(raw)
             except json.JSONDecodeError:
                 return {'raw': raw}
+            if isinstance(parsed, dict) and parsed.get('success') == 0 and parsed.get('error'):
+                raise MaxPlayerError(f"Max Player respondió error: {parsed.get('error')}")
+            return parsed
     except HTTPError as exc:
         raw = exc.read().decode('utf-8', errors='replace')
         try:
@@ -228,7 +232,33 @@ def create_maxplayer_user(username, iptv_user, iptv_pass, password='', fullname=
     if user_email:
         payload['user_email'] = user_email
     response = maxplayer_request('POST', '/users', payload)
-    return response, extract_maxplayer_user_id(response)
+    user_id = extract_maxplayer_user_id(response)
+    if not user_id:
+        for attempt in range(3):
+            if attempt:
+                time.sleep(1)
+            user_id = find_maxplayer_user_id(username)
+            if user_id:
+                break
+    if not user_id:
+        raise MaxPlayerError('Max Player creó el usuario, pero no devolvió/permitió ubicar el user_id para asociar la lista IPTV. Intenta nuevamente en unos segundos.')
+    try:
+        add_maxplayer_user_list(user_id, iptv_user, iptv_pass)
+    except MaxPlayerError as exc:
+        if not is_maxplayer_exists_error(exc):
+            raise
+    return response, user_id
+
+def add_maxplayer_user_list(user_id, iptv_username, iptv_password):
+    if not user_id:
+        raise MaxPlayerError('No hay user_id de Max Player para agregar la lista IPTV.')
+    payload = {
+        'user_id': str(user_id),
+        'domain_id': str(MAXPLAYER_DOMAIN_ID),
+        'iptv_username': iptv_username,
+        'iptv_password': iptv_password,
+    }
+    return maxplayer_request('POST', '/users/list', payload)
 
 def delete_maxplayer_user(user_id):
     if not user_id:
@@ -241,7 +271,7 @@ def is_maxplayer_not_found_error(error):
 
 def is_maxplayer_exists_error(error):
     text = str(error).lower()
-    return '409' in text and ('already exist' in text or 'already exists' in text)
+    return 'already exist' in text or 'already exists' in text
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
