@@ -1782,7 +1782,13 @@ async function loadPhoneGroups() {
       <div class="ops-task-head" style="align-items:flex-start;">
         <div style="flex:1;min-width:260px;">
           <div class="ops-task-title">📞 ${g.telefono} · ${g.total} clientes activos</div>
-          <div class="ops-task-meta">Sin titular asignado: ${g.sin_titular} · Titular sugerido: <b>${g.titular_sugerido}</b></div>
+          <div class="ops-task-meta">Sin titular asignado: ${g.sin_titular} · Sugerido: <b>${g.titular_sugerido}</b></div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <label style="font-size:12px;color:var(--muted);font-weight:800;">Elegir usuario principal</label>
+            <select id="phone-group-owner-${g.telefono}" style="min-width:240px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--text);">
+              ${g.clientes.map(c => `<option value="${c.username}" ${c.username === g.titular_sugerido ? 'selected' : ''}>${c.nombre || c.username} · ${c.username}</option>`).join('')}
+            </select>
+          </div>
           <div style="margin-top:10px;display:grid;gap:7px;">
             ${g.clientes.map(c => `
               <div class="pay-row" style="cursor:pointer;" onclick="openModal('${c.username}')">
@@ -1796,12 +1802,31 @@ async function loadPhoneGroups() {
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-          <button class="ops-btn-secondary" onclick="openModal('${g.titular_sugerido}')">Abrir sugerido</button>
-          <button class="ops-btn-primary" onclick="autoAsociarClientes('${g.titular_sugerido}')">Asociar a sugerido</button>
+          <button class="ops-btn-secondary" onclick="openSelectedPhoneGroupOwner('${g.telefono}')">Abrir elegido</button>
+          <button class="ops-btn-primary" onclick="autoAsociarPhoneGroupOwner('${g.telefono}')">Asociar a elegido</button>
         </div>
       </div>
     </div>
   `).join('');
+}
+
+function selectedPhoneGroupOwner(phone) {
+  return document.getElementById(`phone-group-owner-${phone}`)?.value || '';
+}
+
+function openSelectedPhoneGroupOwner(phone) {
+  const owner = selectedPhoneGroupOwner(phone);
+  if (owner) openModal(owner);
+}
+
+async function autoAsociarPhoneGroupOwner(phone) {
+  const owner = selectedPhoneGroupOwner(phone);
+  if (!owner) {
+    showToast('⚠️ Elige un usuario principal');
+    return;
+  }
+  await autoAsociarClientes(owner);
+  loadPhoneGroups();
 }
 
 function buildMigrationMessageFromDetail(d) {
