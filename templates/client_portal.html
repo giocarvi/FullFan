@@ -97,6 +97,18 @@
             <div class="copy-row"><b id="service-pass">{{ service.service_username or 'Pendiente' }}</b><button class="copy" onclick="copyText('service-pass')">Copiar</button></div>
           </div>
         </div>
+        <h3 style="margin:18px 0 8px;">Credenciales XUI / IPTV</h3>
+        <p class="lead" style="font-size:13px;margin-bottom:12px;">Algunas apps pueden pedir estas credenciales directas.</p>
+        <div class="fields">
+          <div class="field">
+            <small>Usuario XUI / IPTV</small>
+            <div class="copy-row"><b id="xui-user">{{ service.service_username or 'Pendiente' }}</b><button class="copy" onclick="copyText('xui-user')">Copiar</button></div>
+          </div>
+          <div class="field">
+            <small>Password XUI / IPTV</small>
+            <div class="copy-row"><b id="xui-pass">{{ service.service_password or 'Pendiente' }}</b><button class="copy" onclick="copyText('xui-pass')">Copiar</button></div>
+          </div>
+        </div>
         <p class="lead" style="margin-top:14px;font-size:14px;">Estos datos son para la app de entretenimiento. Tu contraseña del portal Fénix no se muestra por seguridad.</p>
       </div>
       <div class="card" style="grid-column:1/-1;">
