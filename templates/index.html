@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fénix Digital TV</title>
 <style>
 /* ── RESET & BASE ─────────────────────────────────────────────────── */
@@ -459,7 +459,55 @@ body {
 .activation-modal-card h3 { margin:0 0 14px; color:var(--text); font-size:17px; }
 .activation-modal-card label { display:block; font-size:12px; color:var(--muted); margin:10px 0 5px; font-weight:700; }
 .activation-modal-card input, .activation-modal-card textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); padding:10px; box-sizing:border-box; }
-@media (max-width: 640px) { .ops-form { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); font-size: 14px; }
+  .topbar { padding: 10px 12px; gap: 8px; }
+  .topbar-title img { height: 30px !important; max-width: 112px; }
+  .topbar > div:last-child { gap: 6px !important; min-width: 0; }
+  .topbar > div:last-child span { max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .logout-btn { padding: 8px 6px; }
+  .view { padding: 12px; }
+  .bottom-nav {
+    justify-content: flex-start;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 8px 8px max(10px, env(safe-area-inset-bottom));
+    scrollbar-width: none;
+  }
+  .bottom-nav::-webkit-scrollbar { display:none; }
+  .nav-btn { min-width: 72px; padding: 7px 10px; }
+  .nav-btn .icon { font-size: 20px; }
+  .stats-grid, .analytics-kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card, .kpi-card, .chart-card, .analytics-chart-card { padding: 13px; border-radius: 14px; }
+  .list-item { padding: 12px; gap: 10px; }
+  .item-avatar { width: 36px; height: 36px; border-radius: 10px; }
+  .filter-tabs, .year-tabs, .day-month-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .filter-tabs::-webkit-scrollbar, .year-tabs::-webkit-scrollbar, .day-month-tabs::-webkit-scrollbar { display:none; }
+  .modal-overlay { align-items: stretch; }
+  .modal {
+    width: 100%;
+    max-width: none;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding-bottom: calc(34px + env(safe-area-inset-bottom));
+  }
+  .modal-header { padding: 16px 14px 12px; align-items:flex-start; }
+  .modal-avatar { width: 44px; height: 44px; border-radius: 13px; }
+  .modal-name { font-size: 17px; }
+  .modal-body, .wa-section, .pago-form { padding-left: 14px; padding-right: 14px; }
+  .form-row, .ops-form { grid-template-columns: 1fr !important; gap: 10px; }
+  .wa-buttons, .actions, .ops-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .wa-btn, .btn-primary, .btn-secondary, .ops-btn-primary, .ops-btn-secondary, .ops-btn-success, .ops-btn-danger { width: 100%; justify-content: center; min-height: 42px; }
+  .pay-row { padding: 11px 14px; gap: 10px; align-items:flex-start; }
+  .analytics-table { min-width: 560px; }
+  .analytics-chart-card { overflow-x: auto; }
+  .success-toast { left: 12px !important; right: 12px !important; bottom: calc(92px + env(safe-area-inset-bottom)) !important; width: auto; text-align:center; }
+}
+@media (max-width: 380px) {
+  .stats-grid, .analytics-kpi-grid { grid-template-columns: 1fr; }
+  .stat-card .val { font-size: 24px; }
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>

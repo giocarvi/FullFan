@@ -20,6 +20,15 @@
     button, .btn { width:100%; display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:999px; margin-top:18px; padding:13px 18px; font-weight:950; cursor:pointer; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#170B02; text-decoration:none; }
     .ghost { background:rgba(255,255,255,.06); color:var(--text); border:1px solid var(--border); margin-top:10px; }
     .error { border:1px solid rgba(239,68,68,.35); background:rgba(239,68,68,.12); color:#FCA5A5; border-radius:14px; padding:12px; margin-bottom:16px; font-size:14px; }
+    @media (max-width:480px) {
+      body { padding:14px; align-items:start; padding-top:28px; }
+      .card { padding:22px 18px; border-radius:22px; }
+      .logo { width:118px; margin-bottom:18px; }
+      h1 { font-size:30px; }
+      p { font-size:15px; }
+      input { font-size:16px; min-height:46px; }
+      button, .btn { min-height:46px; }
+    }
   </style>
 </head>
 <body>

@@ -208,15 +208,50 @@
       .reseller-head, .reseller-packages, .audience { grid-template-columns:1fr; }
     }
     @media (max-width:560px) {
+      .wrap { width:min(100% - 24px,1120px); }
       .nav { align-items:flex-start; flex-direction:column; padding:12px 0; }
+      .logo img { width:104px; }
+      .nav-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+      .nav-actions .link { display:none; }
       .devices-shell { padding:16px; border-radius:24px; }
       .cards, .plans, .devices, .mini-grid { grid-template-columns:1fr; }
       .stats, .steps, .event-grid { grid-template-columns:1fr; }
       .cta-band { flex-direction:column; align-items:flex-start; }
-      .hero { padding-top:42px; }
+      .hero { padding:36px 0 28px; gap:22px; }
+      h1 { font-size:clamp(36px,12vw,52px); }
+      .lead { font-size:16px; }
       .nav-actions { width:100%; justify-content:space-between; }
-      .btn { width:100%; }
+      .btn { width:100%; min-height:44px; padding:12px 14px; }
       .hero-actions .btn { width:100%; }
+      .hero-card, .image-card, .sports-card, .reseller, .formbox { border-radius:22px; padding:16px; }
+      .image-card .landing-img, .sports-image { min-height:260px; border-radius:20px; }
+      .image-overlay { left:12px; right:12px; bottom:12px; padding:14px; }
+      .image-overlay h3 { font-size:20px; }
+      .poster-wall { grid-template-columns:repeat(2,1fr); }
+      .poster { min-height:96px; }
+      section { padding:30px 0; }
+      .section-title { font-size:30px; }
+      .currency-box { display:grid; }
+      .currency-box select { min-width:0; width:100%; }
+      .plan { padding:18px; }
+      .price { font-size:32px; }
+      .devices-head { gap:8px; }
+      .device { min-height:220px; }
+      .device-scene { min-height:112px; }
+      .brand-logo { width:68px; height:38px; }
+      .support-logo { width:72px; height:72px; }
+      .demo-card { width:130px; min-height:68px; }
+      .rail-wrap, .showcase { overflow-x:auto; }
+      .rail { min-width:860px; }
+      .reseller-package { padding:16px; }
+      .cta-band { padding:20px; border-radius:22px; }
+      .formbox { grid-template-columns:1fr; gap:16px; }
+      input, select, textarea { font-size:16px; }
+    }
+    @media (max-width:380px) {
+      .nav-actions { grid-template-columns:1fr; }
+      .poster-wall { grid-template-columns:1fr; }
+      .device-chip { font-size:11px; }
     }
   </style>
 </head>
