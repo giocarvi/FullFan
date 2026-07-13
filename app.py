@@ -1471,6 +1471,39 @@ def actualizar_portal_cliente(username):
     db.close()
     return jsonify({'ok': True})
 
+@app.route('/api/clientes/<username>/portal/reset-password', methods=['POST'])
+@login_required
+def restablecer_password_portal_cliente(username):
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
+    cliente = fetchone(c)
+    if not cliente:
+        db.close()
+        return jsonify({'error': 'Cliente no encontrado'}), 404
+    now = now_gt().isoformat(timespec='seconds')
+    if PG:
+        c.execute("""
+            INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
+            VALUES (%s,%s,TRUE,%s)
+            ON CONFLICT (username) DO UPDATE SET
+                password=EXCLUDED.password,
+                is_enabled=TRUE,
+                updated_at=EXCLUDED.updated_at
+        """, (username, hash_password(username), now))
+    else:
+        c.execute("""
+            INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
+            VALUES (?,?,1,?)
+            ON CONFLICT(username) DO UPDATE SET
+                password=excluded.password,
+                is_enabled=1,
+                updated_at=excluded.updated_at
+        """, (username, hash_password(username), now))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'username': username, 'password': username})
+
 @app.route('/api/clientes/<username>/maxplayer/restore', methods=['POST'])
 @login_required
 def restaurar_maxplayer_cliente(username):

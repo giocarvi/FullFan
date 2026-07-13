@@ -1614,6 +1614,16 @@ async function openModal(username) {
     ${waSection}
 
     <div class="pago-form">
+      <h3>Portal del cliente</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        <span class="badge gray">Usuario: ${c.username}</span>
+        <span class="badge gray">Password temporal: ${c.username}</span>
+      </div>
+      <button class="btn-secondary" onclick="restablecerPasswordPortal('${username}')">Restablecer contraseña del portal</button>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">Deja el acceso activo y vuelve a poner la contraseña del portal igual al usuario. No modifica Max Player ni XUI.</div>
+    </div>
+
+    <div class="pago-form">
       <h3>Max Player</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <span class="badge gray">Usuario: ${service.service_username || c.username}</span>
@@ -2009,6 +2019,27 @@ async function migrarGrupoFenix(username) {
   const url = buildMigrationUrlFromDetail(detail);
   if (url) window.open(url, '_blank', 'noopener');
   openModal(username);
+}
+
+async function restablecerPasswordPortal(username) {
+  if (!confirm(`¿Restablecer contraseña del portal para ${username}?\n\nLa nueva contraseña temporal será igual al usuario: ${username}`)) return;
+  try {
+    const r = await fetch(`/api/clientes/${encodeURIComponent(username)}/portal/reset-password`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'}
+    });
+    let d = {};
+    try { d = await r.json(); } catch(e) {}
+    if (!r.ok || !d.ok) {
+      showToast('❌ ' + (d.error || `Error ${r.status || ''} al restablecer`));
+      return;
+    }
+    showToast('✅ Contraseña del portal restablecida');
+    const msg = `Acceso portal Fénix:\nUsuario: ${d.username || username}\nPassword: ${d.password || username}`;
+    try { await navigator.clipboard.writeText(msg); } catch(e) {}
+  } catch(e) {
+    showToast('❌ Error de conexión al restablecer portal');
+  }
 }
 
 async function autoAsociarClientes(username) {
