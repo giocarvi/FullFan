@@ -689,6 +689,7 @@ body {
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
         <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;" onclick="loadMigrationClients()">Actualizar lista</button>
         <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#334155;" onclick="loadPhoneGroups()">Ver posibles grupos por teléfono</button>
+        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#475569;" onclick="loadDuplicateClients()">Ver posibles duplicados</button>
         {% if rol == 'admin' %}
         <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#6c3483;" onclick="document.getElementById('xui-credentials-upload').click()">Importar Excel XUI</button>
         {% endif %}
@@ -708,6 +709,11 @@ body {
       <h3>Posibles grupos por teléfono</h3>
       <p class="config-hint">Muestra teléfonos con 2 o más clientes activos. Úsalo para asociar familias o clientes con varios usuarios.</p>
       <div id="phone-groups-list"><div class="empty-state"><p>Presiona “Ver posibles grupos por teléfono”.</p></div></div>
+    </div>
+    <div class="analytics-chart-card">
+      <h3>Posibles duplicados por nombre o usuario</h3>
+      <p class="config-hint">Revisa clientes activos con el mismo nombre normalizado o usernames parecidos. Solo usa datos guardados en la plataforma.</p>
+      <div id="duplicates-list"><div class="empty-state"><p>Presiona “Ver posibles duplicados”.</p></div></div>
     </div>
   </div>
 </div>
@@ -1039,6 +1045,16 @@ body {
 function localDateStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function escHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
 }
 
 // ── STATE ──────────────────────────────────────────────────────────────────
@@ -1866,6 +1882,62 @@ async function loadPhoneGroups() {
       </div>
     </div>
   `).join('');
+}
+
+async function loadDuplicateClients() {
+  const list = document.getElementById('duplicates-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading">Buscando posibles duplicados...</div>';
+  const r = await fetch('/api/clientes/duplicados?activos=1');
+  let d = {};
+  try { d = await r.json(); } catch(e) {}
+  if (!r.ok || !d.ok) {
+    list.innerHTML = `<div class="empty-state"><p>${escHtml(d.error || 'No se pudieron cargar los posibles duplicados.')}</p></div>`;
+    return;
+  }
+
+  const renderClient = c => `
+    <div class="pay-row" style="cursor:pointer;" onclick="openModal('${escHtml(c.username)}')">
+      <div>
+        <div style="font-weight:800;">${escHtml(c.nombre || c.username)}</div>
+        <div style="font-size:12px;color:var(--muted);font-family:monospace;">
+          ${escHtml(c.username)} · Tel: ${escHtml(c.contacto || '—')} · vence ${escHtml(c.vencimiento || 'sin fecha')}${c.parent_username ? ' · titular: ' + escHtml(c.parent_username) : ''}
+        </div>
+      </div>
+      <span class="pay-amount">Q${parseFloat(c.total_pagado || 0).toLocaleString()}</span>
+    </div>`;
+
+  const renderGroup = (g, label) => `
+    <div class="ops-task">
+      <div class="ops-task-head" style="align-items:flex-start;">
+        <div style="flex:1;min-width:260px;">
+          <div class="ops-task-title">${escHtml(label)}: ${escHtml(g.key)} · ${g.total} clientes</div>
+          <div style="margin-top:10px;display:grid;gap:7px;">
+            ${(g.clientes || []).map(renderClient).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const nameGroups = d.name_groups || [];
+  const usernameGroups = d.username_groups || [];
+  const counts = d.counts || {};
+  if (!nameGroups.length && !usernameGroups.length) {
+    list.innerHTML = `<div class="empty-state"><p>No encontré duplicados entre ${counts.clientes_revisados || 0} clientes activos.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = `
+    <div class="ops-task-meta" style="margin-bottom:10px;">
+      Revisados: <b>${counts.clientes_revisados || 0}</b> ·
+      nombres repetidos: <b>${counts.nombres_repetidos || 0}</b> ·
+      usuarios similares: <b>${counts.usuarios_similares || 0}</b>
+    </div>
+    ${nameGroups.length ? '<h4 style="margin:10px 0;">Mismo nombre de cliente</h4>' : ''}
+    ${nameGroups.map(g => renderGroup(g, 'Nombre')).join('')}
+    ${usernameGroups.length ? '<h4 style="margin:16px 0 10px;">Username parecido</h4>' : ''}
+    ${usernameGroups.map(g => renderGroup(g, 'Usuario')).join('')}
+  `;
 }
 
 function selectedPhoneGroupOwner(phone) {

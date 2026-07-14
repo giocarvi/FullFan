@@ -4,6 +4,7 @@ import hmac
 import json
 import time
 import re
+import unicodedata
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -25,6 +26,20 @@ def now_gt():
 def normalize_phone(value):
     digits = re.sub(r'\D+', '', str(value or ''))
     return digits[-8:] if len(digits) >= 8 else digits
+
+def normalize_text_key(value):
+    """Normaliza texto para comparar nombres sin tildes, símbolos o espacios raros."""
+    text = str(value or '').strip().lower()
+    text = unicodedata.normalize('NFKD', text)
+    text = ''.join(ch for ch in text if not unicodedata.combining(ch))
+    text = re.sub(r'[^a-z0-9\s]+', ' ', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+def normalize_username_base(value):
+    """Agrupa usernames parecidos removiendo símbolos y sufijos numéricos comunes."""
+    text = normalize_text_key(value).replace(' ', '')
+    text = re.sub(r'\d+$', '', text)
+    return text.strip()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or os.environ.get('FLASK_SECRET_KEY')
@@ -1803,6 +1818,84 @@ def grupos_por_telefono():
         })
     groups.sort(key=lambda g: (g['sin_titular'], g['total']), reverse=True)
     return jsonify({'ok': True, 'groups': groups, 'total': len(groups)})
+
+@app.route('/api/clientes/duplicados')
+@login_required
+def clientes_duplicados():
+    """Detecta posibles duplicados usando únicamente clientes guardados en la plataforma."""
+    today = today_gt().isoformat()
+    solo_activos = request.args.get('activos', '1') != '0'
+    db = get_db()
+    c = db.cursor()
+    if solo_activos:
+        c.execute(qmark("""
+            SELECT username, nombre, contacto, vencimiento, parent_username, total_pagado
+            FROM clientes
+            WHERE vencimiento IS NOT NULL
+              AND vencimiento <> ''
+              AND vencimiento >= ?
+            ORDER BY nombre ASC, username ASC
+        """), (today,))
+    else:
+        c.execute("""
+            SELECT username, nombre, contacto, vencimiento, parent_username, total_pagado
+            FROM clientes
+            ORDER BY nombre ASC, username ASC
+        """)
+    rows = fetchall(c)
+    db.close()
+
+    def client_payload(row):
+        return {
+            'username': row.get('username') or '',
+            'nombre': row.get('nombre') or '',
+            'contacto': row.get('contacto') or '',
+            'telefono_key': normalize_phone(row.get('contacto')),
+            'vencimiento': row.get('vencimiento') or '',
+            'parent_username': row.get('parent_username') or '',
+            'total_pagado': row.get('total_pagado') or 0,
+        }
+
+    by_name = {}
+    by_username = {}
+    for row in rows:
+        username = row.get('username') or ''
+        name_key = normalize_text_key(row.get('nombre'))
+        if name_key and len(name_key) >= 4:
+            by_name.setdefault(name_key, []).append(row)
+
+        username_key = normalize_username_base(username)
+        if username_key and len(username_key) >= 5:
+            by_username.setdefault(username_key, []).append(row)
+
+    def build_groups(grouped):
+        out = []
+        for key, items in grouped.items():
+            unique_usernames = {str(i.get('username') or '').lower() for i in items}
+            if len(items) < 2 or len(unique_usernames) < 2:
+                continue
+            out.append({
+                'key': key,
+                'total': len(items),
+                'clientes': [client_payload(i) for i in items],
+            })
+        out.sort(key=lambda g: (-g['total'], g['key']))
+        return out[:150]
+
+    name_groups = build_groups(by_name)
+    username_groups = build_groups(by_username)
+
+    return jsonify({
+        'ok': True,
+        'solo_activos': solo_activos,
+        'counts': {
+            'clientes_revisados': len(rows),
+            'nombres_repetidos': len(name_groups),
+            'usuarios_similares': len(username_groups),
+        },
+        'name_groups': name_groups,
+        'username_groups': username_groups,
+    })
 
 @app.route('/api/clientes/<username>', methods=['DELETE'])
 @login_required
