@@ -713,6 +713,11 @@ body {
     <div class="analytics-chart-card">
       <h3>Posibles duplicados por nombre o usuario</h3>
       <p class="config-hint">Revisa clientes activos con el mismo nombre normalizado o usernames parecidos. Solo usa datos guardados en la plataforma.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px;">
+        <button class="ops-btn-secondary" onclick="loadDuplicateClients('grouped')">Ver agrupado</button>
+        <button class="ops-btn-secondary" onclick="loadDuplicateClients('flat')">Ver listado</button>
+        <button class="ops-btn-primary" onclick="exportDuplicateClients()">Descargar Excel</button>
+      </div>
       <div id="duplicates-list"><div class="empty-state"><p>Presiona “Ver posibles duplicados”.</p></div></div>
     </div>
   </div>
@@ -1884,15 +1889,50 @@ async function loadPhoneGroups() {
   `).join('');
 }
 
-async function loadDuplicateClients() {
-  const list = document.getElementById('duplicates-list');
-  if (!list) return;
-  list.innerHTML = '<div class="loading">Buscando posibles duplicados...</div>';
+async function fetchDuplicateClients() {
   const r = await fetch('/api/clientes/duplicados?activos=1');
   let d = {};
   try { d = await r.json(); } catch(e) {}
-  if (!r.ok || !d.ok) {
-    list.innerHTML = `<div class="empty-state"><p>${escHtml(d.error || 'No se pudieron cargar los posibles duplicados.')}</p></div>`;
+  if (!r.ok || !d.ok) throw new Error(d.error || 'No se pudieron cargar los posibles duplicados.');
+  return d;
+}
+
+function flattenDuplicateGroups(d) {
+  const rows = [];
+  const seen = new Set();
+  const pushGroup = (type, g) => {
+    (g.clientes || []).forEach(c => {
+      const rowKey = `${type}|${g.key}|${c.username}`;
+      if (seen.has(rowKey)) return;
+      seen.add(rowKey);
+      rows.push({
+        tipo: type,
+        clave: g.key,
+        total_grupo: g.total,
+        nombre: c.nombre || '',
+        username: c.username || '',
+        contacto: c.contacto || '',
+        telefono_key: c.telefono_key || '',
+        vencimiento: c.vencimiento || '',
+        parent_username: c.parent_username || '',
+        total_pagado: c.total_pagado || 0,
+      });
+    });
+  };
+  (d.name_groups || []).forEach(g => pushGroup('Mismo nombre', g));
+  (d.username_groups || []).forEach(g => pushGroup('Username parecido', g));
+  return rows;
+}
+
+async function loadDuplicateClients(mode='grouped') {
+  const list = document.getElementById('duplicates-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading">Buscando posibles duplicados...</div>';
+  let d;
+  try {
+    d = await fetchDuplicateClients();
+  } catch(e) {
+    list.innerHTML = `<div class="empty-state"><p>${escHtml(e.message)}</p></div>`;
     return;
   }
 
@@ -1927,6 +1967,44 @@ async function loadDuplicateClients() {
     return;
   }
 
+  if (mode === 'flat') {
+    const rows = flattenDuplicateGroups(d);
+    list.innerHTML = `
+      <div class="ops-task-meta" style="margin-bottom:10px;">
+        Listado plano: <b>${rows.length}</b> filas · clientes revisados: <b>${counts.clientes_revisados || 0}</b>
+      </div>
+      <div style="overflow:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Coincidencia</th>
+              <th>Clave</th>
+              <th>Nombre</th>
+              <th>Usuario</th>
+              <th>Teléfono</th>
+              <th>Vence</th>
+              <th>Titular</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r => `
+              <tr onclick="openModal('${escHtml(r.username)}')" style="cursor:pointer;">
+                <td>${escHtml(r.tipo)}</td>
+                <td>${escHtml(r.clave)}</td>
+                <td>${escHtml(r.nombre || '—')}</td>
+                <td style="font-family:monospace;">${escHtml(r.username)}</td>
+                <td>${escHtml(r.contacto || '—')}</td>
+                <td>${escHtml(r.vencimiento || '—')}</td>
+                <td>${escHtml(r.parent_username || '—')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    return;
+  }
+
   list.innerHTML = `
     <div class="ops-task-meta" style="margin-bottom:10px;">
       Revisados: <b>${counts.clientes_revisados || 0}</b> ·
@@ -1938,6 +2016,50 @@ async function loadDuplicateClients() {
     ${usernameGroups.length ? '<h4 style="margin:16px 0 10px;">Username parecido</h4>' : ''}
     ${usernameGroups.map(g => renderGroup(g, 'Usuario')).join('')}
   `;
+}
+
+async function exportDuplicateClients() {
+  try {
+    const d = await fetchDuplicateClients();
+    const rows = flattenDuplicateGroups(d);
+    if (!rows.length) {
+      showToast('No hay duplicados para exportar');
+      return;
+    }
+    const data = [[
+      'Tipo de coincidencia',
+      'Clave detectada',
+      'Total en grupo',
+      'Nombre',
+      'Usuario',
+      'Teléfono',
+      'Teléfono normalizado',
+      'Vencimiento',
+      'Usuario titular',
+      'Total pagado (Q)'
+    ]];
+    rows.forEach(r => data.push([
+      r.tipo,
+      r.clave,
+      r.total_grupo,
+      r.nombre,
+      r.username,
+      r.contacto,
+      r.telefono_key,
+      r.vencimiento,
+      r.parent_username,
+      parseFloat(r.total_pagado || 0),
+    ]));
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [20,24,14,30,24,18,18,16,24,16].map(w => ({wch: w}));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Posibles duplicados');
+    XLSX.writeFile(wb, `duplicados_clientes_fenix_${localDateStr()}.xlsx`);
+    showToast('✅ Reporte descargado');
+  } catch(e) {
+    showToast('❌ ' + e.message);
+  }
 }
 
 function selectedPhoneGroupOwner(phone) {
