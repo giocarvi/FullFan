@@ -25,7 +25,28 @@ def now_gt():
 
 def normalize_phone(value):
     digits = re.sub(r'\D+', '', str(value or ''))
-    return digits[-8:] if len(digits) >= 8 else digits
+    if digits.startswith('00'):
+        digits = digits[2:]
+    if len(digits) == 8:
+        return '502' + digits
+    return digits
+
+def phone_country_label(value):
+    digits = normalize_phone(value)
+    country_codes = [
+        ('502', 'Guatemala'),
+        ('503', 'El Salvador'),
+        ('504', 'Honduras'),
+        ('505', 'Nicaragua'),
+        ('506', 'Costa Rica'),
+        ('507', 'Panamá'),
+        ('52', 'México'),
+        ('1', 'Estados Unidos / Canadá'),
+    ]
+    for prefix, label in country_codes:
+        if digits.startswith(prefix):
+            return label
+    return 'Internacional' if len(digits) > 8 else ''
 
 def normalize_text_key(value):
     """Normaliza texto para comparar nombres sin tildes, símbolos o espacios raros."""
@@ -1175,8 +1196,8 @@ def client_change_password():
 def client_update_profile():
     data = request.json or {}
     username = session['client_username']
-    contacto = ''.join(ch for ch in (data.get('contacto') or '') if ch.isdigit())[-12:]
-    contacto_secundario = ''.join(ch for ch in (data.get('contacto_secundario') or '') if ch.isdigit())[-12:]
+    contacto = ''.join(ch for ch in (data.get('contacto') or '') if ch.isdigit())[-15:]
+    contacto_secundario = ''.join(ch for ch in (data.get('contacto_secundario') or '') if ch.isdigit())[-15:]
     email = (data.get('email') or '').strip().lower()
     if not contacto or len(contacto) < 8:
         return jsonify({'error': 'Ingresa un celular principal válido.'}), 400
@@ -1804,6 +1825,7 @@ def grupos_por_telefono():
         sugerido = max(clientes, key=lambda c: float(c.get('total_pagado') or 0))
         groups.append({
             'telefono': phone,
+            'pais': phone_country_label(phone),
             'total': len(clientes),
             'sin_titular': len(sin_titular),
             'titular_sugerido': sugerido.get('username'),
@@ -1811,6 +1833,8 @@ def grupos_por_telefono():
                 'username': c.get('username'),
                 'nombre': c.get('nombre'),
                 'contacto': c.get('contacto'),
+                'telefono_key': normalize_phone(c.get('contacto')),
+                'pais': phone_country_label(c.get('contacto')),
                 'vencimiento': c.get('vencimiento'),
                 'parent_username': c.get('parent_username') or '',
                 'total_pagado': c.get('total_pagado') or 0,
@@ -1851,6 +1875,7 @@ def clientes_duplicados():
             'nombre': row.get('nombre') or '',
             'contacto': row.get('contacto') or '',
             'telefono_key': normalize_phone(row.get('contacto')),
+            'pais': phone_country_label(row.get('contacto')),
             'vencimiento': row.get('vencimiento') or '',
             'parent_username': row.get('parent_username') or '',
             'total_pagado': row.get('total_pagado') or 0,

@@ -799,7 +799,7 @@ body {
       <div class="config-group">
         <label>Prefijo de país (sin +)</label>
         <input type="text" id="cfg-wa-prefijo" placeholder="502" maxlength="5">
-        <span class="config-hint">Guatemala = 502. Se antepone a los últimos 8 dígitos del contacto.</span>
+        <span class="config-hint">Si el contacto tiene 8 dígitos se usa este prefijo. Si ya trae código de país, se respeta completo.</span>
       </div>
     </div>
 
@@ -1060,6 +1060,14 @@ function escHtml(value) {
     '"': '&quot;',
     "'": '&#39;'
   }[ch]));
+}
+
+function normalizeWhatsAppPhone(value, defaultPrefix='502') {
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.length === 8) return `${defaultPrefix || '502'}${digits}`;
+  if (digits.length > 8) return digits;
+  return '';
 }
 
 // ── STATE ──────────────────────────────────────────────────────────────────
@@ -1569,8 +1577,7 @@ async function openModal(username) {
   // WhatsApp section
   const cfg = window._appConfig;
   const prefijo = cfg.wa_prefijo || '502';
-  const phone = (c.contacto || '').replace(/\D/g, '');
-  const waPhone = phone.length >= 8 ? prefijo + phone.slice(-8) : '';
+  const waPhone = normalizeWhatsAppPhone(c.contacto, prefijo);
   const waBase = waPhone ? `https://wa.me/${waPhone}` : '';
   const encMsg = t => encodeURIComponent(t);
   const nombreCliente = c.nombre || c.username;
@@ -1860,7 +1867,7 @@ async function loadPhoneGroups() {
     <div class="ops-task">
       <div class="ops-task-head" style="align-items:flex-start;">
         <div style="flex:1;min-width:260px;">
-          <div class="ops-task-title">📞 ${g.telefono} · ${g.total} clientes activos</div>
+          <div class="ops-task-title">📞 ${g.telefono} ${g.pais ? '· ' + g.pais : ''} · ${g.total} clientes activos</div>
           <div class="ops-task-meta">Sin titular asignado: ${g.sin_titular} · Sugerido: <b>${g.titular_sugerido}</b></div>
           <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <label style="font-size:12px;color:var(--muted);font-weight:800;">Elegir usuario principal</label>
@@ -1873,7 +1880,7 @@ async function loadPhoneGroups() {
               <div class="pay-row" style="cursor:pointer;" onclick="openModal('${c.username}')">
                 <div>
                   <div style="font-weight:800;">${c.nombre || c.username}</div>
-                  <div style="font-size:12px;color:var(--muted);font-family:monospace;">${c.username} · vence ${c.vencimiento || 'sin fecha'}${c.parent_username ? ' · titular: ' + c.parent_username : ''}</div>
+                  <div style="font-size:12px;color:var(--muted);font-family:monospace;">${c.username} · ${c.telefono_key || c.contacto || ''} ${c.pais ? '· ' + c.pais : ''} · vence ${c.vencimiento || 'sin fecha'}${c.parent_username ? ' · titular: ' + c.parent_username : ''}</div>
                 </div>
                 <span class="pay-amount">Q${parseFloat(c.total_pagado || 0).toLocaleString()}</span>
               </div>
@@ -1913,6 +1920,7 @@ function flattenDuplicateGroups(d) {
         username: c.username || '',
         contacto: c.contacto || '',
         telefono_key: c.telefono_key || '',
+        pais: c.pais || '',
         vencimiento: c.vencimiento || '',
         parent_username: c.parent_username || '',
         total_pagado: c.total_pagado || 0,
@@ -1941,7 +1949,7 @@ async function loadDuplicateClients(mode='grouped') {
       <div>
         <div style="font-weight:800;">${escHtml(c.nombre || c.username)}</div>
         <div style="font-size:12px;color:var(--muted);font-family:monospace;">
-          ${escHtml(c.username)} · Tel: ${escHtml(c.contacto || '—')} · vence ${escHtml(c.vencimiento || 'sin fecha')}${c.parent_username ? ' · titular: ' + escHtml(c.parent_username) : ''}
+          ${escHtml(c.username)} · Tel: ${escHtml(c.contacto || '—')} ${c.pais ? '· ' + escHtml(c.pais) : ''} · vence ${escHtml(c.vencimiento || 'sin fecha')}${c.parent_username ? ' · titular: ' + escHtml(c.parent_username) : ''}
         </div>
       </div>
       <span class="pay-amount">Q${parseFloat(c.total_pagado || 0).toLocaleString()}</span>
@@ -1982,6 +1990,7 @@ async function loadDuplicateClients(mode='grouped') {
               <th>Nombre</th>
               <th>Usuario</th>
               <th>Teléfono</th>
+              <th>País</th>
               <th>Vence</th>
               <th>Titular</th>
             </tr>
@@ -1994,6 +2003,7 @@ async function loadDuplicateClients(mode='grouped') {
                 <td>${escHtml(r.nombre || '—')}</td>
                 <td style="font-family:monospace;">${escHtml(r.username)}</td>
                 <td>${escHtml(r.contacto || '—')}</td>
+                <td>${escHtml(r.pais || '—')}</td>
                 <td>${escHtml(r.vencimiento || '—')}</td>
                 <td>${escHtml(r.parent_username || '—')}</td>
               </tr>
@@ -2034,6 +2044,7 @@ async function exportDuplicateClients() {
       'Usuario',
       'Teléfono',
       'Teléfono normalizado',
+      'País detectado',
       'Vencimiento',
       'Usuario titular',
       'Total pagado (Q)'
@@ -2046,13 +2057,14 @@ async function exportDuplicateClients() {
       r.username,
       r.contacto,
       r.telefono_key,
+      r.pais,
       r.vencimiento,
       r.parent_username,
       parseFloat(r.total_pagado || 0),
     ]));
 
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [20,24,14,30,24,18,18,16,24,16].map(w => ({wch: w}));
+    ws['!cols'] = [20,24,14,30,24,18,18,20,16,24,16].map(w => ({wch: w}));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Posibles duplicados');
     XLSX.writeFile(wb, `duplicados_clientes_fenix_${localDateStr()}.xlsx`);
@@ -2103,10 +2115,10 @@ function buildMigrationMessageFromDetail(d) {
 function buildMigrationUrlFromDetail(d) {
   const c = d.cliente || {};
   const cfg = window._appConfig || {};
-  const phone = (c.contacto || '').replace(/\D/g, '');
-  if (phone.length < 8) return '';
   const prefijo = cfg.wa_prefijo || '502';
-  const waBase = `https://wa.me/${prefijo + phone.slice(-8)}`;
+  const waPhone = normalizeWhatsAppPhone(c.contacto, prefijo);
+  if (!waPhone) return '';
+  const waBase = `https://wa.me/${waPhone}`;
   const msg = buildMigrationMessageFromDetail(d);
   return `${waBase}?text=${encodeURIComponent(msg)}`;
 }
