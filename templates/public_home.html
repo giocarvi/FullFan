@@ -101,6 +101,12 @@
       rgba(255,255,255,.025); box-shadow:0 24px 70px rgba(0,0,0,.22); }
     .devices-head { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:18px; }
     .devices-head .section-title { margin-bottom:8px; }
+    .app-video-card { display:grid; grid-template-columns:1.05fr .95fr; gap:18px; align-items:center; padding:18px; border:1px solid rgba(255,255,255,.12); border-radius:26px; background:linear-gradient(135deg,rgba(255,106,0,.09),rgba(124,58,237,.11)); margin:0 0 18px; box-shadow:0 18px 48px rgba(0,0,0,.22); }
+    .app-video-copy h3 { margin:0 0 8px; font-size:26px; letter-spacing:-.02em; }
+    .app-video-copy p { margin:0 0 14px; color:var(--muted); line-height:1.5; }
+    .app-video-copy ul { margin:0; padding:0; list-style:none; display:grid; gap:8px; color:#DDE7FF; font-size:14px; }
+    .app-video-copy li:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
+    .app-video { width:100%; aspect-ratio:16/9; display:block; border:1px solid rgba(255,255,255,.14); border-radius:20px; background:#020617; box-shadow:0 16px 40px rgba(0,0,0,.28); }
     .device-chips { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; min-width:260px; }
     .device-chip { color:#DDE7FF; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); border-radius:999px; padding:8px 10px; font-size:12px; font-weight:800; }
     .devices { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
@@ -200,6 +206,7 @@
       .plan-modes { grid-template-columns:1fr; }
       .devices-head { align-items:flex-start; flex-direction:column; }
       .device-chips { justify-content:flex-start; min-width:0; }
+      .app-video-card { grid-template-columns:1fr; }
       .devices { grid-template-columns:1fr 1fr; }
       .stats, .steps { grid-template-columns:1fr 1fr; }
       .sports-grid { grid-template-columns:1fr; }
@@ -449,6 +456,21 @@
             <span class="device-chip">📺 Smart TV</span>
             <span class="device-chip">💻 Computadora</span>
             <span class="device-chip">💬 Soporte guiado</span>
+          </div>
+        </div>
+        <div class="app-video-card">
+          <video class="app-video" controls preload="metadata" poster="{{ url_for('static', filename='apps/fenix-max-player-tutorial-poster.jpg') }}">
+            <source src="{{ url_for('static', filename='apps/fenix-max-player-tutorial.mp4') }}" type="video/mp4">
+            Tu navegador no soporta video HTML5.
+          </video>
+          <div class="app-video-copy">
+            <h3>Cómo usar Max Player con Fénix</h3>
+            <p>Una guía rápida para descargar la app, ingresar tus credenciales y empezar a disfrutar tu contenido.</p>
+            <ul>
+              <li>Ideal para clientes nuevos</li>
+              <li>Explica usuario, contraseña y portal</li>
+              <li>Lista para reproducirse desde la página</li>
+            </ul>
           </div>
         </div>
         <div class="devices">
