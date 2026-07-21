@@ -91,6 +91,10 @@
     .price { font-size:34px; font-weight:900; margin:14px 0 4px; }
     .usd { color:var(--muted); font-size:13px; margin-bottom:16px; }
     .local-price { color:var(--gold); font-size:14px; font-weight:800; margin-bottom:14px; min-height:20px; }
+    .family-price { margin:10px 0 14px; padding:12px; border:1px solid var(--border); border-radius:16px; background:rgba(255,200,87,.08); }
+    .family-price span { display:block; color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    .family-price b { display:block; color:var(--text); font-size:22px; margin:3px 0; }
+    .family-price small { display:block; color:var(--orange); font-weight:800; min-height:18px; }
     .currency-box { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:0 0 18px; padding:12px; border:1px solid var(--border); border-radius:16px; background:rgba(255,255,255,.04); color:var(--muted); }
     .currency-box select { width:auto; min-width:190px; padding:10px 12px; }
     .plan ul { padding:0; list-style:none; margin:0 0 18px; color:var(--muted); display:grid; gap:8px; font-size:14px; }
@@ -594,12 +598,12 @@
         <div class="plan-mode">
           <b>Plan individual</b>
           Hasta 3 dispositivos simultáneos con los precios publicados abajo.
-          <small>Ideal para uso personal o casa pequeña</small>
+          <small>Desde Q90 / US$11.99</small>
         </div>
         <div class="plan-mode active">
           <b>Plan familiar</b>
-          Hasta 6 dispositivos simultáneos para hogares con más pantallas.
-          <small>Disponible por WhatsApp</small>
+          Hasta 6 dispositivos simultáneos. Se calcula sumando el adicional familiar al plan individual.
+          <small>Desde Q150 / US$19.99</small>
         </div>
       </div>
       <div class="currency-box">
@@ -617,32 +621,36 @@
         <span id="currency-note">Valores referenciales sujetos a tipo de cambio.</span>
       </div>
       <div class="plans">
-        <div class="plan" data-usd="7.99" data-gtq="60">
+        <div class="plan" data-usd="11.99" data-gtq="90" data-family-usd="19.99" data-family-gtq="150">
           <h3>1 mes</h3>
-          <div class="price">US$7.99</div>
+          <div class="price">US$11.99</div>
           <div class="local-price"></div>
+          <div class="family-price"><span>Plan familiar · hasta 6 dispositivos</span><b>US$19.99</b><small class="family-local-price"></small></div>
           <ul><li>Plan individual</li><li>Hasta 3 dispositivos simultáneos</li><li>Soporte de instalación</li><li>Ideal para probar</li><li>Activación guiada por WhatsApp</li></ul>
           <a class="btn btn-ghost" href="#solicitar">Elegir</a>
         </div>
-        <div class="plan" data-usd="19.99" data-gtq="150">
+        <div class="plan" data-usd="28.99" data-gtq="225" data-family-usd="47.99" data-family-gtq="375">
           <h3>3 meses</h3>
-          <div class="price">US$19.99</div>
+          <div class="price">US$28.99</div>
           <div class="local-price"></div>
+          <div class="family-price"><span>Plan familiar · hasta 6 dispositivos</span><b>US$47.99</b><small class="family-local-price"></small></div>
           <ul><li>Plan individual</li><li>Mejor precio mensual</li><li>Hasta 3 dispositivos simultáneos</li><li>Activación guiada</li><li>Buena opción para renovar menos seguido</li></ul>
           <a class="btn btn-ghost" href="#solicitar">Elegir</a>
         </div>
-        <div class="plan featured" data-usd="32.99" data-gtq="250">
+        <div class="plan featured" data-usd="50.99" data-gtq="400" data-family-usd="82.99" data-family-gtq="650">
           <span class="badge">Popular</span>
           <h3>6 meses</h3>
-          <div class="price">US$32.99</div>
+          <div class="price">US$50.99</div>
           <div class="local-price"></div>
+          <div class="family-price"><span>Plan familiar · hasta 6 dispositivos</span><b>US$82.99</b><small class="family-local-price"></small></div>
           <ul><li>Plan individual</li><li>Excelente ahorro</li><li>Hasta 3 dispositivos simultáneos</li><li>Soporte por WhatsApp</li><li>Recomendado para clientes frecuentes</li></ul>
           <a class="btn btn-primary" href="#solicitar">Elegir</a>
         </div>
-        <div class="plan" data-usd="57.99" data-gtq="450">
+        <div class="plan" data-usd="89.99" data-gtq="700" data-family-usd="147.99" data-family-gtq="1150">
           <h3>12 meses</h3>
-          <div class="price">US$57.99</div>
+          <div class="price">US$89.99</div>
           <div class="local-price"></div>
+          <div class="family-price"><span>Plan familiar · hasta 6 dispositivos</span><b>US$147.99</b><small class="family-local-price"></small></div>
           <ul><li>Plan individual</li><li>Máximo ahorro anual</li><li>Hasta 3 dispositivos simultáneos</li><li>Renovación sencilla</li><li>Menor preocupación mes a mes</li></ul>
           <a class="btn btn-ghost" href="#solicitar">Elegir</a>
         </div>
@@ -929,7 +937,12 @@
         const gtq = Number(plan.dataset.gtq || 0);
         const local = cfg === LOCAL_CURRENCIES.GT && gtq ? gtq : usd * cfg.rate;
         const el = plan.querySelector('.local-price');
-        if (el) el.textContent = `aprox. ${formatLocal(local, cfg)} ${cfg.label}`;
+        if (el) el.textContent = `Individual: aprox. ${formatLocal(local, cfg)} ${cfg.label}`;
+        const familyUsd = Number(plan.dataset.familyUsd || 0);
+        const familyGtq = Number(plan.dataset.familyGtq || 0);
+        const familyLocal = cfg === LOCAL_CURRENCIES.GT && familyGtq ? familyGtq : familyUsd * cfg.rate;
+        const familyEl = plan.querySelector('.family-local-price');
+        if (familyEl) familyEl.textContent = `aprox. ${formatLocal(familyLocal, cfg)} ${cfg.label}`;
       });
       const note = document.getElementById('currency-note');
       if (note) note.textContent = `Tipo de cambio referencial. Precio base en dólares.`;
