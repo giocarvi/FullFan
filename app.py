@@ -1762,7 +1762,7 @@ def restaurar_maxplayer_cliente(username):
             username=service_username,
             iptv_user=service_username,
             iptv_pass=service_password,
-            password=service_username,
+            password=service_password,
             fullname=cliente.get('nombre') or username,
             user_email=''
         )
@@ -2395,7 +2395,7 @@ def api_update_activation_task(task_id):
                     username=xui_username,
                     iptv_user=xui_username,
                     iptv_pass=xui_password,
-                    password=xui_username,
+                    password=xui_password,
                     fullname=client_row.get('nombre') or task['username'],
                     user_email=''
                 )

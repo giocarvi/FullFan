@@ -1585,9 +1585,9 @@ async function openModal(username) {
   const expDate = c.vencimiento ? (d => `${String(d.getUTCDate()).padStart(2,'0')}-${_meses[d.getUTCMonth()]}-${d.getUTCFullYear()}`)(new Date(c.vencimiento)) : '';
   const portalUrl = 'https://www.fenixdigitaltv.net/cliente/login';
   const portalUser = c.username;
-  const portalPassword = c.username;
+  const portalPassword = service.service_password || c.username;
   const appUser = service.service_username || c.username;
-  const appPassword = appUser;
+  const appPassword = service.service_password || appUser;
   const waFill = (tpl) => (tpl || '')
     .replace(/\{nombre\}/g, nombreCliente)
     .replace(/\{fecha\}/g, expDate)
@@ -1645,22 +1645,22 @@ async function openModal(username) {
       <h3>Portal del cliente</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <span class="badge gray">Usuario: ${c.username}</span>
-        <span class="badge gray">Password temporal: ${c.username}</span>
+        <span class="badge gray">Password temporal: ${portalPassword}</span>
       </div>
       <button class="btn-secondary" onclick="restablecerPasswordPortal('${username}')">Restablecer contraseña del portal</button>
-      <div style="font-size:12px;color:var(--muted);margin-top:8px;">Deja el acceso activo y vuelve a poner la contraseña del portal igual al usuario. No modifica Max Player ni XUI.</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">Deja el acceso activo y vuelve a poner la contraseña del portal igual al password XUI guardado. No modifica XUI.</div>
     </div>
 
     <div class="pago-form">
       <h3>Max Player</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <span class="badge gray">Usuario: ${service.service_username || c.username}</span>
-        <span class="badge gray">Password app: ${service.service_username || c.username}</span>
+        <span class="badge gray">Password app: ${service.service_password || 'Sin password XUI'}</span>
         <span class="badge ${service.maxplayer_user_id ? 'green' : 'yellow'}">${service.maxplayer_user_id ? 'ID guardado' : 'Sin ID guardado'}</span>
         ${service.maxplayer_sync_status ? `<span class="badge gray">${service.maxplayer_sync_status}</span>` : ''}
       </div>
       <button class="btn-secondary" onclick="restaurarMaxPlayer('${username}', ${service.service_password ? 'true' : 'false'})">Restaurar usuario Max Player</button>
-      <div style="font-size:12px;color:var(--muted);margin-top:8px;">Borra el usuario anterior si lo encuentra y lo crea nuevamente. Max Player queda con password igual al usuario.</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;">Borra el usuario anterior si lo encuentra y lo crea nuevamente. Max Player queda con password igual al password XUI.</div>
     </div>
 
     <div class="pago-form" id="edit-form-${username}">
@@ -1716,7 +1716,7 @@ async function openModal(username) {
           <input type="password" id="edit-service-password" value="${service.service_password || ''}" placeholder="Password XUI/IPTV">
         </div>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">El portal del cliente muestra como password de Max Player el mismo usuario Max Player. El password XUI/IPTV queda solo para uso interno y sincronizacion.</div>
+      <div style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">El portal del cliente muestra el password XUI como contraseña Fénix y como contraseña de Max Player cuando se usa Migrar + Max Player.</div>
       <button class="btn-primary" onclick="guardarEdicion('${username}')">💾 Guardar cambios</button>
       ${esAdmin ? `<button class="btn-danger" style="background:var(--red);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-left:6px;" onclick="eliminarCliente('${username}', '${(c.nombre||username).replace(/'/g,"\\'") }')">🗑️ Eliminar cliente</button>` : ''}
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
@@ -1752,12 +1752,16 @@ async function openModal(username) {
   `;
 }
 
-async function ejecutarRestauracionMaxPlayer(username, hasSavedPassword = false) {
+async function ejecutarRestauracionMaxPlayer(username, hasSavedPassword = false, suppliedPassword = '') {
   const body = {};
-  if (!hasSavedPassword) {
+  let servicePassword = suppliedPassword || '';
+  if (!hasSavedPassword && !servicePassword) {
     const password = prompt(`Fenix no tiene guardado el password XUI/IPTV de ${username}.\n\nIngresa el password XUI/IPTV para guardarlo y restaurar Max Player:`);
     if (!password) return false;
-    body.service_password = password.trim();
+    servicePassword = password.trim();
+  }
+  if (servicePassword) {
+    body.service_password = servicePassword;
   }
   const r = await fetch(`/api/clientes/${username}/maxplayer/restore`, {
     method: 'POST',
@@ -1769,23 +1773,25 @@ async function ejecutarRestauracionMaxPlayer(username, hasSavedPassword = false)
     alert(d.error || 'No se pudo restaurar Max Player.');
     return false;
   }
-  return true;
+  return {ok: true, service_password: servicePassword};
 }
 
 async function restaurarMaxPlayer(username, hasSavedPassword = false) {
   if (!confirm(`Restaurar usuario Max Player para ${username}?\n\nSe buscara/borrara el usuario anterior si existe y se creara nuevamente.`)) return;
-  const ok = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
-  if (!ok) return;
+  const result = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
+  if (!result) return;
   showToast('Max Player restaurado');
   openModal(username);
 }
 
 async function migrarFenixConMaxPlayer(username, hasSavedPassword = false) {
   if (!confirm(`Enviar migración Fénix para ${username}?\n\nPrimero se restaurará/creará Max Player. Si todo sale bien, se abrirá WhatsApp con el mensaje listo.`)) return;
-  const ok = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
-  if (!ok) return;
+  const result = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
+  if (!result) return;
   showToast('Max Player listo. Abriendo WhatsApp...');
-  const url = window._migrationWaUrls && window._migrationWaUrls[username];
+  const detailR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
+  const detail = await detailR.json();
+  const url = detailR.ok ? buildMigrationUrlFromDetail(detail) : (window._migrationWaUrls && window._migrationWaUrls[username]);
   if (url) window.open(url, '_blank', 'noopener');
   openModal(username);
 }
@@ -2101,15 +2107,16 @@ function buildMigrationMessageFromDetail(d) {
   const _meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
   const expDate = c.vencimiento ? (date => `${String(date.getUTCDate()).padStart(2,'0')}-${_meses[date.getUTCMonth()]}-${date.getUTCFullYear()}`)(new Date(c.vencimiento)) : '';
   const appUser = service.service_username || c.username;
+  const xuiPassword = service.service_password || c.username;
   const tpl = cfg.wa_migracion || DEFAULT_MIGRATION_MESSAGE;
   return tpl
     .replace(/\{nombre\}/g, nombreCliente)
     .replace(/\{fecha\}/g, expDate)
     .replace(/\{portal\}/g, 'https://www.fenixdigitaltv.net/cliente/login')
     .replace(/\{usuario\}/g, c.username)
-    .replace(/\{password_portal\}/g, c.username)
+    .replace(/\{password_portal\}/g, xuiPassword)
     .replace(/\{app_usuario\}/g, appUser)
-    .replace(/\{app_password\}/g, appUser);
+    .replace(/\{app_password\}/g, xuiPassword);
 }
 
 function buildMigrationUrlFromDetail(d) {
@@ -2147,19 +2154,29 @@ async function migrarClienteDesdeLista(username, hasSavedPassword = false) {
     alert(detail.error || 'No se pudo cargar el cliente.');
     return;
   }
+  const currentService = detail.service || {};
+  let xuiPassword = currentService.service_password || '';
+  if (!xuiPassword) {
+    const password = prompt(`Fenix no tiene guardado el password XUI/IPTV de ${username}.\n\nIngresa el password XUI/IPTV para migrar, crear Max Player y enviar el mensaje:`);
+    if (!password) return;
+    xuiPassword = password.trim();
+  }
   await fetch(`/api/clientes/${encodeURIComponent(username)}/portal`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      portal_password: username,
+      portal_password: xuiPassword,
       enabled: true,
       service_username: (detail.service && detail.service.service_username) || username,
+      service_password: xuiPassword,
       expires_at: (detail.cliente && detail.cliente.vencimiento) || ''
     })
   });
-  const ok = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
-  if (!ok) return;
-  const url = buildMigrationUrlFromDetail(detail);
+  const result = await ejecutarRestauracionMaxPlayer(username, Boolean(currentService.service_password), xuiPassword);
+  if (!result) return;
+  const refreshedR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
+  const refreshed = await refreshedR.json();
+  const url = buildMigrationUrlFromDetail(refreshedR.ok ? refreshed : detail);
   if (url) window.open(url, '_blank', 'noopener');
   else alert('Max Player listo, pero este cliente no tiene teléfono válido para WhatsApp.');
   loadMigrationClients();
@@ -2171,19 +2188,20 @@ async function migrarUsuarioTecnico(username) {
   if (!detailR.ok) throw new Error(detail.error || `No se pudo cargar ${username}`);
   const service = detail.service || {};
   const client = detail.cliente || {};
+  if (!service.service_password) {
+    return { ok: false, skipped: true, reason: 'Sin password XUI/IPTV guardado', detail };
+  }
   await fetch(`/api/clientes/${encodeURIComponent(username)}/portal`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      portal_password: username,
+      portal_password: service.service_password,
       enabled: true,
       service_username: service.service_username || username,
+      service_password: service.service_password,
       expires_at: client.vencimiento || ''
     })
   });
-  if (!service.service_password) {
-    return { ok: false, skipped: true, reason: 'Sin password XUI/IPTV guardado', detail };
-  }
   const restoreR = await fetch(`/api/clientes/${encodeURIComponent(username)}/maxplayer/restore`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
