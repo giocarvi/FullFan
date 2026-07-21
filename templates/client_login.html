@@ -5,21 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Acceso cliente | Fénix Digital TV</title>
   <style>
-    :root { --bg:#070B18; --card:#111827; --text:#F8F7F2; --muted:#A8B3CF; --orange:#FF6A00; --gold:#FFC857; --border:rgba(255,255,255,.12); --red:#EF4444; }
+    :root { --bg:#F7F8FC; --card:#FFFFFF; --text:#111827; --muted:#5F6B7A; --orange:#FF6A00; --gold:#F6B73C; --border:rgba(17,24,39,.12); --red:#DC2626; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; display:grid; place-items:center; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; color:var(--text); background:
-      radial-gradient(circle at 20% 10%,rgba(255,106,0,.22),transparent 34%),
-      radial-gradient(circle at 85% 0%,rgba(124,58,237,.24),transparent 32%),
-      var(--bg); padding:20px; }
-    .card { width:min(430px,100%); border:1px solid var(--border); border-radius:28px; background:rgba(17,24,39,.86); padding:28px; box-shadow:0 24px 70px rgba(0,0,0,.36); }
+      radial-gradient(circle at 20% 10%,rgba(255,106,0,.10),transparent 34%),
+      radial-gradient(circle at 85% 0%,rgba(109,40,217,.08),transparent 32%),
+      linear-gradient(180deg,#FFFFFF 0%,#F7F8FC 54%,#FFFFFF 100%); padding:20px; }
+    .card { width:min(430px,100%); border:1px solid var(--border); border-radius:28px; background:linear-gradient(180deg,#FFFFFF,#F8FAFC); padding:28px; box-shadow:0 24px 70px rgba(15,23,42,.12); }
     .logo { width:130px; display:block; margin:0 0 20px; }
     h1 { margin:0 0 8px; font-size:34px; letter-spacing:-.04em; }
     p { margin:0 0 22px; color:var(--muted); line-height:1.5; }
     label { display:block; color:var(--muted); font-size:13px; font-weight:800; margin:14px 0 6px; }
-    input { width:100%; border:1px solid var(--border); background:rgba(7,11,24,.76); color:var(--text); border-radius:14px; padding:13px; font:inherit; }
+    input { width:100%; border:1px solid var(--border); background:#FFFFFF; color:var(--text); border-radius:14px; padding:13px; font:inherit; }
     button, .btn { width:100%; display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:999px; margin-top:18px; padding:13px 18px; font-weight:950; cursor:pointer; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#170B02; text-decoration:none; }
-    .ghost { background:rgba(255,255,255,.06); color:var(--text); border:1px solid var(--border); margin-top:10px; }
-    .error { border:1px solid rgba(239,68,68,.35); background:rgba(239,68,68,.12); color:#FCA5A5; border-radius:14px; padding:12px; margin-bottom:16px; font-size:14px; }
+    .ghost { background:#FFFFFF; color:var(--text); border:1px solid var(--border); margin-top:10px; box-shadow:0 8px 18px rgba(15,23,42,.05); }
+    .error { border:1px solid rgba(220,38,38,.25); background:rgba(220,38,38,.10); color:#B91C1C; border-radius:14px; padding:12px; margin-bottom:16px; font-size:14px; }
     @media (max-width:480px) {
       body { padding:14px; align-items:start; padding-top:28px; }
       .card { padding:22px 18px; border-radius:22px; }

@@ -5,43 +5,47 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mi cuenta | Fénix Digital TV</title>
   <style>
-    :root { --bg:#070B18; --card:#111827; --text:#F8F7F2; --muted:#A8B3CF; --orange:#FF6A00; --gold:#FFC857; --green:#10B981; --red:#EF4444; --border:rgba(255,255,255,.12); }
+    :root { --bg:#F7F8FC; --card:#FFFFFF; --text:#111827; --muted:#5F6B7A; --orange:#FF6A00; --gold:#F6B73C; --green:#059669; --red:#DC2626; --border:rgba(17,24,39,.12); --blue:#0B1B34; }
     * { box-sizing:border-box; }
-    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; color:var(--text); background:radial-gradient(circle at top left,rgba(255,106,0,.18),transparent 34%),var(--bg); min-height:100vh; }
+    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; color:var(--text); background:
+      radial-gradient(circle at top left,rgba(255,106,0,.10),transparent 34%),
+      radial-gradient(circle at 90% 8%,rgba(109,40,217,.08),transparent 30%),
+      linear-gradient(180deg,#FFFFFF 0%,#F7F8FC 54%,#FFFFFF 100%); min-height:100vh; }
     .wrap { width:min(980px,calc(100% - 32px)); margin:0 auto; }
-    header { border-bottom:1px solid var(--border); background:rgba(7,11,24,.8); backdrop-filter:blur(14px); }
+    header { border-bottom:1px solid rgba(255,255,255,.10); background:linear-gradient(135deg,#071426,#0B1B34 62%,#0E2446); box-shadow:0 12px 30px rgba(15,23,42,.16); }
     .nav { min-height:74px; display:flex; align-items:center; justify-content:space-between; gap:14px; }
     .logo { width:120px; max-height:54px; object-fit:contain; }
     a { color:inherit; text-decoration:none; }
-    .logout { color:var(--muted); font-size:14px; }
+    .logout { color:#C8D6EA; font-size:14px; }
+    .logout:hover { color:#FFFFFF; }
     .hero { padding:36px 0 20px; }
     h1 { font-size:clamp(32px,5vw,54px); letter-spacing:-.045em; margin:0 0 10px; }
     .lead { color:var(--muted); line-height:1.55; margin:0; }
     .grid { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; padding:18px 0 44px; }
-    .card { border:1px solid var(--border); border-radius:26px; padding:22px; background:rgba(17,24,39,.84); box-shadow:0 20px 60px rgba(0,0,0,.24); }
+    .card { border:1px solid var(--border); border-radius:26px; padding:22px; background:linear-gradient(180deg,#FFFFFF,#F8FAFC); box-shadow:0 18px 45px rgba(15,23,42,.08); }
     .status { display:inline-flex; border-radius:999px; padding:7px 11px; font-size:13px; font-weight:950; margin-bottom:12px; }
-    .status.activo { background:rgba(16,185,129,.16); color:#86EFAC; }
-    .status.vencido { background:rgba(239,68,68,.16); color:#FCA5A5; }
-    .status.pendiente { background:rgba(255,200,87,.16); color:var(--gold); }
+    .status.activo { background:rgba(5,150,105,.12); color:#047857; }
+    .status.vencido { background:rgba(220,38,38,.10); color:#B91C1C; }
+    .status.pendiente { background:rgba(246,183,60,.16); color:#9A4A00; }
     .fields { display:grid; gap:12px; margin-top:14px; }
-    .field { border:1px solid rgba(255,255,255,.1); border-radius:18px; padding:14px; background:rgba(255,255,255,.04); }
+    .field { border:1px solid rgba(17,24,39,.10); border-radius:18px; padding:14px; background:#FFFFFF; box-shadow:0 10px 22px rgba(15,23,42,.04); }
     .field small { display:block; color:var(--muted); font-size:12px; font-weight:850; margin-bottom:6px; }
     .field b { font-size:20px; word-break:break-word; }
     .copy-row { display:flex; gap:8px; align-items:center; }
     .copy-row b { flex:1; }
     label { display:block; color:var(--muted); font-size:12px; font-weight:850; margin:12px 0 6px; }
-    input { width:100%; border:1px solid var(--border); background:rgba(7,11,24,.74); color:var(--text); border-radius:14px; padding:12px; font:inherit; }
+    input { width:100%; border:1px solid var(--border); background:#FFFFFF; color:var(--text); border-radius:14px; padding:12px; font:inherit; }
     button, .btn { display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:999px; padding:11px 15px; font-weight:950; cursor:pointer; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#170B02; }
-    .copy { background:rgba(255,255,255,.08); color:var(--text); border:1px solid var(--border); padding:9px 12px; }
+    .copy { background:#F3F6FC; color:var(--text); border:1px solid var(--border); padding:9px 12px; }
     .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
-    .btn.ghost { background:rgba(255,255,255,.06); color:var(--text); border:1px solid var(--border); }
+    .btn.ghost { background:#FFFFFF; color:var(--text); border:1px solid var(--border); box-shadow:0 8px 18px rgba(15,23,42,.05); }
     table { width:100%; border-collapse:collapse; margin-top:10px; }
     td, th { text-align:left; border-bottom:1px solid var(--border); padding:10px 4px; font-size:14px; }
     th { color:var(--muted); font-size:12px; }
     .empty { color:var(--muted); padding:12px 0; }
     .message { display:none; border-radius:14px; padding:12px; margin-top:12px; font-size:14px; }
-    .message.ok { display:block; background:rgba(16,185,129,.14); color:#86EFAC; border:1px solid rgba(16,185,129,.25); }
-    .message.error { display:block; background:rgba(239,68,68,.14); color:#FCA5A5; border:1px solid rgba(239,68,68,.25); }
+    .message.ok { display:block; background:rgba(5,150,105,.10); color:#047857; border:1px solid rgba(5,150,105,.22); }
+    .message.error { display:block; background:rgba(220,38,38,.10); color:#B91C1C; border:1px solid rgba(220,38,38,.22); }
     @media (max-width:760px) {
       .wrap { width:min(100% - 24px,980px); }
       .grid { grid-template-columns:1fr; gap:14px; padding-bottom:28px; }
@@ -78,7 +82,7 @@
   <main class="wrap">
     <section class="hero">
       <h1>Hola, {{ client.nombre or client.username }}</h1>
-      <p class="lead">Aquí puedes consultar tu servicio, vencimiento y credenciales de acceso para tu app.</p>
+      <p class="lead">Aquí puedes consultar tu servicio, vencimiento y credenciales de acceso Fénix.</p>
     </section>
     <section class="grid">
       <div class="card" style="grid-column:1/-1;border-color:rgba(255,200,87,.28);">
@@ -109,7 +113,8 @@
         </div>
       </div>
       <div class="card">
-        <h2>Credenciales de acceso</h2>
+        <h2>Credenciales Max Player</h2>
+        <p class="lead" style="font-size:13px;margin-bottom:12px;">Únicamente para ingresar en la app Max Player.</p>
         <div class="fields">
           <div class="field">
             <small>Usuario {{ service.app_name or 'Max Player' }}</small>
@@ -120,15 +125,15 @@
             <div class="copy-row"><b id="service-pass">{{ service.service_username or 'Pendiente' }}</b><button class="copy" onclick="copyText('service-pass')">Copiar</button></div>
           </div>
         </div>
-        <h3 style="margin:18px 0 8px;">Credenciales XUI / IPTV</h3>
-        <p class="lead" style="font-size:13px;margin-bottom:12px;">Algunas apps pueden pedir estas credenciales directas.</p>
+        <h3 style="margin:18px 0 8px;">Credenciales Fénix</h3>
+        <p class="lead" style="font-size:13px;margin-bottom:12px;">No se pueden modificar. Son para ingresar en apps que solicitan usuario y password.</p>
         <div class="fields">
           <div class="field">
-            <small>Usuario XUI / IPTV</small>
+            <small>Usuario Fénix</small>
             <div class="copy-row"><b id="xui-user">{{ service.service_username or 'Pendiente' }}</b><button class="copy" onclick="copyText('xui-user')">Copiar</button></div>
           </div>
           <div class="field">
-            <small>Password XUI / IPTV</small>
+            <small>Password Fénix</small>
             <div class="copy-row"><b id="xui-pass">{{ service.service_password or 'Pendiente' }}</b><button class="copy" onclick="copyText('xui-pass')">Copiar</button></div>
           </div>
         </div>
