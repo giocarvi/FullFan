@@ -99,6 +99,20 @@
     .currency-box select { width:auto; min-width:190px; padding:10px 12px; }
     .plan ul { padding:0; list-style:none; margin:0 0 18px; color:var(--muted); display:grid; gap:8px; font-size:14px; }
     .plan li:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
+    .payment-shell { margin-top:22px; border:1px solid var(--border); border-radius:26px; padding:20px; background:linear-gradient(135deg,rgba(255,106,0,.08),rgba(124,58,237,.08)); }
+    .payment-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:14px; }
+    .payment-head h3 { margin:0 0 6px; font-size:26px; letter-spacing:-.025em; }
+    .payment-head p { margin:0; color:var(--muted); line-height:1.45; }
+    .payment-table { display:grid; gap:10px; }
+    .payment-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:center; border:1px solid var(--border); border-radius:18px; padding:12px; background:rgba(255,255,255,.045); }
+    .payment-row b { display:block; }
+    .payment-row small { color:var(--muted); }
+    .payment-buttons { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+    .payment-buttons .btn { padding:9px 12px; font-size:13px; }
+    .payment-buttons .disabled { opacity:.45; pointer-events:none; }
+    .paypal-public { margin-top:14px; border:1px solid var(--border); border-radius:18px; padding:14px; background:rgba(255,255,255,.045); }
+    .paypal-public h4 { margin:0 0 6px; font-size:18px; }
+    .paypal-public p { margin:0 0 10px; color:var(--muted); line-height:1.45; }
     .devices-shell { padding:22px; border:1px solid var(--border); border-radius:30px; background:
       radial-gradient(circle at 8% 0%,rgba(255,106,0,.16),transparent 30%),
       radial-gradient(circle at 92% 10%,rgba(124,58,237,.18),transparent 34%),
@@ -228,6 +242,9 @@
       .nav-actions .link { display:none; }
       .devices-shell { padding:16px; border-radius:24px; }
       .cards, .plans, .devices, .mini-grid { grid-template-columns:1fr; }
+      .payment-head { display:block; }
+      .payment-row { grid-template-columns:1fr; }
+      .payment-buttons { justify-content:stretch; }
       .stats, .steps, .event-grid { grid-template-columns:1fr; }
       .cta-band { flex-direction:column; align-items:flex-start; }
       .hero { padding:36px 0 28px; gap:22px; }
@@ -305,7 +322,7 @@
     header .link:hover {
       color:#FFFFFF;
     }
-    .link, .nav-links, .lead, .section-sub, .card p, .feature, .usd, .plan ul, .device, .step p, .event, .premium-list div, .audience-card, details p, footer {
+    .link, .nav-links, .lead, .section-sub, .card p, .feature, .usd, .plan ul, .device, .step p, .event, .premium-list div, .audience-card, details p, footer, .payment-head p, .payment-row small, .paypal-public p {
       color:var(--muted);
     }
     .nav-links a:hover, .device span, .local-price, .reseller-price, .tile-icon {
@@ -332,12 +349,12 @@
       border:1px solid rgba(17,24,39,.14);
       box-shadow:0 8px 18px rgba(15,23,42,.05);
     }
-    .chip, .stat, .card, .plan-mode, .plan, .device, .step, details, .premium-list div, .audience-card, .event, .currency-box {
+    .chip, .stat, .card, .plan-mode, .plan, .device, .step, details, .premium-list div, .audience-card, .event, .currency-box, .payment-row, .paypal-public {
       background:#FFFFFF;
       border-color:rgba(17,24,39,.12);
       box-shadow:var(--soft-shadow);
     }
-    .hero-card, .devices-shell, .showcase, .reseller, .formbox {
+    .hero-card, .devices-shell, .showcase, .reseller, .formbox, .payment-shell {
       background:linear-gradient(180deg,#FFFFFF,#F8FAFC);
       border-color:rgba(17,24,39,.12);
       box-shadow:var(--deep-shadow);
@@ -665,6 +682,42 @@
         </div>
       </div>
       <p class="section-sub" style="margin-top:16px;font-size:14px;">La activación se realiza manualmente después de validar datos y pago. Durante horario de atención, el equipo te guía para que empieces lo antes posible.</p>
+      <div class="payment-shell" id="pagos">
+        <div class="payment-head">
+          <div>
+            <h3>Paga en línea</h3>
+            <p>Elige Recurrente para pagar con tarjeta o transferencia según disponibilidad. Para pagos internacionales, también tenemos PayPal.</p>
+          </div>
+          <a class="btn btn-ghost" href="/cliente/login">Ya soy cliente</a>
+        </div>
+        <div class="payment-table">
+          {% for plan in payment_plans %}
+          <div class="payment-row">
+            <div>
+              <b>{{ plan.label }}</b>
+              <small>Activación manual después de validar pago</small>
+            </div>
+            <div>
+              <b>Individual{% if plan.individual_gtq %} · Q{{ plan.individual_gtq }}{% endif %}</b>
+              <small>Hasta 3 dispositivos simultáneos</small>
+              <b style="margin-top:6px;">Familiar{% if plan.family_gtq %} · Q{{ plan.family_gtq }}{% else %} · consultar{% endif %}</b>
+              <small>Hasta 6 dispositivos simultáneos</small>
+            </div>
+            <div class="payment-buttons">
+              <a class="btn btn-ghost" target="_blank" rel="noopener" href="{{ plan.recurrente_individual }}">Recurrente individual</a>
+              <a class="btn btn-ghost {% if not plan.recurrente_family %}disabled{% endif %}" target="_blank" rel="noopener" href="{{ plan.recurrente_family or '#' }}">Recurrente familiar</a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% if paypal_client_id and paypal_hosted_button_id %}
+        <div class="paypal-public">
+          <h4>PayPal internacional</h4>
+          <p>Usa este botón si prefieres pagar con PayPal. Si necesitas un plan específico, escríbenos por WhatsApp para confirmarlo.</p>
+          <div id="paypal-container-public"></div>
+        </div>
+        {% endif %}
+      </div>
     </section>
 
     <section class="wrap" id="dispositivos">
@@ -864,6 +917,9 @@
     <div class="wrap">© 2026 Fénix Digital TV. Tu entretenimiento, sin fronteras. Servicio sujeto a disponibilidad técnica por dispositivo y país.</div>
   </footer>
 
+  {% if paypal_client_id and paypal_hosted_button_id %}
+  <script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&components=hosted-buttons&disable-funding=venmo&currency=USD"></script>
+  {% endif %}
   <script>
     const LOCAL_CURRENCIES = {
       GT: { label: 'Quetzales', symbol: 'Q', rate: 7.8, locale: 'es-GT' },
@@ -919,6 +975,12 @@
       const select = document.getElementById('currency-country');
       if (select) select.value = guessCountry();
       updateLocalPrices();
+      const paypalContainer = document.getElementById('paypal-container-public');
+      if (paypalContainer && window.paypal?.HostedButtons) {
+        paypal.HostedButtons({
+          hostedButtonId: "{{ paypal_hosted_button_id }}",
+        }).render("#paypal-container-public");
+      }
     });
 
     function sendLead(e) {

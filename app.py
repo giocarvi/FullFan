@@ -74,6 +74,64 @@ USD_GTQ_RATE = float(os.environ.get('USD_GTQ_RATE', '7.80'))
 MAXPLAYER_API_BASE = os.environ.get('MAXPLAYER_API_BASE', 'https://api.maxplayer.tv/v3/api/public').rstrip('/')
 MAXPLAYER_API_TOKEN = os.environ.get('MAXPLAYER_API_TOKEN', '')
 MAXPLAYER_DOMAIN_ID = os.environ.get('MAXPLAYER_DOMAIN_ID', '')
+PAYPAL_CLIENT_ID = os.environ.get(
+    'PAYPAL_CLIENT_ID',
+    'BAAysVQngxEwR-B24HNggrsLWDm0VZjMaXvQkcVhBrU2vRG5_2nU9mRJNJYNIzmxZeQT5qok6JuVWHI0NE'
+)
+PAYPAL_HOSTED_BUTTON_ID = os.environ.get('PAYPAL_HOSTED_BUTTON_ID', 'EQVWPWA4RD6Y4')
+
+PAYMENT_PLANS = [
+    {
+        'months': 1,
+        'label': '1 mes',
+        'individual_gtq': 90,
+        'individual_usd': 'US$11.99',
+        'family_gtq': 150,
+        'family_usd': 'US$19.99',
+        'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/1-mes-individual-fenix-digital-tv',
+        'recurrente_family': 'https://app.recurrente.com/s/fenixdigitaltv/1-mes-familiar-fenix-digital-tv',
+    },
+    {
+        'months': 3,
+        'label': '3 meses',
+        'individual_gtq': 225,
+        'individual_usd': 'US$28.99',
+        'family_gtq': 375,
+        'family_usd': 'US$47.99',
+        'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/3-meses-individual-fenix-digital-tv',
+        'recurrente_family': 'https://app.recurrente.com/s/fenixdigitaltv/3-meses-familiar-fenix-digital-tv',
+    },
+    {
+        'months': 6,
+        'label': '6 meses',
+        'individual_gtq': 400,
+        'individual_usd': 'US$50.99',
+        'family_gtq': 650,
+        'family_usd': 'US$82.99',
+        'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/6-meses-individual-fenix-digital-tv',
+        'recurrente_family': 'https://app.recurrente.com/s/fenixdigitaltv/6-meses-familiar-fenix-digital-tv',
+    },
+    {
+        'months': 12,
+        'label': '12 meses',
+        'individual_gtq': 700,
+        'individual_usd': 'US$89.99',
+        'family_gtq': 1150,
+        'family_usd': 'US$147.99',
+        'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/12-meses-individual-fenix-digital-tv',
+        'recurrente_family': 'https://app.recurrente.com/s/fenixdigitaltv/12-meses-familiar-fenix-digital-tv',
+    },
+    {
+        'months': 18,
+        'label': '18 meses',
+        'individual_gtq': None,
+        'individual_usd': 'Consultar',
+        'family_gtq': None,
+        'family_usd': 'Consultar',
+        'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/18-meses-individual-fenix-digital-tv',
+        'recurrente_family': '',
+    },
+]
 
 def hash_password(password):
     return generate_password_hash(password)
@@ -907,7 +965,12 @@ def service_status(expires_at):
 # ── AUTH ──────────────────────────────────────────────────────────────────────
 @app.route('/inicio')
 def public_home():
-    return render_template('public_home.html')
+    return render_template(
+        'public_home.html',
+        payment_plans=PAYMENT_PLANS,
+        paypal_client_id=PAYPAL_CLIENT_ID,
+        paypal_hosted_button_id=PAYPAL_HOSTED_BUTTON_ID
+    )
 
 
 @app.route('/')
@@ -1346,7 +1409,10 @@ def client_portal():
                            parent=parent,
                            asociados=asociados,
                            expires_at=expires_at,
-                           status=status)
+                           status=status,
+                           payment_plans=PAYMENT_PLANS,
+                           paypal_client_id=PAYPAL_CLIENT_ID,
+                           paypal_hosted_button_id=PAYPAL_HOSTED_BUTTON_ID)
 
 
 @app.route('/api/cliente/cambiar-password', methods=['POST'])

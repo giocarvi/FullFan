@@ -54,6 +54,17 @@
     .assoc-item b { display:block; }
     .assoc-item small { color:var(--muted); }
     .assoc-status { white-space:nowrap; border-radius:999px; padding:6px 9px; font-size:12px; font-weight:950; background:#EAF2FF; color:#0B1B34; }
+    .payment-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:14px; }
+    .payment-plan { border:1px solid rgba(17,24,39,.10); border-radius:18px; padding:14px; background:#FFFFFF; box-shadow:0 10px 22px rgba(15,23,42,.04); }
+    .payment-plan h3 { margin:0 0 6px; font-size:19px; }
+    .payment-prices { display:grid; gap:8px; margin:10px 0 12px; color:var(--muted); font-size:13px; }
+    .payment-prices b { color:var(--text); font-size:16px; }
+    .payment-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .payment-actions .btn { padding:10px 11px; font-size:13px; width:100%; }
+    .payment-actions .disabled { opacity:.45; pointer-events:none; }
+    .payment-note { color:var(--muted); font-size:13px; line-height:1.45; margin:12px 0 0; }
+    .paypal-box { margin-top:16px; border:1px solid rgba(17,24,39,.10); border-radius:18px; padding:14px; background:#FFFFFF; box-shadow:0 10px 22px rgba(15,23,42,.04); }
+    .paypal-box h3 { margin:0 0 6px; }
     @media (max-width:760px) {
       .wrap { width:min(100% - 24px,980px); }
       .grid { grid-template-columns:1fr; gap:14px; padding-bottom:28px; }
@@ -70,6 +81,8 @@
       .copy { min-width:72px; }
       .actions { display:grid; grid-template-columns:1fr; gap:9px; }
       .actions .btn, button, .btn { width:100%; min-height:44px; }
+      .payment-grid { grid-template-columns:1fr; }
+      .payment-actions { grid-template-columns:1fr; }
       input { font-size:16px; min-height:44px; }
       table { display:block; overflow-x:auto; white-space:nowrap; }
       td, th { padding:10px 8px; }
@@ -119,6 +132,33 @@
           <a class="btn" target="_blank" rel="noopener" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%2C%20quiero%20renovar%20mi%20servicio.%20Mi%20usuario%20es%20{{ client.username | urlencode }}">Renovar por WhatsApp</a>
           <a class="btn ghost" href="/dispositivo/android-ios">Ver guía de instalación</a>
         </div>
+      </div>
+      <div class="card" style="grid-column:1/-1;">
+        <h2>Renovar en línea</h2>
+        <p class="lead" style="font-size:14px;">Elige tu plan y paga con Recurrente. Si estás fuera de Guatemala o prefieres PayPal, usa el botón internacional al final.</p>
+        <div class="payment-grid">
+          {% for plan in payment_plans %}
+          <div class="payment-plan">
+            <h3>{{ plan.label }}</h3>
+            <div class="payment-prices">
+              <span>Individual · hasta 3 dispositivos: <b>{% if plan.individual_gtq %}Q{{ plan.individual_gtq }}{% else %}{{ plan.individual_usd }}{% endif %}</b></span>
+              <span>Familiar · hasta 6 dispositivos: <b>{% if plan.family_gtq %}Q{{ plan.family_gtq }}{% else %}{{ plan.family_usd }}{% endif %}</b></span>
+            </div>
+            <div class="payment-actions">
+              <a class="btn ghost" target="_blank" rel="noopener" href="{{ plan.recurrente_individual }}">Pagar individual</a>
+              <a class="btn ghost {% if not plan.recurrente_family %}disabled{% endif %}" target="_blank" rel="noopener" href="{{ plan.recurrente_family or '#' }}">Pagar familiar</a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="payment-note">Después del pago, si tu renovación no se refleja de inmediato, escríbenos por WhatsApp con tu usuario: <b>{{ client.username }}</b>.</p>
+        {% if paypal_client_id and paypal_hosted_button_id %}
+        <div class="paypal-box">
+          <h3>Pago internacional con PayPal</h3>
+          <p class="lead" style="font-size:14px;margin-bottom:12px;">Usa esta opción si prefieres pagar con PayPal. Si necesitas un plan específico, confirma por WhatsApp antes o después del pago.</p>
+          <div id="paypal-container-client"></div>
+        </div>
+        {% endif %}
       </div>
       <div class="card">
         <h2>Credenciales Max Player</h2>
@@ -268,5 +308,17 @@
       msg.textContent = 'Contraseña actualizada correctamente.';
     }
   </script>
+  {% if paypal_client_id and paypal_hosted_button_id %}
+  <script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&components=hosted-buttons&disable-funding=venmo&currency=USD"></script>
+  <script>
+    window.addEventListener('load', () => {
+      const container = document.getElementById('paypal-container-client');
+      if (!container || !window.paypal?.HostedButtons) return;
+      paypal.HostedButtons({
+        hostedButtonId: "{{ paypal_hosted_button_id }}",
+      }).render("#paypal-container-client");
+    });
+  </script>
+  {% endif %}
 </body>
 </html>
