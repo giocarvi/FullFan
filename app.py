@@ -963,10 +963,11 @@ DEVICE_GUIDES = {
         ]
     },
     'firestick': {
-        'title': 'Firestick',
+        'title': 'Amazon Firestick / Android Stick / TV Box Android',
         'app': 'Max Player / XD+',
         'icon': '🔥',
         'logo': 'apps/max-player.webp',
+        'hero_image': 'landing/device-firestick.webp',
         'steps': [
             'Conecta tu Firestick a internet.',
             'Busca Max Player desde tu tienda o método de instalación disponible.',
@@ -978,6 +979,35 @@ DEVICE_GUIDES = {
         'tips': ['Mantén espacio libre en el Firestick.', 'Si usas Downloader, confirma que el código sea 8813174.', 'Reinicia el dispositivo si una app queda congelada.'],
         'links': [
             {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+        ],
+        'app_options': [
+            {
+                'title': 'Opción 1 · Max Player',
+                'subtitle': 'Disponible para Amazon Firestick, Android Stick y TV Box Android.',
+                'logo': 'apps/max-player.webp',
+                'steps': [
+                    'Conecta tu dispositivo a internet.',
+                    'Busca Max Player desde la tienda o método de instalación disponible.',
+                    'Instala la app y ábrela.',
+                    'Solicita tus datos de acceso por WhatsApp.',
+                    'Ingresa usuario y contraseña y prueba un canal.'
+                ],
+                'links': [
+                    {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+                ]
+            },
+            {
+                'title': 'Opción 2 · XD Plus',
+                'subtitle': 'Disponible para Amazon Firestick, Android Stick y TV Box Android.',
+                'logo': 'apps/xd-plus.webp',
+                'steps': [
+                    'Descarga e instala la app Downloader en tu dispositivo.',
+                    'Abre Downloader y escribe el código 8813174.',
+                    'Instala XD Plus y abre la aplicación.',
+                    'Escríbenos por WhatsApp para confirmar tus datos de acceso.'
+                ],
+                'links': []
+            }
         ]
     },
     'samsung-lg': {
