@@ -261,6 +261,201 @@
       .device-chip { font-size:11px; }
     }
   </style>
+  <style>
+    :root {
+      --bg:#F7F8FC;
+      --card:#FFFFFF;
+      --card2:#F2F5FA;
+      --text:#111827;
+      --muted:#5F6B7A;
+      --orange:#FF6A00;
+      --gold:#F6B73C;
+      --purple:#6D28D9;
+      --green:#059669;
+      --border:rgba(17,24,39,.12);
+      --soft-shadow:0 18px 45px rgba(15,23,42,.08);
+      --deep-shadow:0 24px 70px rgba(15,23,42,.12);
+    }
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(255,106,0,.12), transparent 34%),
+        radial-gradient(circle at 88% 8%, rgba(109,40,217,.10), transparent 30%),
+        linear-gradient(180deg,#FFFFFF 0%,#F7F8FC 48%,#FFFFFF 100%);
+      color:var(--text);
+    }
+    header {
+      background:rgba(255,255,255,.88);
+      border-bottom:1px solid rgba(17,24,39,.10);
+      box-shadow:0 8px 24px rgba(15,23,42,.05);
+    }
+    .link, .nav-links, .lead, .section-sub, .card p, .feature, .usd, .plan ul, .device, .step p, .event, .premium-list div, .audience-card, details p, footer {
+      color:var(--muted);
+    }
+    .nav-links a:hover, .device span, .local-price, .reseller-price, .tile-icon {
+      color:var(--orange);
+    }
+    .gradient {
+      background:linear-gradient(135deg,#111827,var(--orange),var(--purple));
+      -webkit-background-clip:text;
+      color:transparent;
+    }
+    .eyebrow {
+      color:#9A4A00;
+      border-color:rgba(255,106,0,.22);
+      background:#FFF4E8;
+    }
+    .btn-primary {
+      background:linear-gradient(135deg,var(--orange),var(--gold));
+      color:#160B02;
+      box-shadow:0 14px 32px rgba(255,106,0,.22);
+    }
+    .btn-ghost {
+      color:var(--text);
+      background:#FFFFFF;
+      border:1px solid rgba(17,24,39,.14);
+      box-shadow:0 8px 18px rgba(15,23,42,.05);
+    }
+    .chip, .stat, .card, .plan-mode, .plan, .device, .step, details, .premium-list div, .audience-card, .event, .currency-box {
+      background:#FFFFFF;
+      border-color:rgba(17,24,39,.12);
+      box-shadow:var(--soft-shadow);
+    }
+    .hero-card, .devices-shell, .showcase, .reseller, .formbox {
+      background:linear-gradient(180deg,#FFFFFF,#F8FAFC);
+      border-color:rgba(17,24,39,.12);
+      box-shadow:var(--deep-shadow);
+    }
+    .image-card, .sports-image {
+      border-color:rgba(17,24,39,.10);
+      box-shadow:var(--soft-shadow);
+    }
+    .screen {
+      background:
+        radial-gradient(circle at 82% 80%, rgba(255,106,0,.14), transparent 35%),
+        linear-gradient(135deg,#FFFFFF,#F3F6FC);
+      border-color:rgba(17,24,39,.12);
+    }
+    .screen h2, .screen p { color:var(--text); }
+    .mini {
+      background:#FFFFFF;
+      border-color:rgba(17,24,39,.10);
+      color:var(--muted);
+      box-shadow:0 10px 22px rgba(15,23,42,.06);
+    }
+    .mini b, .stat b {
+      color:var(--orange);
+    }
+    .cards .card, .plan, .device, .step {
+      transition:.18s ease;
+    }
+    .cards .card:hover, .plan:hover, .step:hover {
+      transform:translateY(-3px);
+      box-shadow:0 24px 55px rgba(15,23,42,.11);
+    }
+    .plan {
+      background:linear-gradient(180deg,#FFFFFF,#F8FAFC);
+    }
+    .plan.featured {
+      border-color:rgba(255,106,0,.46);
+      box-shadow:0 22px 60px rgba(255,106,0,.12);
+    }
+    .badge {
+      background:linear-gradient(135deg,var(--orange),var(--gold));
+    }
+    .currency-box select, input, select, textarea {
+      background:#FFFFFF;
+      color:var(--text);
+      border-color:rgba(17,24,39,.14);
+    }
+    .devices-shell {
+      background:
+        radial-gradient(circle at 8% 0%,rgba(255,106,0,.10),transparent 30%),
+        radial-gradient(circle at 92% 10%,rgba(109,40,217,.10),transparent 34%),
+        #FFFFFF;
+    }
+    .device {
+      background:linear-gradient(180deg,#FFFFFF,#F8FAFC);
+      border-color:rgba(17,24,39,.12);
+      box-shadow:var(--soft-shadow);
+    }
+    .device:hover {
+      border-color:rgba(255,106,0,.38);
+      background:#FFFFFF;
+      box-shadow:0 22px 52px rgba(15,23,42,.12);
+    }
+    .device b, .plan-mode b, .audience-card b, .premium-list strong, .event b, summary {
+      color:var(--text);
+    }
+    .device small {
+      color:#5B21B6;
+      background:#F3E8FF;
+      border-color:#DDD6FE;
+    }
+    .device-scene {
+      background:
+        radial-gradient(circle at 16% 16%,rgba(255,183,60,.22),transparent 30%),
+        radial-gradient(circle at 86% 86%,rgba(109,40,217,.16),transparent 34%),
+        linear-gradient(135deg,#FFF7ED,#EEF2FF);
+      border-color:rgba(17,24,39,.10);
+    }
+    .brand-logo, .support-logo {
+      background:rgba(255,255,255,.82);
+      border-color:rgba(17,24,39,.10);
+    }
+    .tile {
+      box-shadow:0 16px 36px rgba(15,23,42,.12);
+    }
+    .sports-card, .reseller {
+      background:
+        radial-gradient(circle at 20% 10%, rgba(255,183,60,.16), transparent 34%),
+        linear-gradient(135deg,#FFFFFF,#F8FAFC);
+    }
+    .sports-image:after {
+      background:linear-gradient(90deg,rgba(255,255,255,.94),rgba(255,255,255,.36));
+    }
+    .sports-image-content .section-title,
+    .sports-image-content .section-sub {
+      color:var(--text);
+      text-shadow:none;
+    }
+    .reseller-package {
+      background:#FFFFFF;
+      border-color:rgba(17,24,39,.12);
+      box-shadow:var(--soft-shadow);
+    }
+    .reseller-package.featured {
+      border-color:rgba(255,106,0,.46);
+      box-shadow:0 22px 60px rgba(255,106,0,.12);
+    }
+    .cta-band {
+      color:#FFFFFF;
+    }
+    .cta-band p, .cta-band a {
+      color:rgba(255,255,255,.9);
+    }
+    .cta-band .btn-primary {
+      background:#FFFFFF;
+      color:#7C2D12;
+    }
+    footer {
+      background:#FFFFFF;
+      border-top-color:rgba(17,24,39,.10);
+    }
+    @media (max-width:560px) {
+      header { position:relative; }
+      .hero-card { padding:12px; }
+      .stats { gap:10px; }
+      .stat { padding:14px 10px; }
+      .section-sub { line-height:1.6; }
+      .cards .card, .plan, .device, .step, details { box-shadow:0 12px 28px rgba(15,23,42,.07); }
+      .nav-actions {
+        grid-template-columns:1fr;
+      }
+      .nav-actions .btn {
+        width:100%;
+      }
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -456,21 +651,6 @@
             <span class="device-chip">📺 Smart TV</span>
             <span class="device-chip">💻 Computadora</span>
             <span class="device-chip">💬 Soporte guiado</span>
-          </div>
-        </div>
-        <div class="app-video-card">
-          <video class="app-video" controls preload="metadata" poster="{{ url_for('static', filename='apps/fenix-max-player-tutorial-poster.jpg') }}">
-            <source src="{{ url_for('static', filename='apps/fenix-max-player-tutorial.mp4') }}" type="video/mp4">
-            Tu navegador no soporta video HTML5.
-          </video>
-          <div class="app-video-copy">
-            <h3>Cómo usar Max Player con Fénix</h3>
-            <p>Una guía rápida para descargar la app, ingresar tus credenciales y empezar a disfrutar tu contenido.</p>
-            <ul>
-              <li>Ideal para clientes nuevos</li>
-              <li>Explica usuario, contraseña y portal</li>
-              <li>Lista para reproducirse desde la página</li>
-            </ul>
           </div>
         </div>
         <div class="devices">
