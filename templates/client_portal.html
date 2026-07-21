@@ -65,6 +65,8 @@
     .payment-note { color:var(--muted); font-size:13px; line-height:1.45; margin:12px 0 0; }
     .paypal-box { margin-top:16px; border:1px solid rgba(17,24,39,.10); border-radius:18px; padding:14px; background:#FFFFFF; box-shadow:0 10px 22px rgba(15,23,42,.04); }
     .paypal-box h3 { margin:0 0 6px; }
+    .paypal-plan-buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
+    .paypal-plan-buttons > div { min-width:0; }
     @media (max-width:760px) {
       .wrap { width:min(100% - 24px,980px); }
       .grid { grid-template-columns:1fr; gap:14px; padding-bottom:28px; }
@@ -83,6 +85,7 @@
       .actions .btn, button, .btn { width:100%; min-height:44px; }
       .payment-grid { grid-template-columns:1fr; }
       .payment-actions { grid-template-columns:1fr; }
+      .paypal-plan-buttons { grid-template-columns:1fr; }
       input { font-size:16px; min-height:44px; }
       table { display:block; overflow-x:auto; white-space:nowrap; }
       td, th { padding:10px 8px; }
@@ -148,17 +151,16 @@
               <a class="btn ghost" target="_blank" rel="noopener" href="{{ plan.recurrente_individual }}">Pagar individual</a>
               <a class="btn ghost {% if not plan.recurrente_family %}disabled{% endif %}" target="_blank" rel="noopener" href="{{ plan.recurrente_family or '#' }}">Pagar familiar</a>
             </div>
+            {% if plan.paypal_individual or plan.paypal_family %}
+            <div class="paypal-plan-buttons">
+              {% if plan.paypal_individual %}<div id="paypal-client-{{ plan.paypal_individual }}"></div>{% endif %}
+              {% if plan.paypal_family %}<div id="paypal-client-{{ plan.paypal_family }}"></div>{% endif %}
+            </div>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
         <p class="payment-note">Después del pago, si tu renovación no se refleja de inmediato, escríbenos por WhatsApp con tu usuario: <b>{{ client.username }}</b>.</p>
-        {% if paypal_client_id and paypal_hosted_button_id %}
-        <div class="paypal-box">
-          <h3>Pago internacional con PayPal</h3>
-          <p class="lead" style="font-size:14px;margin-bottom:12px;">Usa esta opción si prefieres pagar con PayPal. Si necesitas un plan específico, confirma por WhatsApp antes o después del pago.</p>
-          <div id="paypal-container-client"></div>
-        </div>
-        {% endif %}
       </div>
       <div class="card">
         <h2>Credenciales Max Player</h2>
@@ -312,11 +314,19 @@
   <script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&components=hosted-buttons&disable-funding=venmo&currency=USD"></script>
   <script>
     window.addEventListener('load', () => {
-      const container = document.getElementById('paypal-container-client');
-      if (!container || !window.paypal?.HostedButtons) return;
-      paypal.HostedButtons({
-        hostedButtonId: "{{ paypal_hosted_button_id }}",
-      }).render("#paypal-container-client");
+      if (!window.paypal?.HostedButtons) return;
+      const hostedButtons = [
+        {% for plan in payment_plans %}
+          {% if plan.paypal_individual %}"{{ plan.paypal_individual }}",{% endif %}
+          {% if plan.paypal_family %}"{{ plan.paypal_family }}",{% endif %}
+        {% endfor %}
+      ];
+      hostedButtons.forEach((id) => {
+        const selector = `#paypal-client-${id}`;
+        if (document.querySelector(selector)) {
+          paypal.HostedButtons({ hostedButtonId: id }).render(selector);
+        }
+      });
     });
   </script>
   {% endif %}

@@ -110,6 +110,8 @@
     .payment-buttons { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
     .payment-buttons .btn { padding:9px 12px; font-size:13px; }
     .payment-buttons .disabled { opacity:.45; pointer-events:none; }
+    .paypal-plan-buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; grid-column:1/-1; margin-top:4px; }
+    .paypal-plan-buttons > div { min-width:0; }
     .paypal-public { margin-top:14px; border:1px solid var(--border); border-radius:18px; padding:14px; background:rgba(255,255,255,.045); }
     .paypal-public h4 { margin:0 0 6px; font-size:18px; }
     .paypal-public p { margin:0 0 10px; color:var(--muted); line-height:1.45; }
@@ -245,6 +247,7 @@
       .payment-head { display:block; }
       .payment-row { grid-template-columns:1fr; }
       .payment-buttons { justify-content:stretch; }
+      .paypal-plan-buttons { grid-template-columns:1fr; }
       .stats, .steps, .event-grid { grid-template-columns:1fr; }
       .cta-band { flex-direction:column; align-items:flex-start; }
       .hero { padding:36px 0 28px; gap:22px; }
@@ -707,16 +710,19 @@
               <a class="btn btn-ghost" target="_blank" rel="noopener" href="{{ plan.recurrente_individual }}">Recurrente individual</a>
               <a class="btn btn-ghost {% if not plan.recurrente_family %}disabled{% endif %}" target="_blank" rel="noopener" href="{{ plan.recurrente_family or '#' }}">Recurrente familiar</a>
             </div>
+            {% if plan.paypal_individual or plan.paypal_family %}
+            <div class="paypal-plan-buttons">
+              {% if plan.paypal_individual %}<div id="paypal-public-{{ plan.paypal_individual }}"></div>{% endif %}
+              {% if plan.paypal_family %}<div id="paypal-public-{{ plan.paypal_family }}"></div>{% endif %}
+            </div>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
-        {% if paypal_client_id and paypal_hosted_button_id %}
         <div class="paypal-public">
           <h4>PayPal internacional</h4>
-          <p>Usa este botón si prefieres pagar con PayPal. Si necesitas un plan específico, escríbenos por WhatsApp para confirmarlo.</p>
-          <div id="paypal-container-public"></div>
+          <p>Los botones de PayPal aparecen por plan cuando están disponibles. Si tu plan todavía no tiene botón PayPal, puedes pagar por Recurrente o escribirnos por WhatsApp.</p>
         </div>
-        {% endif %}
       </div>
     </section>
 
@@ -975,11 +981,19 @@
       const select = document.getElementById('currency-country');
       if (select) select.value = guessCountry();
       updateLocalPrices();
-      const paypalContainer = document.getElementById('paypal-container-public');
-      if (paypalContainer && window.paypal?.HostedButtons) {
-        paypal.HostedButtons({
-          hostedButtonId: "{{ paypal_hosted_button_id }}",
-        }).render("#paypal-container-public");
+      if (window.paypal?.HostedButtons) {
+        const hostedButtons = [
+          {% for plan in payment_plans %}
+            {% if plan.paypal_individual %}"{{ plan.paypal_individual }}",{% endif %}
+            {% if plan.paypal_family %}"{{ plan.paypal_family }}",{% endif %}
+          {% endfor %}
+        ];
+        hostedButtons.forEach((id) => {
+          const selector = `#paypal-public-${id}`;
+          if (document.querySelector(selector)) {
+            paypal.HostedButtons({ hostedButtonId: id }).render(selector);
+          }
+        });
       }
     });
 

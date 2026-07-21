@@ -90,6 +90,8 @@ PAYMENT_PLANS = [
         'family_usd': 'US$19.99',
         'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/1-mes-individual-fenix-digital-tv',
         'recurrente_family': 'https://app.recurrente.com/s/fenixdigitaltv/1-mes-familiar-fenix-digital-tv',
+        'paypal_individual': 'EQVWPWA4RD6Y4',
+        'paypal_family': 'ED9YVWP6YHA8A',
     },
     {
         'months': 3,
@@ -100,6 +102,8 @@ PAYMENT_PLANS = [
         'family_usd': 'US$47.99',
         'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/3-meses-individual-fenix-digital-tv',
         'recurrente_family': 'https://app.recurrente.com/s/fenixdigitaltv/3-meses-familiar-fenix-digital-tv',
+        'paypal_individual': '5W7BUW5242EXW',
+        'paypal_family': 'QVEYJ2VARZUYY',
     },
     {
         'months': 6,
@@ -110,6 +114,8 @@ PAYMENT_PLANS = [
         'family_usd': 'US$82.99',
         'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/6-meses-individual-fenix-digital-tv',
         'recurrente_family': 'https://app.recurrente.com/s/fenixdigitaltv/6-meses-familiar-fenix-digital-tv',
+        'paypal_individual': 'AVH4D9KNYZV7S',
+        'paypal_family': 'A4NNL3PJ6NP98',
     },
     {
         'months': 12,
@@ -120,6 +126,8 @@ PAYMENT_PLANS = [
         'family_usd': 'US$147.99',
         'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/12-meses-individual-fenix-digital-tv',
         'recurrente_family': 'https://app.recurrente.com/s/fenixdigitaltv/12-meses-familiar-fenix-digital-tv',
+        'paypal_individual': '',
+        'paypal_family': '',
     },
     {
         'months': 18,
@@ -130,6 +138,8 @@ PAYMENT_PLANS = [
         'family_usd': 'Consultar',
         'recurrente_individual': 'https://app.recurrente.com/s/fenixdigitaltv/18-meses-individual-fenix-digital-tv',
         'recurrente_family': '',
+        'paypal_individual': '',
+        'paypal_family': '',
     },
 ]
 
