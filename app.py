@@ -917,6 +917,7 @@ DEVICE_GUIDES = {
         'app': 'Max Player',
         'icon': '📱',
         'logo': 'apps/max-player.webp',
+        'hero_image': 'landing/device-android-ios.webp',
         'steps': [
             'Abre la tienda de aplicaciones de tu dispositivo.',
             'Busca e instala Max Player.',
@@ -929,6 +930,36 @@ DEVICE_GUIDES = {
             {'label': 'Max Player para Android', 'url': 'https://play.google.com/store/apps/details?id=tv.maxplayer.android'},
             {'label': 'Max Player para iOS', 'url': 'https://apps.apple.com/app/maxplayer-iptv-player/id1660982028'},
             {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+        ],
+        'app_options': [
+            {
+                'title': 'Opción 1 · Max Player',
+                'subtitle': 'Disponible para celulares y tablets Android / iOS.',
+                'logo': 'apps/max-player.webp',
+                'steps': [
+                    'Abre Google Play o App Store según tu dispositivo.',
+                    'Busca e instala Max Player.',
+                    'Ingresa el usuario y contraseña que te enviaremos.',
+                    'Prueba la reproducción y confirma que todo funcione correctamente.'
+                ],
+                'links': [
+                    {'label': 'Max Player para Android', 'url': 'https://play.google.com/store/apps/details?id=tv.maxplayer.android'},
+                    {'label': 'Max Player para iOS', 'url': 'https://apps.apple.com/app/maxplayer-iptv-player/id1660982028'},
+                    {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+                ]
+            },
+            {
+                'title': 'Opción 2 · XD Plus',
+                'subtitle': 'Únicamente para celulares y tablets Android.',
+                'logo': 'apps/xd-plus.webp',
+                'steps': [
+                    'Descarga e instala la app Downloader en tu Android.',
+                    'Abre Downloader y escribe el código 8813174.',
+                    'Instala XD Plus y abre la aplicación.',
+                    'Escríbenos por WhatsApp para confirmar tus datos de acceso.'
+                ],
+                'links': []
+            }
         ]
     },
     'firestick': {

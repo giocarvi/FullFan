@@ -5,37 +5,48 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ guide.title }} | Guía Fénix Digital TV</title>
   <style>
-    :root { --bg:#070B18; --card:#111827; --text:#F8F7F2; --muted:#A8B3CF; --orange:#FF6A00; --gold:#FFC857; --border:rgba(255,255,255,.12); --green:#10B981; }
+    :root { --bg:#F7F8FC; --card:#FFFFFF; --text:#111827; --muted:#5F6B7A; --orange:#FF6A00; --gold:#F6B73C; --border:rgba(17,24,39,.12); --green:#059669; --blue:#0B1B34; }
     * { box-sizing:border-box; }
-    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; color:var(--text); background:radial-gradient(circle at top left,rgba(255,106,0,.18),transparent 34%),var(--bg); }
+    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; color:var(--text); background:
+      radial-gradient(circle at top left,rgba(255,106,0,.10),transparent 34%),
+      radial-gradient(circle at 90% 8%,rgba(109,40,217,.08),transparent 30%),
+      linear-gradient(180deg,#FFFFFF 0%,#F7F8FC 54%,#FFFFFF 100%); }
     a { color:inherit; text-decoration:none; }
-    .wrap { width:min(920px,calc(100% - 32px)); margin:0 auto; }
-    header { border-bottom:1px solid var(--border); background:rgba(7,11,24,.82); backdrop-filter:blur(16px); }
+    .wrap { width:min(980px,calc(100% - 32px)); margin:0 auto; }
+    header { border-bottom:1px solid rgba(255,255,255,.10); background:linear-gradient(135deg,#071426,#0B1B34 62%,#0E2446); box-shadow:0 12px 30px rgba(15,23,42,.16); }
     .nav { min-height:72px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .logo img { width:120px; max-height:54px; object-fit:contain; }
     .btn { display:inline-flex; align-items:center; justify-content:center; border-radius:999px; padding:12px 18px; font-weight:900; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#190C02; }
-    .btn.secondary { background:rgba(255,255,255,.06); color:var(--text); border:1px solid var(--border); }
-    .hero { padding:58px 0 26px; }
-    .badge { display:inline-flex; border:1px solid rgba(255,200,87,.35); color:var(--gold); background:rgba(255,200,87,.08); padding:8px 12px; border-radius:999px; font-size:13px; font-weight:900; margin-bottom:16px; }
+    .btn.secondary { background:rgba(255,255,255,.08); color:#EAF2FF; border:1px solid rgba(255,255,255,.16); }
+    .hero { padding:48px 0 26px; }
+    .badge { display:inline-flex; border:1px solid rgba(255,106,0,.24); color:#9A4A00; background:#FFF4E8; padding:8px 12px; border-radius:999px; font-size:13px; font-weight:900; margin-bottom:16px; }
     h1 { font-size:clamp(36px,6vw,64px); line-height:.98; margin:0 0 14px; letter-spacing:-.045em; }
     .lead { color:var(--muted); font-size:18px; line-height:1.55; max-width:680px; }
-    .grid { display:grid; grid-template-columns:1fr .8fr; gap:18px; align-items:start; padding:20px 0 52px; }
-    .card { background:rgba(17,24,39,.84); border:1px solid var(--border); border-radius:24px; padding:22px; }
-    .icon { width:70px; height:70px; display:grid; place-items:center; border-radius:22px; background:rgba(255,255,255,.07); border:1px solid var(--border); font-size:34px; margin-bottom:14px; }
-    .app-logo { width:100%; max-width:230px; height:118px; object-fit:contain; display:block; border-radius:20px; padding:16px; margin:0 0 16px; background:rgba(7,11,24,.56); border:1px solid rgba(255,255,255,.1); }
+    .hero-layout { display:grid; grid-template-columns:1fr .82fr; gap:24px; align-items:center; }
+    .hero-image { width:100%; display:block; border-radius:26px; border:1px solid var(--border); box-shadow:0 22px 58px rgba(15,23,42,.12); }
+    .grid { display:grid; grid-template-columns:1fr .78fr; gap:18px; align-items:start; padding:20px 0 52px; }
+    .card { background:linear-gradient(180deg,#FFFFFF,#F8FAFC); border:1px solid var(--border); border-radius:24px; padding:22px; box-shadow:0 18px 45px rgba(15,23,42,.08); }
+    .icon { width:70px; height:70px; display:grid; place-items:center; border-radius:22px; background:#F3F6FC; border:1px solid var(--border); font-size:34px; margin-bottom:14px; }
+    .app-logo { width:100%; max-width:230px; height:118px; object-fit:contain; display:block; border-radius:20px; padding:16px; margin:0 0 16px; background:#F3F6FC; border:1px solid rgba(17,24,39,.1); }
     .app-logo.alt { max-width:320px; }
     ol { padding-left:22px; display:grid; gap:13px; color:var(--muted); line-height:1.5; }
-    li::marker { color:var(--gold); font-weight:900; }
+    li::marker { color:var(--orange); font-weight:900; }
     .tips { display:grid; gap:10px; margin-top:14px; }
-    .tip { color:var(--muted); border:1px solid var(--border); border-radius:16px; padding:12px; background:rgba(255,255,255,.04); }
+    .tip { color:var(--muted); border:1px solid var(--border); border-radius:16px; padding:12px; background:#FFFFFF; }
     .tip:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
     .store-links { display:grid; gap:10px; margin-top:16px; }
-    .store-link { display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid var(--border); border-radius:16px; padding:12px 14px; background:rgba(255,255,255,.05); color:var(--text); font-weight:900; }
-    .store-link span { color:var(--gold); }
+    .store-link { display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid var(--border); border-radius:16px; padding:12px 14px; background:#FFFFFF; color:var(--text); font-weight:900; box-shadow:0 10px 22px rgba(15,23,42,.05); }
+    .store-link span { color:var(--orange); }
     .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
-    footer { border-top:1px solid var(--border); color:var(--muted); padding:24px 0 36px; font-size:13px; }
+    .app-options { display:grid; gap:16px; padding:8px 0 0; }
+    .app-option { display:grid; grid-template-columns:180px 1fr; gap:18px; align-items:start; }
+    .app-option h2 { margin-top:0; }
+    .app-option .app-logo { margin:0; max-width:180px; height:132px; }
+    .download-code { display:inline-flex; align-items:center; gap:8px; margin:8px 0 2px; padding:10px 14px; border-radius:16px; background:#EAF2FF; color:#0B1B34; font-weight:900; border:1px solid #C9DDF6; }
+    footer { border-top:1px solid var(--border); color:var(--muted); padding:24px 0 36px; font-size:13px; background:#FFFFFF; }
     @media (max-width:760px) {
       .wrap { width:min(100% - 24px,920px); }
+      .hero-layout { grid-template-columns:1fr; }
       .grid { grid-template-columns:1fr; gap:14px; padding-bottom:34px; }
       .nav { flex-direction:column; align-items:flex-start; padding:12px 0; }
       .logo img { width:106px; }
@@ -48,6 +59,8 @@
       .app-logo { max-width:100%; height:96px; padding:12px; }
       ol { padding-left:20px; gap:11px; }
       .store-link { align-items:flex-start; overflow-wrap:anywhere; }
+      .app-option { grid-template-columns:1fr; }
+      .app-option .app-logo { max-width:100%; }
     }
   </style>
 </head>
@@ -61,17 +74,52 @@
 
   <main class="wrap">
     <section class="hero">
-      <div class="badge">Guía de instalación</div>
-      <h1>{{ guide.title }}</h1>
-      <p class="lead">App recomendada: <strong>{{ guide.app }}</strong>. Sigue estos pasos y, si necesitas ayuda, escríbenos por WhatsApp para guiarte según tu equipo.</p>
-      <div class="actions">
-        <a class="btn" target="_blank" rel="noopener" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%20Digital%20TV%2C%20necesito%20ayuda%20con%20{{ guide.title | urlencode }}">Pedir ayuda por WhatsApp</a>
-        <a class="btn secondary" href="/inicio#solicitar">Solicitar demo</a>
+      <div class="hero-layout">
+        <div>
+          <div class="badge">Guía de instalación</div>
+          <h1>{{ guide.title }}</h1>
+          <p class="lead">Revisa las apps disponibles para tu dispositivo. Si necesitas ayuda, escríbenos por WhatsApp para guiarte según tu equipo.</p>
+          <div class="actions">
+            <a class="btn" target="_blank" rel="noopener" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%20Digital%20TV%2C%20necesito%20ayuda%20con%20{{ guide.title | urlencode }}">Pedir ayuda por WhatsApp</a>
+            <a class="btn secondary" href="/inicio#solicitar">Solicitar demo</a>
+          </div>
+        </div>
+        {% if guide.hero_image %}
+        <img class="hero-image" src="{{ url_for('static', filename=guide.hero_image) }}" alt="{{ guide.title }}">
+        {% endif %}
       </div>
     </section>
 
     <section class="grid">
       <div class="card">
+        {% if guide.app_options %}
+        <div class="app-options">
+          {% for option in guide.app_options %}
+          <article class="app-option">
+            <img class="app-logo" src="{{ url_for('static', filename=option.logo) }}" alt="{{ option.title }}">
+            <div>
+              <h2>{{ option.title }}</h2>
+              <p class="lead" style="font-size:16px;margin:0 0 12px;">{{ option.subtitle }}</p>
+              {% if 'XD Plus' in option.title %}
+              <div class="download-code">Downloader · código 8813174</div>
+              {% endif %}
+              <ol>
+                {% for step in option.steps %}
+                <li>{{ step }}</li>
+                {% endfor %}
+              </ol>
+              {% if option.links %}
+              <div class="store-links">
+                {% for link in option.links %}
+                <a class="store-link" href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }} <span>↗</span></a>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+        {% else %}
         {% if guide.logo %}
         <img class="app-logo" src="{{ url_for('static', filename=guide.logo) }}" alt="{{ guide.app }}">
         {% if guide.alt_logo %}
@@ -86,6 +134,7 @@
           <li>{{ step }}</li>
           {% endfor %}
         </ol>
+        {% endif %}
       </div>
       <aside class="card">
         <h2>Consejos útiles</h2>
