@@ -952,6 +952,7 @@ DEVICE_GUIDES = {
                 'title': 'Opción 2 · XD Plus',
                 'subtitle': 'Únicamente para celulares y tablets Android.',
                 'logo': 'apps/xd-plus.webp',
+                'download_code': 'Downloader · código 8813174',
                 'steps': [
                     'Descarga e instala la app Downloader en tu Android.',
                     'Abre Downloader y escribe el código 8813174.',
@@ -1000,6 +1001,7 @@ DEVICE_GUIDES = {
                 'title': 'Opción 2 · XD Plus',
                 'subtitle': 'Disponible para Amazon Firestick, Android Stick y TV Box Android.',
                 'logo': 'apps/xd-plus.webp',
+                'download_code': 'Downloader · código 8813174',
                 'steps': [
                     'Descarga e instala la app Downloader en tu dispositivo.',
                     'Abre Downloader y escribe el código 8813174.',
@@ -1080,6 +1082,7 @@ DEVICE_GUIDES = {
         'app': 'Smart One',
         'icon': '🖥️',
         'logo': 'apps/smart-one.webp',
+        'hero_image': 'landing/device-hisense.webp',
         'steps': [
             'Abre la tienda de aplicaciones de Hisense.',
             'Busca Smart One.',
@@ -1090,11 +1093,12 @@ DEVICE_GUIDES = {
         'tips': ['Algunas versiones de Hisense pueden variar por país.', 'Si no aparece la app, escríbenos el modelo exacto.']
     },
     'roku': {
-        'title': 'Roku',
-        'app': 'Premium Player / SACNET Plus',
+        'title': 'Roku TV',
+        'app': 'XD+ / SACNET Plus / Premium Player',
         'icon': '🟣',
         'logo': 'apps/premium-player.webp',
         'alt_logo': 'apps/sacnet-plus.webp',
+        'hero_image': 'landing/device-roku.webp',
         'steps': [
             'Agrega Premium Player o SACNET Plus en tu Roku.',
             'Abre la app y revisa la pantalla inicial.',
@@ -1102,13 +1106,55 @@ DEVICE_GUIDES = {
             'Te enviaremos los datos de acceso o instrucciones necesarias.',
             'Prueba la reproducción durante la demo.'
         ],
-        'tips': ['Roku puede variar según región/cuenta.', 'Si Premium Player no aparece, pregunta por SACNET Plus.', 'Si la app no aparece, te indicaremos alternativas disponibles.']
+        'tips': ['Roku puede variar según región/cuenta.', 'Si una app no aparece, te indicaremos alternativas disponibles.', 'Escríbenos el modelo de Roku si necesitas ayuda.'],
+        'app_options': [
+            {
+                'title': 'Opción 1 · XD Plus',
+                'subtitle': 'Primera opción para Roku, según disponibilidad por región/cuenta.',
+                'logo': 'apps/xd-plus.webp',
+                'steps': [
+                    'Busca XD Plus en tu Roku o confirma con nosotros disponibilidad.',
+                    'Instala la app y abre la pantalla inicial.',
+                    'Escríbenos por WhatsApp para confirmar compatibilidad.',
+                    'Te enviaremos los datos de acceso o instrucciones necesarias.',
+                    'Prueba la reproducción durante la demo.'
+                ],
+                'links': []
+            },
+            {
+                'title': 'Opción 2 · SACNET Plus',
+                'subtitle': 'Alternativa para Roku cuando esté disponible en tu cuenta/región.',
+                'logo': 'apps/sacnet-plus.webp',
+                'steps': [
+                    'Busca SACNET Plus en tu Roku.',
+                    'Instala la app y abre la pantalla inicial.',
+                    'Escríbenos por WhatsApp para confirmar compatibilidad.',
+                    'Te enviaremos los datos de acceso o instrucciones necesarias.',
+                    'Prueba la reproducción durante la demo.'
+                ],
+                'links': []
+            },
+            {
+                'title': 'Opción 3 · Premium Player',
+                'subtitle': 'Otra opción compatible para Roku, según disponibilidad.',
+                'logo': 'apps/premium-player.webp',
+                'steps': [
+                    'Busca Premium Player en tu Roku.',
+                    'Instala la app y abre la pantalla inicial.',
+                    'Escríbenos por WhatsApp para confirmar compatibilidad.',
+                    'Te enviaremos los datos de acceso o instrucciones necesarias.',
+                    'Prueba la reproducción durante la demo.'
+                ],
+                'links': []
+            }
+        ]
     },
     'windows-mac': {
         'title': 'Windows / Mac',
         'app': 'Max Player',
         'icon': '💻',
         'logo': 'apps/max-player.webp',
+        'hero_image': 'landing/device-windows-mac.webp',
         'steps': [
             'Instala Max Player o la app compatible que te indiquemos.',
             'Conecta tu computadora a una red estable.',
@@ -1127,6 +1173,7 @@ DEVICE_GUIDES = {
         'app': 'Soporte Fénix',
         'icon': '💬',
         'logo': '',
+        'hero_image': 'landing/device-support.webp',
         'steps': [
             'Escríbenos al WhatsApp oficial.',
             'Indica país, dispositivo y si deseas demo o contratar.',
@@ -1141,6 +1188,7 @@ DEVICE_GUIDES = {
         'app': 'Prueba Fénix',
         'icon': '⏱️',
         'logo': '',
+        'hero_image': 'landing/device-demo.webp',
         'steps': [
             'Solicita la demo por WhatsApp.',
             'Indica tu dispositivo principal.',

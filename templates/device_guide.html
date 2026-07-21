@@ -100,8 +100,8 @@
             <div>
               <h2>{{ option.title }}</h2>
               <p class="lead" style="font-size:16px;margin:0 0 12px;">{{ option.subtitle }}</p>
-              {% if 'XD Plus' in option.title %}
-              <div class="download-code">Downloader · código 8813174</div>
+              {% if option.download_code %}
+              <div class="download-code">{{ option.download_code }}</div>
               {% endif %}
               <ol>
                 {% for step in option.steps %}
