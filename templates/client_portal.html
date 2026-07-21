@@ -46,6 +46,14 @@
     .message { display:none; border-radius:14px; padding:12px; margin-top:12px; font-size:14px; }
     .message.ok { display:block; background:rgba(5,150,105,.10); color:#047857; border:1px solid rgba(5,150,105,.22); }
     .message.error { display:block; background:rgba(220,38,38,.10); color:#B91C1C; border:1px solid rgba(220,38,38,.22); }
+    .field-link { display:block; color:inherit; }
+    .field-link:hover { border-color:rgba(255,106,0,.34); }
+    .field-link em { display:block; color:var(--orange); font-style:normal; font-size:13px; font-weight:900; margin-top:8px; }
+    .assoc-list { display:grid; gap:10px; margin-top:12px; }
+    .assoc-item { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid rgba(17,24,39,.10); border-radius:16px; padding:12px; background:#FFFFFF; box-shadow:0 10px 22px rgba(15,23,42,.04); }
+    .assoc-item b { display:block; }
+    .assoc-item small { color:var(--muted); }
+    .assoc-status { white-space:nowrap; border-radius:999px; padding:6px 9px; font-size:12px; font-weight:950; background:#EAF2FF; color:#0B1B34; }
     @media (max-width:760px) {
       .wrap { width:min(100% - 24px,980px); }
       .grid { grid-template-columns:1fr; gap:14px; padding-bottom:28px; }
@@ -104,7 +112,7 @@
         <h2>Tu servicio</h2>
         <div class="fields">
           <div class="field"><small>Fecha de vencimiento</small><b>{{ expires_at or 'Pendiente de asignar' }}</b></div>
-          <div class="field"><small>App recomendada</small><b>{{ service.app_name or 'Max Player' }}</b></div>
+          <a class="field field-link" href="/inicio#dispositivos"><small>App recomendada</small><b>{{ service.app_name or 'Max Player' }}</b><em>Ver dispositivos y apps →</em></a>
           <div class="field"><small>Dispositivos incluidos</small><b>{{ service.devices or 3 }}</b></div>
         </div>
         <div class="actions">
@@ -138,6 +146,36 @@
           </div>
         </div>
         <p class="lead" style="margin-top:14px;font-size:14px;">Estos datos son para la app de entretenimiento. Tu contraseña del portal Fénix no se muestra por seguridad.</p>
+      </div>
+      <div class="card" style="grid-column:1/-1;">
+        <h2>Usuarios asociados</h2>
+        {% if parent %}
+        <p class="lead" style="font-size:14px;">Este usuario está asociado al titular principal:</p>
+        <div class="assoc-list">
+          <div class="assoc-item">
+            <div><b>{{ parent.nombre or parent.username }}</b><small>{{ parent.username }} · vence {{ parent.vencimiento or 'sin fecha' }}</small></div>
+            <span class="assoc-status">Titular</span>
+          </div>
+          {% for a in asociados %}
+          <div class="assoc-item">
+            <div><b>{{ a.nombre or a.username }}</b><small>{{ a.username }} · vence {{ a.vencimiento or 'sin fecha' }}</small></div>
+            <span class="assoc-status">{{ service_status(a.vencimiento)|capitalize if service_status is defined else '' }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% elif asociados %}
+        <p class="lead" style="font-size:14px;">Estos usuarios están asociados a tu cuenta principal:</p>
+        <div class="assoc-list">
+          {% for a in asociados %}
+          <div class="assoc-item">
+            <div><b>{{ a.nombre or a.username }}</b><small>{{ a.username }} · vence {{ a.vencimiento or 'sin fecha' }}</small></div>
+            <span class="assoc-status">Asociado</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty">No hay usuarios asociados a esta cuenta.</div>
+        {% endif %}
       </div>
       <div class="card" style="grid-column:1/-1;">
         <h2>Cambiar contraseña del portal</h2>

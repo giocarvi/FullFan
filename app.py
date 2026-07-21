@@ -1311,6 +1311,27 @@ def client_portal():
             }
     c.execute(qmark("SELECT mes, monto, fecha_registro FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 6"), (username,))
     payments = fetchall(c)
+    parent = None
+    asociados = []
+    parent_username = (client or {}).get('parent_username')
+    if parent_username:
+        c.execute(qmark("SELECT username, nombre, contacto, vencimiento FROM clientes WHERE username=?"), (parent_username,))
+        parent = fetchone(c)
+        c.execute(qmark("""
+            SELECT username, nombre, contacto, vencimiento
+            FROM clientes
+            WHERE parent_username=? AND username<>?
+            ORDER BY nombre, username
+        """), (parent_username, username))
+        asociados = fetchall(c)
+    else:
+        c.execute(qmark("""
+            SELECT username, nombre, contacto, vencimiento
+            FROM clientes
+            WHERE parent_username=?
+            ORDER BY nombre, username
+        """), (username,))
+        asociados = fetchall(c)
     db.close()
     expires_at = (service or {}).get('expires_at') or client.get('vencimiento')
     status = service_status(expires_at)
@@ -1318,6 +1339,8 @@ def client_portal():
                            client=client,
                            service=service or {},
                            payments=payments,
+                           parent=parent,
+                           asociados=asociados,
                            expires_at=expires_at,
                            status=status)
 
