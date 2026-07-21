@@ -128,8 +128,7 @@
       linear-gradient(135deg,rgba(255,106,0,.1),rgba(124,58,237,.18)),
       rgba(7,11,24,.72); border:1px solid rgba(255,255,255,.12); overflow:hidden; }
     .device-scene.photo { min-height:160px; background-size:cover; background-position:center; }
-    .device-scene.photo:after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(15,23,42,.42)); pointer-events:none; }
-    .device-scene.photo .brand-strip, .device-scene.photo .support-icons, .device-scene.photo .demo-card { z-index:2; }
+    .device-scene.photo:after { content:none; }
     .device-scene:before { content:""; position:absolute; left:12px; right:12px; bottom:10px; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent); }
     .device-art { position:absolute; inset:18px auto auto 18px; opacity:.92; }
     .mobile-pair .phone { position:absolute; left:6px; top:26px; width:30px; height:58px; border:3px solid rgba(255,255,255,.88); border-radius:10px; background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.03)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
@@ -423,9 +422,6 @@
       border-color:rgba(17,24,39,.12);
       box-shadow:inset 0 0 0 1px rgba(255,255,255,.34);
     }
-    .device-scene.photo:after {
-      background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(15,23,42,.38));
-    }
     .brand-logo, .support-logo {
       background:rgba(255,255,255,.82);
       border-color:rgba(17,24,39,.10);
@@ -681,67 +677,36 @@
         </div>
         <div class="devices">
         <a class="device" href="/dispositivo/android-ios">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-android-ios.webp') }}');">
-            <div class="brand-strip">
-              <img class="brand-logo" src="{{ url_for('static', filename='devices/android.webp') }}" alt="Android">
-              <img class="brand-logo" src="{{ url_for('static', filename='devices/ios.webp') }}" alt="iOS">
-            </div>
-          </div>
-          <b>Celulares/Tablets Android / iOS</b><small>Ver apps</small><span>Ver apps →</span>
+          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-android-ios.webp') }}');"></div>
+          <b>Celulares/Tablets Android / iOS</b><span>Ver apps →</span>
         </a>
         <a class="device" href="/dispositivo/firestick">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-firestick.webp') }}');">
-            <div class="brand-strip single-right"><img class="brand-logo single" src="{{ url_for('static', filename='devices/fire-tv.webp') }}" alt="Amazon Fire TV"></div>
-          </div>
-          <b>Firestick / Android TV Stick</b><small>Ver apps</small><span>Ver apps →</span>
+          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-firestick.webp') }}');"></div>
+          <b>Firestick / Android TV Stick</b><span>Ver apps →</span>
         </a>
         <a class="device" href="/dispositivo/samsung-lg">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-samsung-lg.webp') }}');">
-            <div class="brand-strip">
-              <img class="brand-logo" src="{{ url_for('static', filename='devices/samsung.webp') }}" alt="Samsung">
-              <img class="brand-logo" src="{{ url_for('static', filename='devices/lg.webp') }}" alt="LG">
-            </div>
-          </div>
-          <b>Samsung / LG Smart TV</b><small>Ver apps</small><span>Ver apps →</span>
+          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-samsung-lg.webp') }}');"></div>
+          <b>Samsung / LG Smart TV</b><span>Ver apps →</span>
         </a>
         <a class="device" href="/dispositivo/windows-mac">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-windows-mac.webp') }}');">
-            <div class="brand-strip">
-              <img class="brand-logo" src="{{ url_for('static', filename='devices/windows.webp') }}" alt="Windows">
-              <img class="brand-logo" src="{{ url_for('static', filename='devices/apple.webp') }}" alt="Mac">
-            </div>
-          </div>
-          <b>Windows / Mac</b><small>Ver apps</small><span>Ver apps →</span>
+          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-windows-mac.webp') }}');"></div>
+          <b>Windows / Mac</b><span>Ver apps →</span>
         </a>
         <a class="device" href="/dispositivo/hisense">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-hisense.webp') }}');">
-            <div class="brand-strip single-right"><img class="brand-logo single" src="{{ url_for('static', filename='devices/hisense.webp') }}" alt="Hisense"></div>
-          </div>
-          <b>Hisense Smart TV</b><small>Ver apps</small><span>Ver apps →</span>
+          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-hisense.webp') }}');"></div>
+          <b>Hisense Smart TV</b><span>Ver apps →</span>
         </a>
         <a class="device" href="/dispositivo/roku">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-roku.webp') }}');">
-            <div class="brand-strip">
-              <img class="brand-logo" src="{{ url_for('static', filename='devices/roku.webp') }}" alt="Roku">
-              <img class="brand-logo" src="{{ url_for('static', filename='apps/sacnet-plus.webp') }}" alt="SACNET Plus">
-            </div>
-          </div>
-          <b>Roku TV</b><small>Ver apps</small><span>Ver apps →</span>
+          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-roku.webp') }}');"></div>
+          <b>Roku TV</b><span>Ver apps →</span>
         </a>
         <a class="device" href="/dispositivo/whatsapp">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-support.webp') }}');">
-            <div class="support-icons">
-              <img class="support-logo" src="{{ url_for('static', filename='devices/whatsapp.webp') }}" alt="WhatsApp">
-              <img class="support-logo round" src="{{ url_for('static', filename='devices/telegram.webp') }}" alt="Telegram">
-            </div>
-          </div>
-          <b>Atención</b><small>Ver canales</small><span>Contactar →</span>
+          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-support.webp') }}');"></div>
+          <b>Atención</b><span>Contactar →</span>
         </a>
         <a class="device" href="/dispositivo/demo">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-demo.webp') }}');">
-            <div class="support-icons"><span class="demo-card"><span><b>3h</b><small>demo gratis</small></span></span></div>
-          </div>
-          <b>Demo</b><small>3 horas gratis</small><span>Solicitar demo →</span>
+          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-demo.webp') }}');"></div>
+          <b>Demo</b><span>Solicitar demo →</span>
         </a>
         </div>
       </div>
