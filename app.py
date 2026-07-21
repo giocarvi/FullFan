@@ -5,6 +5,7 @@ import json
 import time
 import re
 import unicodedata
+import traceback
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -330,7 +331,10 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
     def get_db():
-        conn = psycopg2.connect(DATABASE_URL)
+        conn = psycopg2.connect(
+            DATABASE_URL,
+            connect_timeout=int(os.environ.get('DB_CONNECT_TIMEOUT', '8'))
+        )
         return conn
 
     def qmark(sql):
@@ -3262,6 +3266,12 @@ def diagnostico():
 
 
 if __name__ == '__main__':
-    init_db()
+    try:
+        init_db()
+    except Exception as exc:
+        print(f"WARNING: init_db failed during startup: {exc}", flush=True)
+        traceback.print_exc()
+        if os.environ.get('REQUIRE_DB_INIT', '0') == '1':
+            raise
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
