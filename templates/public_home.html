@@ -284,9 +284,20 @@
       color:var(--text);
     }
     header {
-      background:rgba(255,255,255,.88);
-      border-bottom:1px solid rgba(17,24,39,.10);
-      box-shadow:0 8px 24px rgba(15,23,42,.05);
+      background:linear-gradient(135deg,#071426,#0B1B34 62%,#0E2446);
+      border-bottom:1px solid rgba(255,255,255,.10);
+      box-shadow:0 12px 30px rgba(15,23,42,.16);
+    }
+    header .logo img {
+      filter:none;
+    }
+    header .nav-links,
+    header .link {
+      color:#C8D6EA;
+    }
+    header .nav-links a:hover,
+    header .link:hover {
+      color:#FFFFFF;
     }
     .link, .nav-links, .lead, .section-sub, .card p, .feature, .usd, .plan ul, .device, .step p, .event, .premium-list div, .audience-card, details p, footer {
       color:var(--muted);
