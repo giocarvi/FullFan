@@ -1015,6 +1015,7 @@ DEVICE_GUIDES = {
         'app': 'Max Player',
         'icon': '📺',
         'logo': 'apps/max-player.webp',
+        'hero_image': 'landing/device-samsung-lg.webp',
         'steps': [
             'Abre la tienda de apps de tu Smart TV.',
             'Busca Max Player.',
@@ -1025,6 +1026,53 @@ DEVICE_GUIDES = {
         'tips': ['Conecta la TV por cable de red si es posible.', 'Actualiza el software de la TV para mejor compatibilidad.'],
         'links': [
             {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+        ],
+        'app_options': [
+            {
+                'title': 'Opción 1 · Max Player',
+                'subtitle': 'Opción recomendada para Samsung y LG Smart TV.',
+                'logo': 'apps/max-player.webp',
+                'steps': [
+                    'Abre la tienda de apps de tu Smart TV.',
+                    'Busca Max Player.',
+                    'Instala y abre la aplicación.',
+                    'Envíanos por WhatsApp el modelo de TV si necesitas ayuda.',
+                    'Ingresa los datos de acceso que te asignaremos.'
+                ],
+                'links': [
+                    {'label': 'Sitio oficial Max Player', 'url': 'https://maxplayer.tv/en'},
+                ]
+            },
+            {
+                'title': 'Opción 2 · Smart One',
+                'subtitle': 'La licencia de la app tiene un costo anual de 2.50 euros. Nosotros podemos pagarla, previo pago a Fénix.',
+                'logo': 'apps/smart-one.webp',
+                'steps': [
+                    'Abre la tienda de apps de tu Smart TV.',
+                    'Busca e instala Smart One IPTV.',
+                    'Escríbenos por WhatsApp para coordinar la licencia anual de 2.50 euros.',
+                    'Ventaja: permite agregar subtítulos cuando estén disponibles en la película o serie.',
+                    'Ingresa o envíanos los datos que te solicite la app para configurarla.'
+                ],
+                'links': [
+                    {'label': 'Sitio oficial Smart One', 'url': 'https://smartone-iptv.com/'},
+                ]
+            },
+            {
+                'title': 'Opción 3 · Ora Player',
+                'subtitle': 'La licencia de la app tiene un costo anual de US$3. Nosotros podemos pagarla, previo pago a Fénix.',
+                'logo': 'apps/ora-player.webp',
+                'steps': [
+                    'Abre la tienda de apps de tu Smart TV.',
+                    'Busca e instala Ora Player.',
+                    'Escríbenos por WhatsApp para coordinar la licencia anual de US$3.',
+                    'Ventaja: permite agregar subtítulos o cambiar audio cuando esté disponible.',
+                    'Ingresa o envíanos los datos que te solicite la app para configurarla.'
+                ],
+                'links': [
+                    {'label': 'Sitio oficial Ora Player', 'url': 'https://oraplayerapps.com/'},
+                ]
+            }
         ]
     },
     'hisense': {
