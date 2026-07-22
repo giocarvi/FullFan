@@ -966,6 +966,8 @@ def login_required(f):
                 '/reseller',
                 '/api/reseller',
                 '/api/cambiar-password',
+                '/inicio',
+                '/dispositivo',
             )
             if not request.path.startswith(allowed_reseller_paths):
                 if request.path == '/app':

@@ -65,6 +65,7 @@
     <div class="wrap nav">
       <img class="logo" src="{{ url_for('static', filename='logo.png') }}" alt="Fénix Digital TV">
       <div class="nav-actions">
+        <a href="{{ url_for('public_home') }}#dispositivos" target="_blank" rel="noopener">Apps / guías</a>
         <span>{{ user }}</span>
         <a href="{{ url_for('logout') }}">Salir</a>
       </div>
