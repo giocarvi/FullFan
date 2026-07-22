@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal reseller | Fénix Digital TV</title>
+  <style>
+    :root { --bg:#F7F8FC; --card:#FFFFFF; --text:#111827; --muted:#5F6B7A; --orange:#FF6A00; --gold:#F6B73C; --green:#059669; --red:#DC2626; --yellow:#D97706; --border:rgba(17,24,39,.12); --blue:#0B1B34; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; color:var(--text); background:linear-gradient(180deg,#FFFFFF 0%,#F7F8FC 55%,#FFFFFF 100%); min-height:100vh; }
+    header { background:linear-gradient(135deg,#071426,#0B1B34 62%,#0E2446); color:#fff; box-shadow:0 12px 30px rgba(15,23,42,.16); }
+    .wrap { width:min(1120px,calc(100% - 28px)); margin:0 auto; }
+    .nav { min-height:76px; display:flex; align-items:center; justify-content:space-between; gap:14px; }
+    .logo { width:118px; max-height:54px; object-fit:contain; }
+    .nav-actions { display:flex; align-items:center; gap:12px; color:#C8D6EA; font-size:14px; }
+    a { color:inherit; text-decoration:none; }
+    main { padding:28px 0 42px; }
+    h1 { margin:0 0 8px; font-size:clamp(30px,5vw,52px); letter-spacing:-.045em; }
+    .lead { color:var(--muted); line-height:1.55; margin:0; }
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:22px 0; }
+    .stat { background:var(--card); border:1px solid var(--border); border-radius:22px; padding:18px; box-shadow:0 16px 35px rgba(15,23,42,.07); }
+    .stat b { display:block; font-size:30px; line-height:1; margin-bottom:6px; color:var(--orange); }
+    .stat span { color:var(--muted); font-size:13px; font-weight:800; }
+    .panel { background:linear-gradient(180deg,#FFFFFF,#F8FAFC); border:1px solid var(--border); border-radius:26px; padding:18px; box-shadow:0 18px 45px rgba(15,23,42,.08); margin-bottom:18px; }
+    .panel-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:14px; }
+    h2 { margin:0 0 6px; font-size:24px; }
+    .toolbar { display:grid; grid-template-columns:1fr 180px auto; gap:10px; margin-bottom:14px; }
+    input, select, textarea { width:100%; border:1px solid var(--border); background:#fff; color:var(--text); border-radius:14px; padding:12px; font:inherit; }
+    textarea { resize:vertical; min-height:82px; }
+    button, .btn { display:inline-flex; align-items:center; justify-content:center; border:0; border-radius:999px; padding:11px 15px; font-weight:950; cursor:pointer; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#170B02; }
+    .btn.ghost, button.ghost { background:#FFFFFF; color:var(--text); border:1px solid var(--border); box-shadow:0 8px 18px rgba(15,23,42,.05); }
+    .list { display:grid; gap:10px; }
+    .client { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; border:1px solid rgba(17,24,39,.10); border-radius:18px; padding:14px; background:#fff; box-shadow:0 10px 22px rgba(15,23,42,.04); }
+    .client b { display:block; font-size:17px; }
+    .client small { display:flex; flex-wrap:wrap; gap:10px; color:var(--muted); margin-top:4px; }
+    .badge { display:inline-flex; border-radius:999px; padding:6px 9px; font-size:12px; font-weight:950; background:#EAF2FF; color:#0B1B34; }
+    .badge.activo { background:rgba(5,150,105,.12); color:#047857; }
+    .badge.vencido { background:rgba(220,38,38,.10); color:#B91C1C; }
+    .badge.porvencer { background:rgba(246,183,60,.18); color:#9A4A00; }
+    .client-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .empty { color:var(--muted); padding:20px; text-align:center; border:1px dashed var(--border); border-radius:18px; background:#fff; }
+    .modal { display:none; position:fixed; inset:0; z-index:20; background:rgba(15,23,42,.58); padding:16px; align-items:center; justify-content:center; }
+    .modal.open { display:flex; }
+    .modal-card { width:min(560px,100%); max-height:90vh; overflow:auto; background:#fff; border-radius:26px; padding:20px; box-shadow:0 28px 80px rgba(15,23,42,.25); }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    label { display:block; color:var(--muted); font-size:12px; font-weight:900; margin:12px 0 6px; }
+    .modal-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+    .message { display:none; border-radius:14px; padding:12px; margin-top:12px; font-size:14px; }
+    .message.ok { display:block; background:rgba(5,150,105,.10); color:#047857; border:1px solid rgba(5,150,105,.22); }
+    .message.error { display:block; background:rgba(220,38,38,.10); color:#B91C1C; border:1px solid rgba(220,38,38,.22); }
+    @media (max-width:760px) {
+      .stats { grid-template-columns:1fr 1fr; }
+      .toolbar { grid-template-columns:1fr; }
+      .client { grid-template-columns:1fr; }
+      .client-actions { justify-content:stretch; }
+      .client-actions button { width:100%; }
+      .form-grid { grid-template-columns:1fr; }
+      .nav { min-height:66px; }
+      .logo { width:104px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <img class="logo" src="{{ url_for('static', filename='logo.png') }}" alt="Fénix Digital TV">
+      <div class="nav-actions">
+        <span>{{ user }}</span>
+        <a href="{{ url_for('logout') }}">Salir</a>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <section>
+      <h1>Panel de revendedor</h1>
+      <p class="lead">Controla tu cartera de clientes, fechas de vencimiento y solicitudes al equipo Fénix.</p>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><b id="stat-total">—</b><span>Total clientes</span></div>
+      <div class="stat"><b id="stat-activos">—</b><span>Activos</span></div>
+      <div class="stat"><b id="stat-vencer">—</b><span>Vencen en 7 días</span></div>
+      <div class="stat"><b id="stat-vencidos">—</b><span>Vencidos</span></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Mis clientes</h2>
+          <p class="lead" style="font-size:14px;">Agrega clientes, actualiza seguimiento y solicita activación cuando estén listos.</p>
+        </div>
+        <button onclick="openClientModal()">Agregar cliente</button>
+      </div>
+      <div class="toolbar">
+        <input id="search" placeholder="Buscar por nombre, usuario o teléfono">
+        <select id="status-filter">
+          <option value="">Todos</option>
+          <option value="activo">Activos</option>
+          <option value="vencido">Vencidos</option>
+          <option value="prospecto">Prospecto</option>
+          <option value="contactado">Contactado</option>
+          <option value="pendiente_pago">Pendiente de pago</option>
+          <option value="renovo">Renovó</option>
+          <option value="no_respondio">No respondió</option>
+        </select>
+        <button class="ghost" onclick="loadClients()">Actualizar</button>
+      </div>
+      <div id="client-list" class="list"><div class="empty">Cargando clientes...</div></div>
+    </section>
+  </main>
+
+  <div id="client-modal" class="modal" onclick="if(event.target===this) closeClientModal()">
+    <div class="modal-card">
+      <h2 id="modal-title">Agregar cliente</h2>
+      <input type="hidden" id="modal-mode" value="create">
+      <input type="hidden" id="original-username">
+      <div class="form-grid">
+        <div>
+          <label>Usuario</label>
+          <input id="client-username" placeholder="ej: cliente01">
+        </div>
+        <div>
+          <label>Nombre</label>
+          <input id="client-name" placeholder="Nombre del cliente">
+        </div>
+        <div>
+          <label>Teléfono</label>
+          <input id="client-phone" inputmode="tel" placeholder="WhatsApp">
+        </div>
+        <div>
+          <label>Vencimiento</label>
+          <input id="client-exp" type="date">
+        </div>
+      </div>
+      <label>Seguimiento</label>
+      <select id="client-status">
+        <option value="prospecto">Prospecto</option>
+        <option value="contactado">Contactado</option>
+        <option value="pendiente_pago">Pendiente de pago</option>
+        <option value="renovo">Renovó</option>
+        <option value="no_respondio">No respondió</option>
+      </select>
+      <label>Notas</label>
+      <textarea id="client-notes" placeholder="Notas internas de seguimiento"></textarea>
+      <div id="modal-message" class="message"></div>
+      <div class="modal-actions">
+        <button onclick="saveClient()">Guardar</button>
+        <button class="ghost" onclick="closeClientModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let clients = [];
+    let searchTimer;
+
+    function statusLabel(status) {
+      return {
+        prospecto: 'Prospecto',
+        contactado: 'Contactado',
+        pendiente_pago: 'Pendiente de pago',
+        renovo: 'Renovó',
+        no_respondio: 'No respondió'
+      }[status] || 'Seguimiento';
+    }
+
+    function serviceStatus(vencimiento) {
+      if (!vencimiento) return { cls:'vencido', label:'Sin fecha' };
+      const today = new Date(); today.setHours(0,0,0,0);
+      const exp = new Date(vencimiento);
+      const diff = Math.ceil((exp - today) / 86400000);
+      if (diff < 0) return { cls:'vencido', label:'Vencido' };
+      if (diff <= 7) return { cls:'porvencer', label:`${diff} días` };
+      return { cls:'activo', label:'Activo' };
+    }
+
+    function esc(v) {
+      return String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+    }
+
+    async function loadDashboard() {
+      const r = await fetch('/api/reseller/dashboard');
+      const d = await r.json();
+      if (!r.ok) return;
+      document.getElementById('stat-total').textContent = d.total || 0;
+      document.getElementById('stat-activos').textContent = d.activos || 0;
+      document.getElementById('stat-vencer').textContent = d.por_vencer || 0;
+      document.getElementById('stat-vencidos').textContent = d.vencidos || 0;
+    }
+
+    async function loadClients() {
+      const q = encodeURIComponent(document.getElementById('search').value.trim());
+      const estado = encodeURIComponent(document.getElementById('status-filter').value);
+      const r = await fetch(`/api/reseller/clientes?q=${q}&estado=${estado}`);
+      const d = await r.json();
+      const list = document.getElementById('client-list');
+      if (!r.ok) {
+        list.innerHTML = `<div class="empty">${esc(d.error || 'No se pudo cargar')}</div>`;
+        return;
+      }
+      clients = d.clientes || [];
+      if (!clients.length) {
+        list.innerHTML = '<div class="empty">No hay clientes para mostrar.</div>';
+        return;
+      }
+      list.innerHTML = clients.map(c => {
+        const st = serviceStatus(c.vencimiento);
+        return `<div class="client">
+          <div>
+            <b>${esc(c.nombre || c.username)}</b>
+            <small>
+              <span>Usuario: ${esc(c.username)}</span>
+              <span>Tel: ${esc(c.contacto || '—')}</span>
+              <span>Vence: ${esc(c.vencimiento || 'sin fecha')}</span>
+              <span>Seguimiento: ${esc(statusLabel(c.reseller_status))}</span>
+            </small>
+            ${c.notas ? `<p class="lead" style="font-size:13px;margin-top:8px;">${esc(c.notas)}</p>` : ''}
+          </div>
+          <div class="client-actions">
+            <span class="badge ${st.cls}">${st.label}</span>
+            <button class="ghost" onclick="editClient('${esc(c.username)}')">Editar</button>
+            <button onclick="requestActivation('${esc(c.username)}')">Solicitar activación</button>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function openClientModal(client=null) {
+      document.getElementById('modal-message').className = 'message';
+      document.getElementById('modal-message').textContent = '';
+      document.getElementById('modal-mode').value = client ? 'edit' : 'create';
+      document.getElementById('modal-title').textContent = client ? 'Editar cliente' : 'Agregar cliente';
+      document.getElementById('original-username').value = client?.username || '';
+      document.getElementById('client-username').value = client?.username || '';
+      document.getElementById('client-username').disabled = !!client;
+      document.getElementById('client-name').value = client?.nombre || '';
+      document.getElementById('client-phone').value = client?.contacto || '';
+      document.getElementById('client-exp').value = client?.vencimiento || '';
+      document.getElementById('client-status').value = client?.reseller_status || 'prospecto';
+      document.getElementById('client-notes').value = client?.notas || '';
+      document.getElementById('client-modal').classList.add('open');
+    }
+
+    function closeClientModal() {
+      document.getElementById('client-modal').classList.remove('open');
+    }
+
+    function editClient(username) {
+      const client = clients.find(c => c.username === username);
+      if (client) openClientModal(client);
+    }
+
+    async function saveClient() {
+      const msg = document.getElementById('modal-message');
+      msg.className = 'message';
+      msg.textContent = '';
+      const payload = {
+        username: document.getElementById('client-username').value.trim(),
+        nombre: document.getElementById('client-name').value.trim(),
+        contacto: document.getElementById('client-phone').value.trim(),
+        vencimiento: document.getElementById('client-exp').value,
+        reseller_status: document.getElementById('client-status').value,
+        notas: document.getElementById('client-notes').value.trim()
+      };
+      const mode = document.getElementById('modal-mode').value;
+      const original = document.getElementById('original-username').value;
+      const url = mode === 'edit' ? `/api/reseller/clientes/${encodeURIComponent(original)}` : '/api/reseller/clientes';
+      const r = await fetch(url, {
+        method: mode === 'edit' ? 'PUT' : 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        msg.className = 'message error';
+        msg.textContent = d.error || 'No se pudo guardar.';
+        return;
+      }
+      msg.className = 'message ok';
+      msg.textContent = 'Guardado correctamente.';
+      setTimeout(closeClientModal, 500);
+      await loadDashboard();
+      await loadClients();
+    }
+
+    async function requestActivation(username) {
+      const notes = prompt(`Solicitar activación/renovación para ${username}.\n\nNotas para el equipo Fénix:`, '');
+      if (notes === null) return;
+      const r = await fetch(`/api/reseller/clientes/${encodeURIComponent(username)}/solicitar-activacion`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({notes})
+      });
+      const d = await r.json();
+      if (!r.ok) {
+        alert(d.error || 'No se pudo crear la solicitud.');
+        return;
+      }
+      alert(`Solicitud creada. Tarea #${d.task_id}`);
+    }
+
+    document.getElementById('search').addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(loadClients, 300);
+    });
+    document.getElementById('status-filter').addEventListener('change', loadClients);
+    loadDashboard();
+    loadClients();
+  </script>
+</body>
+</html>

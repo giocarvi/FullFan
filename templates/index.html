@@ -724,6 +724,32 @@ body {
 </div>
 
 {% if rol == 'admin' %}
+<div id="view-resellers" class="view">
+  <div class="config-form">
+    <div class="config-section">
+      <h3>🤝 Revendedores</h3>
+      <p class="config-hint">Crea usuarios revendedores y revisa cuántos clientes tiene asignados cada uno. El reseller entra por <b>/reseller</b> y solo ve su cartera.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Usuario reseller</label>
+          <input id="reseller-new-username" placeholder="ej: resellerjuan">
+        </div>
+        <div class="form-group">
+          <label>Contraseña inicial</label>
+          <input id="reseller-new-password" placeholder="Si lo dejas vacío, será igual al usuario">
+        </div>
+      </div>
+      <button class="config-save-btn" onclick="crearReseller()">Crear reseller</button>
+    </div>
+    <div class="analytics-chart-card">
+      <h3>Listado de revendedores</h3>
+      <div id="resellers-list"><div class="loading">Cargando...</div></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if rol == 'admin' %}
 <!-- ANALYTICS VIEW -->
 <div id="view-analytics" class="view">
   <div class="analytics-kpi-grid" id="analytics-kpis">
@@ -909,6 +935,9 @@ body {
     <span class="icon">🚀</span>Migrar
   </button>
   {% if rol == 'admin' %}
+  <button class="nav-btn" data-view="resellers">
+    <span class="icon">🤝</span>Resellers
+  </button>
   <button class="nav-btn" data-view="analytics">
     <span class="icon">📈</span>Análisis
   </button>
@@ -974,6 +1003,25 @@ body {
         <label>Usuario titular / cliente principal</label>
         <input type="text" id="nc-parent-username" placeholder="Opcional, ej: FranciscoNatareno">
       </div>
+
+      {% if rol == 'admin' %}
+      <div class="form-row">
+        <div class="form-group">
+          <label>Reseller asignado</label>
+          <input type="text" id="nc-reseller-username" placeholder="Opcional, usuario reseller">
+        </div>
+        <div class="form-group">
+          <label>Seguimiento reseller</label>
+          <select id="nc-reseller-status">
+            <option value="prospecto">Prospecto</option>
+            <option value="contactado">Contactado</option>
+            <option value="pendiente_pago">Pendiente de pago</option>
+            <option value="renovo">Renovó</option>
+            <option value="no_respondio">No respondió</option>
+          </select>
+        </div>
+      </div>
+      {% endif %}
 
       <div class="form-group">
         <label>Notas</label>
@@ -1105,11 +1153,57 @@ function switchView(view, estado) {
   if (view === 'analytics') loadAnalytics();
   if (view === 'config') loadConfigView();
   if (view === 'migracion') loadMigrationClients();
+  if (view === 'resellers') loadResellers();
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
   if (btn.dataset.view) btn.addEventListener('click', () => switchView(btn.dataset.view));
 });
+
+// ── RESELLERS ───────────────────────────────────────────────────────────────
+async function loadResellers() {
+  if (!IS_ADMIN) return;
+  const list = document.getElementById('resellers-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading">Cargando...</div>';
+  const r = await fetch('/api/resellers');
+  const d = await r.json();
+  if (!r.ok) {
+    list.innerHTML = `<div class="empty-state"><p>${escHtml(d.error || 'No se pudo cargar')}</p></div>`;
+    return;
+  }
+  const rows = d.resellers || [];
+  list.innerHTML = rows.length ? rows.map(x => `
+    <div class="ops-task">
+      <div>
+        <div class="ops-task-title">🤝 ${escHtml(x.username)}</div>
+        <div class="ops-task-meta">Clientes asignados: ${x.clientes || 0} · activos: ${x.activos || 0}</div>
+      </div>
+      <a class="ops-btn-secondary" href="/reseller" target="_blank" rel="noopener">Abrir panel reseller</a>
+    </div>
+  `).join('') : '<div class="empty-state"><p>Aún no hay revendedores.</p></div>';
+}
+
+async function crearReseller() {
+  if (!IS_ADMIN) return;
+  const username = document.getElementById('reseller-new-username').value.trim();
+  const password = document.getElementById('reseller-new-password').value.trim();
+  if (!username) { showToast('⚠️ Ingresa el usuario reseller'); return; }
+  const r = await fetch('/api/resellers', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username, password})
+  });
+  const d = await r.json();
+  if (!r.ok) {
+    showToast('❌ ' + (d.error || 'No se pudo crear'));
+    return;
+  }
+  document.getElementById('reseller-new-username').value = '';
+  document.getElementById('reseller-new-password').value = '';
+  showToast(`✅ Reseller creado. Usuario: ${d.username} · Password: ${d.password}`);
+  loadResellers();
+}
 
 // ── ACTIVACIONES / RENOVACIONES ──────────────────────────────────────────────
 async function loadActivationPlans() {
@@ -1491,6 +1585,7 @@ function clienteItem(c, showDays) {
     daysNote = `<span style="color:var(--yellow);font-size:11px;margin-left:6px;">· vence en ${days}d</span>`;
   }
   const contacto = c.contacto ? `<span style="color:var(--muted)">📞 ${c.contacto}</span>` : '';
+  const reseller = c.reseller_username ? `<span style="color:var(--yellow)">🤝 ${c.reseller_username}</span>` : '';
   return `<div class="list-item" data-username="${c.username}">
     <div class="item-avatar">${initial}</div>
     <div class="item-info">
@@ -1498,6 +1593,7 @@ function clienteItem(c, showDays) {
       <div class="item-sub" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <span style="font-family:monospace;background:rgba(108,99,255,0.15);color:#a5b4fc;padding:1px 6px;border-radius:4px;font-size:11px;">${c.username}</span>
         ${contacto}
+        ${reseller}
       </div>
     </div>
     <span class="badge ${status.cls}">${status.label}</span>
@@ -1701,6 +1797,23 @@ async function openModal(username) {
         <input type="text" id="edit-parent-username" value="${c.parent_username || ''}" placeholder="Ej: FranciscoNatareno">
         <div style="font-size:12px;color:var(--muted);margin-top:6px;">Déjalo vacío si este cliente es titular o no pertenece a un grupo.</div>
       </div>
+      ${esAdmin ? `
+      <div class="form-row">
+        <div class="form-group">
+          <label>Reseller asignado</label>
+          <input type="text" id="edit-reseller-username" value="${c.reseller_username || ''}" placeholder="Usuario reseller">
+        </div>
+        <div class="form-group">
+          <label>Seguimiento reseller</label>
+          <select id="edit-reseller-status">
+            <option value="prospecto" ${(c.reseller_status||'prospecto')==='prospecto'?'selected':''}>Prospecto</option>
+            <option value="contactado" ${(c.reseller_status||'')==='contactado'?'selected':''}>Contactado</option>
+            <option value="pendiente_pago" ${(c.reseller_status||'')==='pendiente_pago'?'selected':''}>Pendiente de pago</option>
+            <option value="renovo" ${(c.reseller_status||'')==='renovo'?'selected':''}>Renovó</option>
+            <option value="no_respondio" ${(c.reseller_status||'')==='no_respondio'?'selected':''}>No respondió</option>
+          </select>
+        </div>
+      </div>` : ''}
       <div class="form-group">
         <label>Notas</label>
         <textarea id="edit-notas" rows="2" placeholder="Notas internas..." style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:14px;resize:vertical;">${c.notas || ''}</textarea>
@@ -2294,6 +2407,10 @@ async function guardarEdicion(username) {
   const servicePasswordEl = document.getElementById('edit-service-password');
   const service_username = serviceUsernameEl ? serviceUsernameEl.value.trim() : '';
   const service_password = servicePasswordEl ? servicePasswordEl.value.trim() : '';
+  const resellerUsernameEl = document.getElementById('edit-reseller-username');
+  const resellerStatusEl = document.getElementById('edit-reseller-status');
+  const reseller_username = resellerUsernameEl ? resellerUsernameEl.value.trim() : undefined;
+  const reseller_status = resellerStatusEl ? resellerStatusEl.value : undefined;
   const usernameEl = document.getElementById('edit-username');
   const nuevo_username = usernameEl ? usernameEl.value.trim() : username;
 
@@ -2303,6 +2420,8 @@ async function guardarEdicion(username) {
   }
 
   const body = { nombre, contacto, vencimiento, referido, notas, parent_username, service_username, service_password };
+  if (reseller_username !== undefined) body.reseller_username = reseller_username;
+  if (reseller_status !== undefined) body.reseller_status = reseller_status;
   if (nuevo_username && nuevo_username !== username) body.nuevo_username = nuevo_username;
 
   try {
@@ -2459,6 +2578,8 @@ function openNuevoCliente() {
   document.getElementById('nc-vencimiento').value = '';
   document.getElementById('nc-pago').value = '';
   document.getElementById('nc-parent-username').value = '';
+  if (document.getElementById('nc-reseller-username')) document.getElementById('nc-reseller-username').value = '';
+  if (document.getElementById('nc-reseller-status')) document.getElementById('nc-reseller-status').value = 'prospecto';
   document.getElementById('nc-notas').value = '';
   document.getElementById('nc-username-error').style.display = 'none';
   document.getElementById('nuevo-modal-overlay').classList.add('open');
@@ -2481,6 +2602,8 @@ async function guardarNuevoCliente() {
   const vencimiento = document.getElementById('nc-vencimiento').value;
   const pago     = parseFloat(document.getElementById('nc-pago').value) || 0;
   const parent_username = document.getElementById('nc-parent-username').value.trim();
+  const reseller_username = document.getElementById('nc-reseller-username')?.value.trim() || '';
+  const reseller_status = document.getElementById('nc-reseller-status')?.value || 'prospecto';
   const notas    = document.getElementById('nc-notas').value.trim();
   const errEl    = document.getElementById('nc-username-error');
 
@@ -2489,7 +2612,7 @@ async function guardarNuevoCliente() {
   const r = await fetch('/api/clientes', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ username, nombre, contacto, referido, vencimiento, parent_username, notas })
+    body: JSON.stringify({ username, nombre, contacto, referido, vencimiento, parent_username, reseller_username, reseller_status, notas })
   });
   const d = await r.json();
 

@@ -465,6 +465,8 @@ def init_db():
             vencimiento TEXT,
             referido TEXT DEFAULT 'NO',
             parent_username TEXT DEFAULT NULL,
+            reseller_username TEXT DEFAULT NULL,
+            reseller_status TEXT DEFAULT 'prospecto',
             total_pagado REAL DEFAULT 0,
             notas TEXT DEFAULT '',
             created_at TEXT DEFAULT (NOW()::text)
@@ -500,6 +502,8 @@ def init_db():
                 username TEXT PRIMARY KEY, nombre TEXT, contacto TEXT,
                 vencimiento TEXT, referido TEXT DEFAULT 'NO',
                 parent_username TEXT DEFAULT NULL,
+                reseller_username TEXT DEFAULT NULL,
+                reseller_status TEXT DEFAULT 'prospecto',
                 total_pagado REAL DEFAULT 0, notas TEXT DEFAULT '',
                 created_at TEXT DEFAULT (datetime('now'))
             );
@@ -534,6 +538,8 @@ def init_db():
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS datos_actualizados_at TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS parent_username TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reseller_username TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reseller_status TEXT DEFAULT 'prospecto'")
     else:
         try:
             c.execute("ALTER TABLE pagos ADD COLUMN comprobante TEXT DEFAULT NULL")
@@ -548,6 +554,8 @@ def init_db():
             "ALTER TABLE clientes ADD COLUMN email TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN datos_actualizados_at TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN parent_username TEXT DEFAULT NULL",
+            "ALTER TABLE clientes ADD COLUMN reseller_username TEXT DEFAULT NULL",
+            "ALTER TABLE clientes ADD COLUMN reseller_status TEXT DEFAULT 'prospecto'",
         ):
             try:
                 c.execute(ddl)
@@ -953,6 +961,16 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if 'user' not in session:
             return redirect(url_for('login'))
+        if session.get('rol') == 'reseller':
+            allowed_reseller_paths = (
+                '/reseller',
+                '/api/reseller',
+                '/api/cambiar-password',
+            )
+            if not request.path.startswith(allowed_reseller_paths):
+                if request.path == '/app':
+                    return redirect(url_for('reseller_home'))
+                return jsonify({'error': 'Acceso denegado para revendedores'}), 403
         return f(*args, **kwargs)
     return decorated
 
@@ -1492,6 +1510,8 @@ def login():
             db.close()
             session['user'] = u
             session['rol'] = user['rol']
+            if user['rol'] == 'reseller':
+                return redirect(url_for('reseller_home'))
             return redirect(url_for('index'))
         db.close()
         error = 'Usuario o contraseña incorrectos'
@@ -1506,6 +1526,217 @@ def logout():
 @login_required
 def index():
     return render_template('index.html', user=session['user'], rol=session['rol'])
+
+
+@app.route('/reseller')
+@login_required
+def reseller_home():
+    if session.get('rol') != 'reseller':
+        return redirect(url_for('index'))
+    return render_template('reseller_portal.html', user=session['user'])
+
+
+@app.route('/api/reseller/dashboard')
+@login_required
+def api_reseller_dashboard():
+    if session.get('rol') != 'reseller':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    reseller = session['user']
+    today = today_gt().isoformat()
+    in_7 = (today_gt() + timedelta(days=7)).isoformat()
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE reseller_username=?"), (reseller,))
+    total = fetchone(c)['c']
+    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND vencimiento>=?"), (reseller, today))
+    activos = fetchone(c)['c']
+    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND (vencimiento<? OR vencimiento IS NULL)"), (reseller, today))
+    vencidos = fetchone(c)['c']
+    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND vencimiento>=? AND vencimiento<=?"), (reseller, today, in_7))
+    por_vencer = fetchone(c)['c']
+    c.execute(qmark("""
+        SELECT username, nombre, contacto, vencimiento, reseller_status, notas
+        FROM clientes
+        WHERE reseller_username=? AND vencimiento>=? AND vencimiento<=?
+        ORDER BY vencimiento ASC, nombre ASC
+        LIMIT 12
+    """), (reseller, today, in_7))
+    proximos = fetchall(c)
+    db.close()
+    return jsonify({'total': total, 'activos': activos, 'vencidos': vencidos, 'por_vencer': por_vencer, 'proximos': proximos})
+
+
+@app.route('/api/reseller/clientes', methods=['GET', 'POST'])
+@login_required
+def api_reseller_clientes():
+    if session.get('rol') != 'reseller':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    reseller = session['user']
+    db = get_db()
+    c = db.cursor()
+    if request.method == 'POST':
+        data = request.json or {}
+        username = (data.get('username') or '').strip()
+        if not username:
+            db.close()
+            return jsonify({'error': 'El username es obligatorio'}), 400
+        c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
+        if fetchone(c):
+            db.close()
+            return jsonify({'error': 'Ese username ya existe'}), 409
+        c.execute(qmark("""
+            INSERT INTO clientes
+                (username, nombre, contacto, vencimiento, referido, reseller_username, reseller_status, notas, total_pagado)
+            VALUES (?,?,?,?,?,?,?,?,0)
+        """), (
+            username,
+            (data.get('nombre') or '').strip(),
+            (data.get('contacto') or '').strip(),
+            data.get('vencimiento') or None,
+            'RESELLER',
+            reseller,
+            data.get('reseller_status') or 'prospecto',
+            (data.get('notas') or '').strip()
+        ))
+        db.commit()
+        db.close()
+        return jsonify({'ok': True})
+
+    q = request.args.get('q', '').strip()
+    estado = request.args.get('estado', '').strip()
+    today = today_gt().isoformat()
+    where = ["reseller_username=?"]
+    params = [reseller]
+    if q:
+        where.append("(nombre ILIKE ? OR username ILIKE ? OR contacto ILIKE ?)" if PG else
+                     "(nombre LIKE ? OR username LIKE ? OR contacto LIKE ?)")
+        params += [f'%{q}%', f'%{q}%', f'%{q}%']
+    if estado == 'activo':
+        where.append("vencimiento>=?")
+        params.append(today)
+    elif estado == 'vencido':
+        where.append("(vencimiento<? OR vencimiento IS NULL)")
+        params.append(today)
+    elif estado:
+        where.append("reseller_status=?")
+        params.append(estado)
+    c.execute(qmark(f"""
+        SELECT username, nombre, contacto, vencimiento, reseller_status, notas, total_pagado
+        FROM clientes
+        WHERE {' AND '.join(where)}
+        ORDER BY vencimiento ASC NULLS LAST, nombre ASC
+    """) if PG else qmark(f"""
+        SELECT username, nombre, contacto, vencimiento, reseller_status, notas, total_pagado
+        FROM clientes
+        WHERE {' AND '.join(where)}
+        ORDER BY vencimiento IS NULL, vencimiento ASC, nombre ASC
+    """), params)
+    rows = fetchall(c)
+    db.close()
+    return jsonify({'clientes': rows, 'total': len(rows)})
+
+
+@app.route('/api/reseller/clientes/<username>', methods=['PUT'])
+@login_required
+def api_reseller_update_cliente(username):
+    if session.get('rol') != 'reseller':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    reseller = session['user']
+    data = request.json or {}
+    allowed_status = {'prospecto', 'contactado', 'pendiente_pago', 'renovo', 'no_respondio'}
+    status = data.get('reseller_status')
+    if status and status not in allowed_status:
+        return jsonify({'error': 'Estado de seguimiento inválido'}), 400
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username FROM clientes WHERE username=? AND reseller_username=?"), (username, reseller))
+    if not fetchone(c):
+        db.close()
+        return jsonify({'error': 'Cliente no encontrado en tu cartera'}), 404
+    fields, params = [], []
+    for field in ['nombre', 'contacto', 'vencimiento', 'notas', 'reseller_status']:
+        if field in data:
+            raw = data.get(field)
+            value = (raw or None) if field == 'vencimiento' else (raw or '').strip()
+            fields.append(f"{field}=?")
+            params.append(value)
+    if fields:
+        params += [username, reseller]
+        c.execute(qmark(f"UPDATE clientes SET {', '.join(fields)} WHERE username=? AND reseller_username=?"), params)
+        db.commit()
+    db.close()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/reseller/clientes/<username>/solicitar-activacion', methods=['POST'])
+@login_required
+def api_reseller_solicitar_activacion(username):
+    if session.get('rol') != 'reseller':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    reseller = session['user']
+    data = request.json or {}
+    notes = (data.get('notes') or '').strip()
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username FROM clientes WHERE username=? AND reseller_username=?"), (username, reseller))
+    if not fetchone(c):
+        db.close()
+        return jsonify({'error': 'Cliente no encontrado en tu cartera'}), 404
+    task_notes = f"Solicitud de reseller {reseller}. {notes}".strip()
+    if PG:
+        c.execute("""
+            INSERT INTO activation_tasks (username, task_type, status, assigned_to, credits_to_consume, notes)
+            VALUES (%s,%s,%s,%s,%s,%s)
+            RETURNING id
+        """, (username, 'reseller_request', 'pending', None, 0, task_notes))
+        task_id = c.fetchone()[0]
+    else:
+        c.execute("""
+            INSERT INTO activation_tasks (username, task_type, status, assigned_to, credits_to_consume, notes)
+            VALUES (?,?,?,?,?,?)
+        """, (username, 'reseller_request', 'pending', None, 0, task_notes))
+        task_id = c.lastrowid
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'task_id': task_id})
+
+
+@app.route('/api/resellers', methods=['GET', 'POST'])
+@login_required
+def api_resellers():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    if request.method == 'POST':
+        data = request.json or {}
+        username = (data.get('username') or '').strip()
+        password = (data.get('password') or username).strip()
+        if not username or not password:
+            db.close()
+            return jsonify({'error': 'Usuario y contraseña son obligatorios'}), 400
+        c.execute(qmark("SELECT username FROM usuarios WHERE username=?"), (username,))
+        if fetchone(c):
+            db.close()
+            return jsonify({'error': 'Ese usuario ya existe'}), 409
+        c.execute(qmark("INSERT INTO usuarios (username,password,rol) VALUES (?,?,?)"),
+                  (username, hash_password(password), 'reseller'))
+        db.commit()
+        db.close()
+        return jsonify({'ok': True, 'username': username, 'password': password})
+    c.execute(qmark("""
+        SELECT u.username,
+               COUNT(c.username) as clientes,
+               COALESCE(SUM(CASE WHEN c.vencimiento>=? THEN 1 ELSE 0 END),0) as activos
+        FROM usuarios u
+        LEFT JOIN clientes c ON c.reseller_username = u.username
+        WHERE u.rol='reseller'
+        GROUP BY u.username
+        ORDER BY u.username ASC
+    """), (today_gt().isoformat(),))
+    rows = fetchall(c)
+    db.close()
+    return jsonify({'resellers': rows})
 
 # ── API: DASHBOARD ────────────────────────────────────────────────────────────
 @app.route('/api/dashboard')
@@ -1615,7 +1846,7 @@ def clientes():
     c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes {where_sql}"), params)
     total = fetchone(c)['c']
     c.execute(qmark(f"""
-        SELECT username, nombre, contacto, vencimiento, referido, parent_username, total_pagado, notas
+        SELECT username, nombre, contacto, vencimiento, referido, parent_username, reseller_username, reseller_status, total_pagado, notas
         FROM clientes {where_sql} ORDER BY vencimiento DESC, username ASC LIMIT ? OFFSET ?
     """), params + [per_page, offset])
     rows = fetchall(c)
@@ -1636,6 +1867,7 @@ def crear_cliente():
         db.close()
         return jsonify({'error': 'Ese username ya existe'}), 409
     parent_username = (data.get('parent_username') or '').strip() or None
+    reseller_username = (data.get('reseller_username') or '').strip() or None
     if parent_username:
         if parent_username == username:
             db.close()
@@ -1644,11 +1876,20 @@ def crear_cliente():
         if not fetchone(c):
             db.close()
             return jsonify({'error': 'El usuario titular/principal no existe'}), 400
+    if reseller_username:
+        if session.get('rol') != 'admin':
+            db.close()
+            return jsonify({'error': 'Solo admin puede asignar reseller'}), 403
+        c.execute(qmark("SELECT username FROM usuarios WHERE username=? AND rol='reseller'"), (reseller_username,))
+        if not fetchone(c):
+            db.close()
+            return jsonify({'error': 'El reseller no existe'}), 400
     c.execute(qmark("""
-        INSERT INTO clientes (username, nombre, contacto, vencimiento, referido, parent_username, notas, total_pagado)
-        VALUES (?,?,?,?,?,?,?,0)
+        INSERT INTO clientes (username, nombre, contacto, vencimiento, referido, parent_username, reseller_username, reseller_status, notas, total_pagado)
+        VALUES (?,?,?,?,?,?,?,?,?,0)
     """), (username, data.get('nombre',''), data.get('contacto',''),
-           data.get('vencimiento') or None, data.get('referido','NO'), parent_username, data.get('notas','')))
+           data.get('vencimiento') or None, data.get('referido','NO'), parent_username, reseller_username,
+           data.get('reseller_status') or 'prospecto', data.get('notas','')))
     db.commit()
     db.close()
     return jsonify({'ok': True})
@@ -1932,7 +2173,7 @@ def actualizar_cliente(username):
         username = nuevo_username  # usar el nuevo para el resto de campos
 
     fields, params = [], []
-    for field in ['nombre', 'contacto', 'vencimiento', 'referido', 'notas', 'parent_username']:
+    for field in ['nombre', 'contacto', 'vencimiento', 'referido', 'notas', 'parent_username', 'reseller_status']:
         if field in data:
             value = data[field]
             if field == 'parent_username':
@@ -1952,6 +2193,18 @@ def actualizar_cliente(username):
                         return jsonify({'error': 'No se puede crear una relación circular entre clientes'}), 400
             fields.append(f"{field}=?")
             params.append(value)
+    if 'reseller_username' in data:
+        if session.get('rol') != 'admin':
+            db.close()
+            return jsonify({'error': 'Solo admin puede asignar reseller'}), 403
+        reseller_username = (data.get('reseller_username') or '').strip() or None
+        if reseller_username:
+            c.execute(qmark("SELECT username FROM usuarios WHERE username=? AND rol='reseller'"), (reseller_username,))
+            if not fetchone(c):
+                db.close()
+                return jsonify({'error': 'El reseller no existe'}), 400
+        fields.append("reseller_username=?")
+        params.append(reseller_username)
     if fields:
         params.append(username)
         c.execute(qmark(f"UPDATE clientes SET {', '.join(fields)} WHERE username=?"), params)
