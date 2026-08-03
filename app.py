@@ -2095,6 +2095,9 @@ def cliente_detalle(username):
     if not cliente:
         db.close()
         return jsonify({'error': 'No encontrado'}), 404
+    c.execute(qmark("SELECT 1 AS found FROM orders WHERE username=? AND type='new' LIMIT 1"), (username,))
+    if fetchone(c):
+        cliente['client_origin'] = 'new'
 
     rol = session.get('rol', 'atencion')
     # Ambos roles ven el historial de pagos reciente
@@ -3929,7 +3932,12 @@ def migracion_clientes():
     c = db.cursor()
     c.execute(qmark(f"""
         SELECT
-            cl.username, cl.nombre, cl.contacto, cl.vencimiento, cl.client_origin,
+            cl.username, cl.nombre, cl.contacto, cl.vencimiento,
+            CASE
+                WHEN cl.client_origin='new'
+                  OR EXISTS (SELECT 1 FROM orders o WHERE o.username=cl.username AND o.type='new')
+                THEN 'new' ELSE 'legacy'
+            END AS client_origin,
             acc.username AS portal_username,
             acc.is_enabled AS portal_enabled,
             svc.service_username, svc.service_password, svc.maxplayer_user_id,
