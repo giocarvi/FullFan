@@ -745,9 +745,21 @@ def init_db():
             date_fetched TEXT,
             playlist_name TEXT,
             edit_url TEXT,
+            smartone_username TEXT,
+            smartone_password TEXT,
+            server_address TEXT,
+            server_port TEXT,
+            account_name TEXT,
+            note TEXT,
             imported_at TEXT DEFAULT (NOW()::text),
             updated_at TEXT DEFAULT (NOW()::text)
         )''')
+        c.execute("ALTER TABLE smartone_inventory ADD COLUMN IF NOT EXISTS smartone_username TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE smartone_inventory ADD COLUMN IF NOT EXISTS smartone_password TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE smartone_inventory ADD COLUMN IF NOT EXISTS server_address TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE smartone_inventory ADD COLUMN IF NOT EXISTS server_port TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE smartone_inventory ADD COLUMN IF NOT EXISTS account_name TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE smartone_inventory ADD COLUMN IF NOT EXISTS note TEXT DEFAULT NULL")
         c.execute('''CREATE TABLE IF NOT EXISTS device_apps (
             id SERIAL PRIMARY KEY,
             device_type TEXT NOT NULL,
@@ -879,6 +891,12 @@ def init_db():
                 date_fetched TEXT,
                 playlist_name TEXT,
                 edit_url TEXT,
+                smartone_username TEXT,
+                smartone_password TEXT,
+                server_address TEXT,
+                server_port TEXT,
+                account_name TEXT,
+                note TEXT,
                 imported_at TEXT DEFAULT (datetime('now')),
                 updated_at TEXT DEFAULT (datetime('now'))
             );
@@ -942,6 +960,12 @@ def init_db():
             "ALTER TABLE client_service_credentials ADD COLUMN maxplayer_user_id TEXT DEFAULT NULL",
             "ALTER TABLE client_service_credentials ADD COLUMN maxplayer_synced_at TEXT DEFAULT NULL",
             "ALTER TABLE client_service_credentials ADD COLUMN maxplayer_sync_status TEXT DEFAULT NULL",
+            "ALTER TABLE smartone_inventory ADD COLUMN smartone_username TEXT DEFAULT NULL",
+            "ALTER TABLE smartone_inventory ADD COLUMN smartone_password TEXT DEFAULT NULL",
+            "ALTER TABLE smartone_inventory ADD COLUMN server_address TEXT DEFAULT NULL",
+            "ALTER TABLE smartone_inventory ADD COLUMN server_port TEXT DEFAULT NULL",
+            "ALTER TABLE smartone_inventory ADD COLUMN account_name TEXT DEFAULT NULL",
+            "ALTER TABLE smartone_inventory ADD COLUMN note TEXT DEFAULT NULL",
         ):
             try:
                 c.execute(ddl)
@@ -2064,9 +2088,9 @@ def smartone_listado():
         params.append(estado)
     if q:
         like = f'%{q}%'
-        where.append("(c.nombre ILIKE ? OR c.username ILIKE ? OR c.contacto ILIKE ? OR s.mac ILIKE ? OR s.device_model ILIKE ?)" if PG else
-                     "(c.nombre LIKE ? OR c.username LIKE ? OR c.contacto LIKE ? OR s.mac LIKE ? OR s.device_model LIKE ?)")
-        params += [like, like, like, like, like]
+        where.append("(c.nombre ILIKE ? OR c.username ILIKE ? OR c.contacto ILIKE ? OR s.mac ILIKE ? OR s.device_model ILIKE ? OR s.smartone_username ILIKE ?)" if PG else
+                     "(c.nombre LIKE ? OR c.username LIKE ? OR c.contacto LIKE ? OR s.mac LIKE ? OR s.device_model LIKE ? OR s.smartone_username LIKE ?)")
+        params += [like, like, like, like, like, like]
 
     select_sql = f"""
         SELECT s.*, c.nombre, c.contacto, c.vencimiento
@@ -2099,6 +2123,70 @@ def smartone_listado():
     })
 
 
+def upsert_smartone_record(c, username, playlist_id, inv, now):
+    params = (
+        username,
+        inv.get('mac'),
+        None,
+        playlist_id,
+        inv.get('account_name') or inv.get('playlist_name') or 'Fenix',
+        inv.get('server_address'),
+        inv.get('server_port'),
+        inv.get('smartone_username'),
+        inv.get('smartone_password'),
+        inv.get('device_model'),
+        inv.get('license_status'),
+        inv.get('license_expires_at'),
+        inv.get('date_fetched'),
+        inv.get('note') or inv.get('expiration_text'),
+        now,
+    )
+    if PG:
+        c.execute("""
+            INSERT INTO smartone_records
+                (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
+                 smartone_username, smartone_password, device_model, license_status, license_expires_at,
+                 date_fetched, note, updated_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (username) DO UPDATE SET
+                mac=EXCLUDED.mac,
+                playlist_id=EXCLUDED.playlist_id,
+                account_name=COALESCE(NULLIF(EXCLUDED.account_name,''), smartone_records.account_name),
+                server_address=COALESCE(NULLIF(EXCLUDED.server_address,''), smartone_records.server_address),
+                server_port=COALESCE(NULLIF(EXCLUDED.server_port,''), smartone_records.server_port),
+                smartone_username=COALESCE(NULLIF(EXCLUDED.smartone_username,''), smartone_records.smartone_username),
+                smartone_password=COALESCE(NULLIF(EXCLUDED.smartone_password,''), smartone_records.smartone_password),
+                device_model=EXCLUDED.device_model,
+                license_status=EXCLUDED.license_status,
+                license_expires_at=EXCLUDED.license_expires_at,
+                date_fetched=EXCLUDED.date_fetched,
+                note=COALESCE(NULLIF(EXCLUDED.note,''), smartone_records.note),
+                updated_at=EXCLUDED.updated_at
+        """, params)
+    else:
+        c.execute("""
+            INSERT INTO smartone_records
+                (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
+                 smartone_username, smartone_password, device_model, license_status, license_expires_at,
+                 date_fetched, note, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(username) DO UPDATE SET
+                mac=excluded.mac,
+                playlist_id=excluded.playlist_id,
+                account_name=COALESCE(NULLIF(excluded.account_name,''), smartone_records.account_name),
+                server_address=COALESCE(NULLIF(excluded.server_address,''), smartone_records.server_address),
+                server_port=COALESCE(NULLIF(excluded.server_port,''), smartone_records.server_port),
+                smartone_username=COALESCE(NULLIF(excluded.smartone_username,''), smartone_records.smartone_username),
+                smartone_password=COALESCE(NULLIF(excluded.smartone_password,''), smartone_records.smartone_password),
+                device_model=excluded.device_model,
+                license_status=excluded.license_status,
+                license_expires_at=excluded.license_expires_at,
+                date_fetched=excluded.date_fetched,
+                note=COALESCE(NULLIF(excluded.note,''), smartone_records.note),
+                updated_at=excluded.updated_at
+        """, params)
+
+
 @app.route('/api/smartone/<playlist_id>/asociar', methods=['POST'])
 @login_required
 def smartone_asociar(playlist_id):
@@ -2123,53 +2211,42 @@ def smartone_asociar(playlist_id):
     now = now_gt().isoformat(timespec='seconds')
     if PG:
         c.execute("UPDATE smartone_inventory SET username=%s, updated_at=%s WHERE playlist_id=%s", (username, now, playlist_id))
-        c.execute("""
-            INSERT INTO smartone_records
-                (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
-                 smartone_username, smartone_password, device_model, license_status, license_expires_at,
-                 date_fetched, note, updated_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (username) DO UPDATE SET
-                mac=EXCLUDED.mac,
-                playlist_id=EXCLUDED.playlist_id,
-                account_name=EXCLUDED.account_name,
-                device_model=EXCLUDED.device_model,
-                license_status=EXCLUDED.license_status,
-                license_expires_at=EXCLUDED.license_expires_at,
-                date_fetched=EXCLUDED.date_fetched,
-                note=EXCLUDED.note,
-                updated_at=EXCLUDED.updated_at
-        """, (
-            username, inv.get('mac'), None, playlist_id, inv.get('playlist_name') or 'Fenix',
-            None, None, None, None, inv.get('device_model'), inv.get('license_status'),
-            inv.get('license_expires_at'), inv.get('date_fetched'), inv.get('expiration_text'), now
-        ))
     else:
         c.execute("UPDATE smartone_inventory SET username=?, updated_at=? WHERE playlist_id=?", (username, now, playlist_id))
-        c.execute("""
-            INSERT INTO smartone_records
-                (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
-                 smartone_username, smartone_password, device_model, license_status, license_expires_at,
-                 date_fetched, note, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(username) DO UPDATE SET
-                mac=excluded.mac,
-                playlist_id=excluded.playlist_id,
-                account_name=excluded.account_name,
-                device_model=excluded.device_model,
-                license_status=excluded.license_status,
-                license_expires_at=excluded.license_expires_at,
-                date_fetched=excluded.date_fetched,
-                note=excluded.note,
-                updated_at=excluded.updated_at
-        """, (
-            username, inv.get('mac'), None, playlist_id, inv.get('playlist_name') or 'Fenix',
-            None, None, None, None, inv.get('device_model'), inv.get('license_status'),
-            inv.get('license_expires_at'), inv.get('date_fetched'), inv.get('expiration_text'), now
-        ))
+    upsert_smartone_record(c, username, playlist_id, inv, now)
     db.commit()
     db.close()
     return jsonify({'ok': True})
+
+
+@app.route('/api/smartone/auto-asociar-username', methods=['POST'])
+@login_required
+def smartone_auto_asociar_username():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Solo admin puede auto-asociar Smart One'}), 403
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("""
+        SELECT s.*
+        FROM smartone_inventory s
+        INNER JOIN clientes c ON c.username=s.smartone_username
+        WHERE s.smartone_username IS NOT NULL
+          AND s.smartone_username<>''
+          AND (s.username IS NULL OR s.username='')
+    """))
+    rows = fetchall(c)
+    now = now_gt().isoformat(timespec='seconds')
+    for inv in rows:
+        username = inv.get('smartone_username')
+        playlist_id = inv.get('playlist_id')
+        if PG:
+            c.execute("UPDATE smartone_inventory SET username=%s, updated_at=%s WHERE playlist_id=%s", (username, now, playlist_id))
+        else:
+            c.execute("UPDATE smartone_inventory SET username=?, updated_at=? WHERE playlist_id=?", (username, now, playlist_id))
+        upsert_smartone_record(c, username, playlist_id, inv, now)
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'count': len(rows)})
 
 
 @app.route('/api/smartone/importar', methods=['POST'])
@@ -2202,15 +2279,29 @@ def smartone_importar():
         status = normalize_smartone_status(expiration_text, row.get('license_status'))
         expires_iso = smartone_expiration_iso(expiration_text, status)
         date_fetched = parse_smartone_date(row.get('date_fetched'))
+        smartone_username = (row.get('smartone_username') or row.get('username') or row.get('xui_username') or '').strip()
+        smartone_password = (row.get('smartone_password') or row.get('password') or row.get('xui_password') or '').strip()
+        server_address = (row.get('server_address') or row.get('server') or '').strip()
+        server_port = (row.get('server_port') or row.get('port') or '').strip()
+        account_name = (row.get('account_name') or row.get('playlist_name') or '').strip()
+        note = (row.get('note') or '').strip()
+        matched_username = None
+        if smartone_username:
+            c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (smartone_username,))
+            match = fetchone(c)
+            if match:
+                matched_username = match['username']
         c.execute(qmark("SELECT playlist_id FROM smartone_inventory WHERE playlist_id=?"), (playlist_id,))
         exists = bool(fetchone(c))
         if PG:
             c.execute("""
                 INSERT INTO smartone_inventory
-                    (playlist_id, mac, expiration_text, license_status, license_expires_at, device_model,
-                     date_fetched, playlist_name, edit_url, imported_at, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    (playlist_id, username, mac, expiration_text, license_status, license_expires_at, device_model,
+                     date_fetched, playlist_name, edit_url, smartone_username, smartone_password,
+                     server_address, server_port, account_name, note, imported_at, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (playlist_id) DO UPDATE SET
+                    username=COALESCE(smartone_inventory.username, EXCLUDED.username),
                     mac=EXCLUDED.mac,
                     expiration_text=EXCLUDED.expiration_text,
                     license_status=EXCLUDED.license_status,
@@ -2219,20 +2310,29 @@ def smartone_importar():
                     date_fetched=EXCLUDED.date_fetched,
                     playlist_name=EXCLUDED.playlist_name,
                     edit_url=EXCLUDED.edit_url,
+                    smartone_username=COALESCE(NULLIF(EXCLUDED.smartone_username,''), smartone_inventory.smartone_username),
+                    smartone_password=COALESCE(NULLIF(EXCLUDED.smartone_password,''), smartone_inventory.smartone_password),
+                    server_address=COALESCE(NULLIF(EXCLUDED.server_address,''), smartone_inventory.server_address),
+                    server_port=COALESCE(NULLIF(EXCLUDED.server_port,''), smartone_inventory.server_port),
+                    account_name=COALESCE(NULLIF(EXCLUDED.account_name,''), smartone_inventory.account_name),
+                    note=COALESCE(NULLIF(EXCLUDED.note,''), smartone_inventory.note),
                     updated_at=EXCLUDED.updated_at
             """, (
-                playlist_id, mac, expiration_text, status, expires_iso,
+                playlist_id, matched_username, mac, expiration_text, status, expires_iso,
                 (row.get('device') or '').strip(), date_fetched,
                 (row.get('playlist_name') or '').strip(), (row.get('edit_url') or '').strip(),
+                smartone_username, smartone_password, server_address, server_port, account_name, note,
                 now, now
             ))
         else:
             c.execute("""
                 INSERT INTO smartone_inventory
-                    (playlist_id, mac, expiration_text, license_status, license_expires_at, device_model,
-                     date_fetched, playlist_name, edit_url, imported_at, updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                    (playlist_id, username, mac, expiration_text, license_status, license_expires_at, device_model,
+                     date_fetched, playlist_name, edit_url, smartone_username, smartone_password,
+                     server_address, server_port, account_name, note, imported_at, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(playlist_id) DO UPDATE SET
+                    username=COALESCE(smartone_inventory.username, excluded.username),
                     mac=excluded.mac,
                     expiration_text=excluded.expiration_text,
                     license_status=excluded.license_status,
@@ -2241,13 +2341,35 @@ def smartone_importar():
                     date_fetched=excluded.date_fetched,
                     playlist_name=excluded.playlist_name,
                     edit_url=excluded.edit_url,
+                    smartone_username=COALESCE(NULLIF(excluded.smartone_username,''), smartone_inventory.smartone_username),
+                    smartone_password=COALESCE(NULLIF(excluded.smartone_password,''), smartone_inventory.smartone_password),
+                    server_address=COALESCE(NULLIF(excluded.server_address,''), smartone_inventory.server_address),
+                    server_port=COALESCE(NULLIF(excluded.server_port,''), smartone_inventory.server_port),
+                    account_name=COALESCE(NULLIF(excluded.account_name,''), smartone_inventory.account_name),
+                    note=COALESCE(NULLIF(excluded.note,''), smartone_inventory.note),
                     updated_at=excluded.updated_at
             """, (
-                playlist_id, mac, expiration_text, status, expires_iso,
+                playlist_id, matched_username, mac, expiration_text, status, expires_iso,
                 (row.get('device') or '').strip(), date_fetched,
                 (row.get('playlist_name') or '').strip(), (row.get('edit_url') or '').strip(),
+                smartone_username, smartone_password, server_address, server_port, account_name, note,
                 now, now
             ))
+        if matched_username:
+            inv = {
+                'mac': mac,
+                'playlist_name': account_name or (row.get('playlist_name') or '').strip(),
+                'device_model': (row.get('device') or '').strip(),
+                'license_status': status,
+                'license_expires_at': expires_iso,
+                'date_fetched': date_fetched,
+                'expiration_text': expiration_text,
+                'smartone_username': smartone_username,
+                'smartone_password': smartone_password,
+                'server_address': server_address,
+                'server_port': server_port,
+            }
+            upsert_smartone_record(c, matched_username, playlist_id, inv, now)
         procesadas += 1
         if exists:
             actualizadas += 1

@@ -755,6 +755,7 @@ body {
         {% if rol == 'admin' %}
         <button id="smartone-import-btn" class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#0f766e;" onclick="document.getElementById('smartone-csv-upload').click()">Importar CSV Smart One</button>
         <input type="file" id="smartone-csv-upload" accept=".csv,text/csv" style="display:none" onchange="importarSmartOneCsv(this)">
+        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#2563eb;" onclick="autoAsociarSmartOneUsername()">Auto-asociar por username</button>
         {% endif %}
       </div>
     </div>
@@ -1255,7 +1256,7 @@ async function loadSmartOne() {
         <div style="flex:1;min-width:0;${row.username ? 'cursor:pointer;' : ''}" ${row.username ? `onclick="openModal('${row.username}')"` : ''}>
           <div style="font-weight:900;">${row.nombre || row.username || row.playlist_name || 'Smart One sin asociar'}</div>
           <div style="font-size:12px;color:var(--muted);font-family:monospace;word-break:break-word;">
-            ${row.username || 'sin cliente Fénix'} · MAC: ${row.mac || 'sin MAC'} · ${row.device_model || 'sin dispositivo'}
+            ${row.username || 'sin cliente Fénix'} · SmartOne: ${row.smartone_username || 'sin username'} · MAC: ${row.mac || 'sin MAC'} · ${row.device_model || 'sin dispositivo'}
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">
             Vence: ${vencimiento} · Playlist: ${row.playlist_id || '—'} · Nombre: ${row.playlist_name || row.account_name || '—'}
@@ -1297,6 +1298,22 @@ async function asociarSmartOne(playlistId) {
     loadSmartOne();
   } catch(e) {
     showToast('❌ Error de conexión al asociar');
+  }
+}
+
+async function autoAsociarSmartOneUsername() {
+  if (!confirm('¿Auto-asociar registros Smart One cuyo username coincida exactamente con un cliente Fénix?\n\nSolo se asociarán registros que todavía estén sin cliente.')) return;
+  try {
+    const r = await fetch('/api/smartone/auto-asociar-username', {method:'POST'});
+    const d = await r.json();
+    if (!r.ok || !d.ok) {
+      showToast('❌ ' + (d.error || 'No se pudo auto-asociar'));
+      return;
+    }
+    showToast(`✅ ${d.count || 0} registro(s) asociado(s) por username`);
+    loadSmartOne();
+  } catch(e) {
+    showToast('❌ Error de conexión al auto-asociar');
   }
 }
 
