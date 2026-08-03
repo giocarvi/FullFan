@@ -3971,6 +3971,183 @@ def migracion_clientes():
     return jsonify({'clientes': items, 'counts': counts})
 
 
+@app.route('/api/admin/base-health')
+@login_required
+def base_health():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    today = today_gt().isoformat()
+    db = get_db()
+    c = db.cursor()
+
+    def scalar(sql, params=()):
+        c.execute(qmark(sql), params)
+        row = fetchone(c)
+        return int(row.get('c') or 0) if row else 0
+
+    pagos_void_sql = (
+        "SELECT COUNT(*) as c FROM pagos WHERE COALESCE(is_void, FALSE)=TRUE"
+        if PG else
+        "SELECT COUNT(*) as c FROM pagos WHERE COALESCE(is_void, 0)=1"
+    )
+
+    counts = {
+        'clientes_activos': scalar(f"SELECT COUNT(*) as c FROM clientes WHERE vencimiento>=? AND {active_client_where()}", (today,)),
+        'clientes_vencidos': scalar(f"SELECT COUNT(*) as c FROM clientes WHERE (vencimiento<? OR vencimiento IS NULL OR vencimiento='') AND {active_client_where()}", (today,)),
+        'clientes_archivados': scalar("SELECT COUNT(*) as c FROM clientes WHERE archived_at IS NOT NULL AND archived_at<>''"),
+        'pagos_anulados': scalar(pagos_void_sql),
+    }
+
+    c.execute(qmark(f"""
+        SELECT cl.username, cl.nombre, cl.contacto, cl.vencimiento
+        FROM clientes cl
+        LEFT JOIN client_portal_accounts acc ON acc.username=cl.username
+        WHERE {active_client_where('cl')}
+          AND (acc.username IS NULL OR COALESCE(acc.is_enabled, FALSE)=FALSE)
+        ORDER BY CASE WHEN cl.vencimiento IS NULL OR cl.vencimiento='' THEN 1 ELSE 0 END,
+                 cl.vencimiento DESC, cl.username ASC
+        LIMIT 500
+    """))
+    sin_portal = fetchall(c)
+
+    c.execute(qmark(f"""
+        SELECT cl.username, cl.nombre, cl.contacto, cl.vencimiento, acc.updated_at
+        FROM clientes cl
+        JOIN client_portal_accounts acc ON acc.username=cl.username
+        WHERE {active_client_where('cl')}
+          AND COALESCE(acc.is_enabled, FALSE)=TRUE
+        ORDER BY CASE WHEN cl.vencimiento IS NULL OR cl.vencimiento='' THEN 1 ELSE 0 END,
+                 cl.vencimiento DESC, cl.username ASC
+        LIMIT 1000
+    """))
+    con_portal = fetchall(c)
+
+    c.execute(qmark(f"""
+        SELECT cl.username, cl.nombre, cl.contacto, cl.vencimiento,
+               svc.service_username, svc.service_password
+        FROM clientes cl
+        LEFT JOIN client_service_credentials svc ON svc.username=cl.username
+        WHERE {active_client_where('cl')}
+          AND (
+            svc.username IS NULL OR
+            COALESCE(svc.service_username, '')='' OR
+            COALESCE(svc.service_password, '')=''
+          )
+        ORDER BY CASE WHEN cl.vencimiento IS NULL OR cl.vencimiento='' THEN 1 ELSE 0 END,
+                 cl.vencimiento DESC, cl.username ASC
+        LIMIT 500
+    """))
+    sin_xui = fetchall(c)
+
+    c.execute(qmark(f"""
+        SELECT username, nombre, contacto, vencimiento
+        FROM clientes
+        WHERE {active_client_where()}
+          AND (
+            COALESCE(nombre, '')='' OR
+            COALESCE(contacto, '')='' OR
+            COALESCE(vencimiento, '')=''
+          )
+        ORDER BY username ASC
+        LIMIT 500
+    """))
+    datos_incompletos = fetchall(c)
+
+    c.execute(qmark(f"""
+        SELECT username, nombre, contacto, vencimiento, parent_username, total_pagado
+        FROM clientes
+        WHERE {active_client_where()}
+        ORDER BY nombre ASC, username ASC
+    """))
+    rows = fetchall(c)
+
+    c.execute(qmark("""
+        SELECT acc.username, acc.is_enabled, acc.updated_at
+        FROM client_portal_accounts acc
+        LEFT JOIN clientes cl ON cl.username=acc.username
+        WHERE cl.username IS NULL
+        ORDER BY acc.username ASC
+        LIMIT 500
+    """))
+    portal_sin_cliente = fetchall(c)
+
+    pagos_anulados_sql = """
+        SELECT id, username, mes, monto, voided_at, voided_by, void_reason
+        FROM pagos
+        WHERE COALESCE(is_void, FALSE)=TRUE
+        ORDER BY CASE WHEN voided_at IS NULL OR voided_at='' THEN 1 ELSE 0 END,
+                 voided_at DESC, id DESC
+        LIMIT 500
+    """ if PG else """
+        SELECT id, username, mes, monto, voided_at, voided_by, void_reason
+        FROM pagos
+        WHERE COALESCE(is_void, 0)=1
+        ORDER BY CASE WHEN voided_at IS NULL OR voided_at='' THEN 1 ELSE 0 END,
+                 voided_at DESC, id DESC
+        LIMIT 500
+    """
+    c.execute(qmark(pagos_anulados_sql))
+    pagos_anulados = fetchall(c)
+    db.close()
+
+    by_phone = {}
+    by_name = {}
+    for row in rows:
+        phone = normalize_phone(row.get('contacto'))
+        if len(phone) >= 8:
+            by_phone.setdefault(phone, []).append(row)
+        name_key = normalize_text_key(row.get('nombre'))
+        if name_key and len(name_key) >= 4:
+            by_name.setdefault(name_key, []).append(row)
+
+    def group_payload(grouped, key_label):
+        groups = []
+        for key, items in grouped.items():
+            unique = {str(i.get('username') or '').lower() for i in items}
+            if len(items) < 2 or len(unique) < 2:
+                continue
+            groups.append({
+                key_label: key,
+                'total': len(items),
+                'clientes': [{
+                    'username': i.get('username') or '',
+                    'nombre': i.get('nombre') or '',
+                    'contacto': i.get('contacto') or '',
+                    'pais': phone_country_label(i.get('contacto')) if key_label == 'telefono' else '',
+                    'vencimiento': i.get('vencimiento') or '',
+                    'parent_username': i.get('parent_username') or '',
+                    'total_pagado': i.get('total_pagado') or 0,
+                } for i in items],
+            })
+        groups.sort(key=lambda g: (-g['total'], str(g.get(key_label) or '')))
+        return groups[:200]
+
+    duplicados_telefono = group_payload(by_phone, 'telefono')
+    duplicados_nombre = group_payload(by_name, 'nombre_key')
+    counts.update({
+        'con_portal': len(con_portal),
+        'sin_portal': len(sin_portal),
+        'sin_xui': len(sin_xui),
+        'datos_incompletos': len(datos_incompletos),
+        'duplicados_telefono': len(duplicados_telefono),
+        'duplicados_nombre': len(duplicados_nombre),
+        'portal_sin_cliente': len(portal_sin_cliente),
+    })
+
+    return jsonify({
+        'ok': True,
+        'counts': counts,
+        'con_portal': con_portal,
+        'sin_portal': sin_portal,
+        'sin_xui': sin_xui,
+        'datos_incompletos': datos_incompletos,
+        'duplicados_telefono': duplicados_telefono,
+        'duplicados_nombre': duplicados_nombre,
+        'portal_sin_cliente': portal_sin_cliente,
+        'pagos_anulados': pagos_anulados,
+    })
+
+
 # ── EXPORTAR CLIENTES (datos JSON para generar Excel en el frontend) ──────────
 @app.route('/api/admin/exportar-clientes')
 @login_required

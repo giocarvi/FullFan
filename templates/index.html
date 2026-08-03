@@ -807,6 +807,18 @@ body {
         {% endif %}
       </div>
     </div>
+    <div class="analytics-chart-card">
+      <h3>Salud de base de clientes</h3>
+      <p class="config-hint">Diagnostico de la plataforma sin borrar ni modificar datos. Usalo para revisar accesos al portal, credenciales incompletas, duplicados probables y registros por limpiar.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px;">
+        <button class="ops-btn-primary" onclick="loadBaseHealth()">Analizar base</button>
+        <button class="ops-btn-secondary" onclick="exportBaseHealth()">Descargar Excel</button>
+      </div>
+      <div class="analytics-kpi-grid" id="base-health-kpis">
+        <div class="kpi-card"><div class="kpi-val">—</div><div class="kpi-lbl">Presiona analizar</div></div>
+      </div>
+      <div id="base-health-list"><div class="empty-state"><p>Presiona “Analizar base” para generar el diagnostico.</p></div></div>
+    </div>
     <div class="analytics-kpi-grid" id="migration-kpis">
       <div class="kpi-card"><div class="kpi-val" id="mig-total">—</div><div class="kpi-lbl">En lista</div></div>
       <div class="kpi-card"><div class="kpi-val" id="mig-sin-portal">—</div><div class="kpi-lbl">Sin portal</div></div>
@@ -1288,6 +1300,7 @@ let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', curre
 let searchTimeout;
 let activationPlansLoaded = false;
 let currentActivationStatus = 'open';
+let baseHealthData = null;
 const IS_ADMIN = {{ 'true' if rol == 'admin' else 'false' }};
 window._appConfig = {};
 const DEFAULT_MIGRATION_MESSAGE = 'Hola {nombre}, le saludamos de Fénix Digital TV 🔥\n\nLe informamos que Full Fan Digital TV ya no opera, debido a la situación que se dio en Guatemala a principios de junio. Ahora es parte del grupo internacional Fénix Digital TV: su entretenimiento, sin fronteras.\n\nSeguimos con la misma atención, experiencia de 7 años y hoy lanzamos un nuevo servidor con nuevas opciones 😉\n\nLe invitamos a ingresar a nuestro portal de clientes:\n{portal}\n\nUsuario: {usuario}\nPassword: {password_portal}\n\nEn el portal podrá ver apps recomendadas, su usuario y password de Max Player, fecha de vencimiento e historial de pagos.\n\nPara Smart One el cambio se hará automático.\n\nSu servicio vence el {fecha}. Gracias por seguir con nosotros 🖐🏻';
@@ -2381,6 +2394,146 @@ async function loadMigrationClients() {
       </div>
     </div>`;
   }).join('');
+}
+
+async function loadBaseHealth() {
+  const list = document.getElementById('base-health-list');
+  const kpis = document.getElementById('base-health-kpis');
+  if (!list || !kpis) return null;
+  list.innerHTML = '<div class="loading">Analizando base...</div>';
+  const r = await fetch('/api/admin/base-health');
+  let d = {};
+  try { d = await r.json(); } catch(e) {}
+  if (!r.ok || !d.ok) {
+    list.innerHTML = `<div class="empty-state"><p>${escHtml(d.error || 'No se pudo analizar la base.')}</p></div>`;
+    return null;
+  }
+  baseHealthData = d;
+  const c = d.counts || {};
+  const kpiItems = [
+    ['Clientes activos', c.clientes_activos || 0],
+    ['Clientes vencidos', c.clientes_vencidos || 0],
+    ['Con portal', c.con_portal || 0],
+    ['Sin portal', c.sin_portal || 0],
+    ['Sin credenciales Fenix', c.sin_xui || 0],
+    ['Duplicados telefono', c.duplicados_telefono || 0],
+    ['Duplicados nombre', c.duplicados_nombre || 0],
+    ['Datos incompletos', c.datos_incompletos || 0],
+    ['Archivados', c.clientes_archivados || 0],
+    ['Pagos anulados', c.pagos_anulados || 0],
+  ];
+  kpis.innerHTML = kpiItems.map(([label, value]) => `
+    <div class="kpi-card"><div class="kpi-val">${escHtml(value)}</div><div class="kpi-lbl">${escHtml(label)}</div></div>
+  `).join('');
+
+  const renderClientRows = (rows, opts={}) => {
+    if (!rows || !rows.length) return '<div class="empty-state"><p>Sin hallazgos en esta categoria.</p></div>';
+    return `<div style="overflow:auto;"><table class="data-table"><thead><tr>
+      <th>Cliente</th><th>Usuario</th><th>Telefono</th><th>Vence</th>${opts.extraHead || ''}
+    </tr></thead><tbody>${rows.slice(0, 80).map(x => `
+      <tr onclick="openModal('${escHtml(x.username)}')" style="cursor:pointer;">
+        <td>${escHtml(x.nombre || '—')}</td>
+        <td style="font-family:monospace;">${escHtml(x.username || '—')}</td>
+        <td>${escHtml(x.contacto || '—')}</td>
+        <td>${escHtml(x.vencimiento || '—')}</td>${opts.extraRow ? opts.extraRow(x) : ''}
+      </tr>
+    `).join('')}</tbody></table>${rows.length > 80 ? `<p class="config-hint">Mostrando 80 de ${rows.length}. Descarga Excel para ver todo.</p>` : ''}</div>`;
+  };
+
+  const renderGroups = (groups, keyName) => {
+    if (!groups || !groups.length) return '<div class="empty-state"><p>Sin duplicados probables en esta categoria.</p></div>';
+    return groups.slice(0, 30).map(g => `
+      <div class="ops-task">
+        <div class="ops-task-title">${escHtml(g[keyName] || '')} · ${g.total} clientes</div>
+        <div style="margin-top:8px;display:grid;gap:7px;">
+          ${(g.clientes || []).map(c => `
+            <div class="pay-row" onclick="openModal('${escHtml(c.username)}')" style="cursor:pointer;">
+              <div>
+                <div style="font-weight:800;">${escHtml(c.nombre || c.username)}</div>
+                <div style="font-size:12px;color:var(--muted);font-family:monospace;">
+                  ${escHtml(c.username)} · ${escHtml(c.contacto || '—')} ${c.pais ? '· ' + escHtml(c.pais) : ''} · vence ${escHtml(c.vencimiento || '—')}${c.parent_username ? ' · titular: ' + escHtml(c.parent_username) : ''}
+                </div>
+              </div>
+              <span class="pay-amount">Q${parseFloat(c.total_pagado || 0).toLocaleString()}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `).join('') + (groups.length > 30 ? `<p class="config-hint">Mostrando 30 de ${groups.length} grupos. Descarga Excel para ver todo.</p>` : '');
+  };
+
+  const renderPortalOrphans = rows => {
+    if (!rows || !rows.length) return '<div class="empty-state"><p>No hay accesos de portal sin cliente.</p></div>';
+    return `<div style="overflow:auto;"><table class="data-table"><thead><tr><th>Usuario portal</th><th>Activo</th><th>Actualizado</th></tr></thead><tbody>
+      ${rows.map(x => `<tr><td style="font-family:monospace;">${escHtml(x.username)}</td><td>${x.is_enabled ? 'Si' : 'No'}</td><td>${escHtml(x.updated_at || '—')}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  };
+
+  const renderVoids = rows => {
+    if (!rows || !rows.length) return '<div class="empty-state"><p>No hay pagos anulados.</p></div>';
+    return `<div style="overflow:auto;"><table class="data-table"><thead><tr><th>ID</th><th>Usuario</th><th>Fecha pago</th><th>Monto</th><th>Anulado</th><th>Motivo</th></tr></thead><tbody>
+      ${rows.slice(0, 80).map(x => `<tr>
+        <td>${escHtml(x.id)}</td><td style="font-family:monospace;">${escHtml(x.username || '—')}</td><td>${escHtml(x.mes || '—')}</td>
+        <td>Q${parseFloat(x.monto || 0).toLocaleString()}</td><td>${escHtml(x.voided_at || '—')}</td><td>${escHtml(x.void_reason || '—')}</td>
+      </tr>`).join('')}
+    </tbody></table>${rows.length > 80 ? `<p class="config-hint">Mostrando 80 de ${rows.length}. Descarga Excel para ver todo.</p>` : ''}</div>`;
+  };
+
+  list.innerHTML = `
+    <div class="ops-task-meta" style="margin-bottom:12px;">Lectura segura: este reporte no elimina, no archiva y no cambia pagos.</div>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Clientes con portal activo (${(d.con_portal || []).length})</summary>${renderClientRows(d.con_portal, {extraHead:'<th>Actualizado</th>', extraRow:x => `<td>${escHtml(x.updated_at || '—')}</td>`})}</details>
+    <details class="config-section" open><summary style="cursor:pointer;font-weight:900;">Clientes sin acceso al portal (${(d.sin_portal || []).length})</summary>${renderClientRows(d.sin_portal)}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Clientes sin credenciales Fenix/XUI completas (${(d.sin_xui || []).length})</summary>${renderClientRows(d.sin_xui, {extraHead:'<th>Usuario Fenix</th><th>Password</th>', extraRow:x => `<td>${escHtml(x.service_username || '—')}</td><td>${x.service_password ? 'OK' : 'Falta'}</td>`})}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Datos incompletos (${(d.datos_incompletos || []).length})</summary>${renderClientRows(d.datos_incompletos)}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Duplicados probables por telefono (${(d.duplicados_telefono || []).length})</summary>${renderGroups(d.duplicados_telefono, 'telefono')}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Duplicados probables por nombre (${(d.duplicados_nombre || []).length})</summary>${renderGroups(d.duplicados_nombre, 'nombre_key')}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Accesos de portal sin cliente (${(d.portal_sin_cliente || []).length})</summary>${renderPortalOrphans(d.portal_sin_cliente)}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Pagos anulados conservados en historial (${(d.pagos_anulados || []).length})</summary>${renderVoids(d.pagos_anulados)}</details>
+  `;
+  return d;
+}
+
+function appendSheet(wb, name, rows) {
+  const ws = XLSX.utils.json_to_sheet(rows && rows.length ? rows : [{info: 'Sin registros'}]);
+  XLSX.utils.book_append_sheet(wb, ws, name.substring(0, 31));
+}
+
+function flattenBaseHealthGroups(groups, keyName) {
+  const rows = [];
+  (groups || []).forEach(g => (g.clientes || []).forEach(c => rows.push({
+    grupo: g[keyName] || '',
+    total_grupo: g.total || 0,
+    username: c.username || '',
+    nombre: c.nombre || '',
+    contacto: c.contacto || '',
+    pais: c.pais || '',
+    vencimiento: c.vencimiento || '',
+    usuario_titular: c.parent_username || '',
+    total_pagado: c.total_pagado || 0,
+  })));
+  return rows;
+}
+
+async function exportBaseHealth() {
+  try {
+    const d = baseHealthData || await loadBaseHealth();
+    if (!d) return;
+    const wb = XLSX.utils.book_new();
+    const c = d.counts || {};
+    appendSheet(wb, 'Resumen', Object.keys(c).map(k => ({indicador: k, total: c[k]})));
+    appendSheet(wb, 'Con portal', d.con_portal || []);
+    appendSheet(wb, 'Sin portal', d.sin_portal || []);
+    appendSheet(wb, 'Sin Fenix XUI', d.sin_xui || []);
+    appendSheet(wb, 'Datos incompletos', d.datos_incompletos || []);
+    appendSheet(wb, 'Dup telefono', flattenBaseHealthGroups(d.duplicados_telefono, 'telefono'));
+    appendSheet(wb, 'Dup nombre', flattenBaseHealthGroups(d.duplicados_nombre, 'nombre_key'));
+    appendSheet(wb, 'Portal sin cliente', d.portal_sin_cliente || []);
+    appendSheet(wb, 'Pagos anulados', d.pagos_anulados || []);
+    XLSX.writeFile(wb, `salud_base_fenix_${localDateStr()}.xlsx`);
+    showToast('Reporte de salud descargado');
+  } catch(e) {
+    showToast('No se pudo descargar: ' + e.message);
+  }
 }
 
 async function loadPhoneGroups() {
