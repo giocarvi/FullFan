@@ -232,6 +232,57 @@ body {
 .modal-name { font-size: 18px; font-weight: 700; }
 .modal-username { font-size: 13px; color: var(--muted); font-family: monospace; }
 .modal-body { padding: 16px 20px; }
+.client-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 16px 20px 4px;
+}
+.client-summary-card {
+  background: rgba(255,255,255,0.045);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  min-width: 0;
+}
+.client-summary-card .lbl {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .55px;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+.client-summary-card .val {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.client-quick-actions {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 20px 4px;
+  scrollbar-width: none;
+}
+.client-quick-actions::-webkit-scrollbar { display: none; }
+.client-quick-actions button {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.055);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.client-quick-actions button.primary {
+  background: linear-gradient(135deg,#FF6A00,#FFB000);
+  color: #160A00;
+  border-color: transparent;
+}
 .info-row {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 0; border-bottom: 1px solid var(--border);
@@ -316,6 +367,7 @@ body {
   .stats-grid { grid-template-columns: repeat(4, 1fr); }
   .modal { border-radius: 24px; margin-bottom: 20px; }
   .modal-overlay { align-items: center; }
+  .client-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 /* ── ANALYTICS ────────────────────────────────────────────────────── */
@@ -1856,7 +1908,7 @@ async function openModal(username) {
     : '<div class="empty-state" style="padding:20px"><p>Sin pagos registrados</p></div>';
 
   const asociadosHtml = `
-    <div class="pago-form">
+    <div class="pago-form" id="client-associated-${username}">
       <h3>👥 Usuarios asociados</h3>
       ${parent ? `
         <div class="info-row" style="margin-bottom:12px;">
@@ -1908,7 +1960,7 @@ async function openModal(username) {
   window._migrationWaUrls = window._migrationWaUrls || {};
   window._migrationWaUrls[username] = waBase ? `${waBase}?text=${encMsg(waFill(migrationTemplate))}` : '';
   const waSection = `
-    <div class="wa-section">
+    <div class="wa-section" id="client-wa-${username}">
       <div class="wa-section-title">💬 WhatsApp</div>
       <div class="wa-buttons">
         ${waBase ? `
@@ -1937,6 +1989,20 @@ async function openModal(username) {
       </div>
       <span class="badge ${status.cls}" style="margin-left:auto;flex-shrink:0;">${status.label}</span>
     </div>
+    <div class="client-summary-grid">
+      <div class="client-summary-card"><div class="lbl">Vencimiento</div><div class="val">${c.vencimiento || 'Sin fecha'}</div></div>
+      <div class="client-summary-card"><div class="lbl">Contacto</div><div class="val">${c.contacto || 'N/A'}</div></div>
+      <div class="client-summary-card"><div class="lbl">Total pagado</div><div class="val">Q${parseFloat(c.total_pagado||0).toLocaleString()}</div></div>
+      <div class="client-summary-card"><div class="lbl">Asociados</div><div class="val">${asociados.length}${parent ? ' · secundario' : ''}</div></div>
+    </div>
+    <div class="client-quick-actions">
+      <button class="primary" onclick="scrollClientSection('pago-form-${username}')">Registrar pago</button>
+      <button onclick="scrollClientSection('client-wa-${username}')">WhatsApp</button>
+      <button onclick="scrollClientSection('client-service-${username}')">Max Player</button>
+      <button onclick="scrollClientSection('client-smartone-${username}')">Smart One</button>
+      <button onclick="scrollClientSection('client-edit-${username}')">Editar</button>
+      <button onclick="scrollClientSection('client-associated-${username}')">Asociados</button>
+    </div>
     <div class="modal-body">
       <div class="info-row"><div class="info-icon">📞</div><div class="info-data"><div class="lbl">Contacto</div><div class="val">${c.contacto || 'N/A'}</div></div></div>
       <div class="info-row"><div class="info-icon">📅</div><div class="info-data"><div class="lbl">Vencimiento</div><div class="val">${c.vencimiento || 'Sin fecha'}</div></div></div>
@@ -1949,7 +2015,7 @@ async function openModal(username) {
 
     ${waSection}
 
-    <div class="pago-form">
+    <div class="pago-form" id="client-portal-${username}">
       <h3>Portal del cliente</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <span class="badge gray">Usuario: ${c.username}</span>
@@ -1959,7 +2025,7 @@ async function openModal(username) {
       <div style="font-size:12px;color:var(--muted);margin-top:8px;">Deja el acceso activo y vuelve a poner la contraseña del portal igual al password XUI guardado. No modifica XUI.</div>
     </div>
 
-    <div class="pago-form">
+    <div class="pago-form" id="client-service-${username}">
       <h3>Max Player</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <span class="badge gray">Usuario: ${service.service_username || c.username}</span>
@@ -1971,7 +2037,7 @@ async function openModal(username) {
       <div style="font-size:12px;color:var(--muted);margin-top:8px;">Borra el usuario anterior si lo encuentra y lo crea nuevamente. Max Player queda con password igual al password XUI.</div>
     </div>
 
-    <div class="pago-form">
+    <div class="pago-form" id="client-smartone-${username}">
       <h3>📺 Smart One</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <span class="badge ${smartOneStatusLabel(smartone.license_status, smartone.license_expires_at).cls}">${smartOneStatusLabel(smartone.license_status, smartone.license_expires_at).label}</span>
@@ -2054,7 +2120,7 @@ async function openModal(username) {
       </div>
     </div>
 
-    <div class="pago-form" id="edit-form-${username}">
+    <div class="pago-form" id="client-edit-${username}">
       <h3>✏️ Editar datos</h3>
       ${esAdmin ? `
       <div class="form-group" style="margin-bottom:10px;">
@@ -2909,6 +2975,12 @@ eliminarPago = eliminarPagoSeguro;
 
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('open');
+}
+
+function scrollClientSection(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 document.getElementById('modal-overlay').addEventListener('click', e => {
