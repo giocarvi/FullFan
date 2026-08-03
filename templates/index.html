@@ -324,6 +324,17 @@ body {
 }
 .form-group input:focus, .form-group select:focus { border-color: var(--accent); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-group textarea {
+  width: 100%;
+  min-height: 88px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+  resize: vertical;
+}
 .btn-primary {
   width: 100%; padding: 14px;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
@@ -368,6 +379,50 @@ body {
   .modal { border-radius: 24px; margin-bottom: 20px; }
   .modal-overlay { align-items: center; }
   .client-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media(max-width: 520px) {
+  .view { padding: 12px; }
+  .modal {
+    max-height: 94vh;
+    border-radius: 22px 22px 0 0;
+    padding-bottom: 96px;
+  }
+  .modal-header {
+    padding: 16px 14px 12px;
+    gap: 10px;
+  }
+  .modal-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    font-size: 19px;
+  }
+  .modal-name { font-size: 16px; }
+  .modal-body, .client-summary-grid, .client-quick-actions {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .client-summary-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .client-summary-card { padding: 10px; }
+  .client-summary-card .val { font-size: 14px; }
+  .pago-form {
+    margin-left: 14px;
+    margin-right: 14px;
+    padding: 14px;
+  }
+  .form-row { grid-template-columns: 1fr; gap: 0; }
+  .btn-primary, .btn-secondary, .wa-btn {
+    min-height: 44px;
+  }
+  .pay-row {
+    padding: 12px 14px;
+    gap: 10px;
+    align-items: flex-start;
+  }
 }
 
 /* ── ANALYTICS ────────────────────────────────────────────────────── */
