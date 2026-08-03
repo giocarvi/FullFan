@@ -4,6 +4,8 @@ import hmac
 import json
 import time
 import re
+import csv
+import io
 import unicodedata
 import traceback
 from urllib import request as urlrequest
@@ -48,6 +50,42 @@ def phone_country_label(value):
         if digits.startswith(prefix):
             return label
     return 'Internacional' if len(digits) > 8 else ''
+
+def parse_smartone_date(value):
+    """Convierte fechas tipo 'Aug  01, 2026' a ISO yyyy-mm-dd."""
+    text = str(value or '').strip()
+    if not text:
+        return None
+    text = re.sub(r'\s+', ' ', text)
+    for fmt in ('%b %d, %Y', '%B %d, %Y', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            pass
+    return None
+
+def normalize_smartone_status(expiration_text, status=''):
+    raw = f"{status or ''} {expiration_text or ''}".lower()
+    if 'expired' in raw or 'vencid' in raw:
+        return 'vencida'
+    if 'trial' in raw:
+        return 'trial'
+    if expiration_text:
+        return 'activa'
+    return 'sin_registro'
+
+def smartone_expiration_iso(expiration_text, status=''):
+    text = str(expiration_text or '').strip()
+    if not text:
+        return None
+    if 'trial' in text.lower():
+        m = re.search(r'days?\s*left\s*:\s*(\d+)', text, re.I)
+        if m:
+            return (today_gt() + timedelta(days=int(m.group(1)))).isoformat()
+        return None
+    if 'expired' in text.lower():
+        return None
+    return parse_smartone_date(text)
 
 def normalize_text_key(value):
     """Normaliza texto para comparar nombres sin tildes, símbolos o espacios raros."""
@@ -696,6 +734,20 @@ def init_db():
             note TEXT,
             updated_at TEXT DEFAULT (NOW()::text)
         )''')
+        c.execute('''CREATE TABLE IF NOT EXISTS smartone_inventory (
+            playlist_id TEXT PRIMARY KEY,
+            username TEXT DEFAULT NULL,
+            mac TEXT,
+            expiration_text TEXT,
+            license_status TEXT DEFAULT 'sin_registro',
+            license_expires_at TEXT,
+            device_model TEXT,
+            date_fetched TEXT,
+            playlist_name TEXT,
+            edit_url TEXT,
+            imported_at TEXT DEFAULT (NOW()::text),
+            updated_at TEXT DEFAULT (NOW()::text)
+        )''')
         c.execute('''CREATE TABLE IF NOT EXISTS device_apps (
             id SERIAL PRIMARY KEY,
             device_type TEXT NOT NULL,
@@ -814,6 +866,20 @@ def init_db():
                 license_expires_at TEXT,
                 date_fetched TEXT,
                 note TEXT,
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS smartone_inventory (
+                playlist_id TEXT PRIMARY KEY,
+                username TEXT DEFAULT NULL,
+                mac TEXT,
+                expiration_text TEXT,
+                license_status TEXT DEFAULT 'sin_registro',
+                license_expires_at TEXT,
+                device_model TEXT,
+                date_fetched TEXT,
+                playlist_name TEXT,
+                edit_url TEXT,
+                imported_at TEXT DEFAULT (datetime('now')),
                 updated_at TEXT DEFAULT (datetime('now'))
             );
             CREATE TABLE IF NOT EXISTS device_apps (
@@ -2000,7 +2066,7 @@ def smartone_listado():
 
     select_sql = f"""
         SELECT s.*, c.nombre, c.contacto, c.vencimiento
-        FROM smartone_records s
+        FROM smartone_inventory s
         LEFT JOIN clientes c ON c.username=s.username
         WHERE {' AND '.join(where)}
     """
@@ -2008,15 +2074,15 @@ def smartone_listado():
     c.execute(qmark(select_sql + order_sql), params)
     rows = fetchall(c)
 
-    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records"))
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_inventory"))
     total = fetchone(c)['c']
-    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records WHERE license_status='activa'"))
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_inventory WHERE license_status='activa'"))
     activas = fetchone(c)['c']
-    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records WHERE license_status='trial'"))
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_inventory WHERE license_status='trial'"))
     trial = fetchone(c)['c']
-    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records WHERE license_status='vencida' OR (license_expires_at IS NOT NULL AND license_expires_at<?)"), (today,))
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_inventory WHERE license_status='vencida' OR (license_expires_at IS NOT NULL AND license_expires_at<?)"), (today,))
     vencidas = fetchone(c)['c']
-    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records WHERE license_expires_at IS NOT NULL AND license_expires_at>=? AND license_expires_at<=?"), (today, in_15))
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_inventory WHERE license_expires_at IS NOT NULL AND license_expires_at>=? AND license_expires_at<=?"), (today, in_15))
     por_vencer = fetchone(c)['c']
     db.close()
     return jsonify({
@@ -2027,6 +2093,92 @@ def smartone_listado():
         'vencidas': vencidas,
         'por_vencer': por_vencer,
     })
+
+
+@app.route('/api/smartone/importar', methods=['POST'])
+@login_required
+def smartone_importar():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Solo admin puede importar Smart One'}), 403
+    if 'archivo' not in request.files:
+        return jsonify({'error': 'Adjunta el CSV exportado de Smart One'}), 400
+    f = request.files['archivo']
+    raw = f.read()
+    text = raw.decode('utf-8-sig', errors='replace')
+    reader = csv.DictReader(io.StringIO(text))
+    now = now_gt().isoformat(timespec='seconds')
+    db = get_db()
+    c = db.cursor()
+    procesadas = 0
+    insertadas = 0
+    actualizadas = 0
+    omitidas = 0
+    for row in reader:
+        playlist_id = (row.get('playlist_id') or '').strip()
+        mac = (row.get('mac') or '').strip().upper()
+        if not playlist_id and not mac:
+            omitidas += 1
+            continue
+        if not playlist_id:
+            playlist_id = f"MAC:{mac}"
+        expiration_text = (row.get('expiration') or '').strip()
+        status = normalize_smartone_status(expiration_text, row.get('license_status'))
+        expires_iso = smartone_expiration_iso(expiration_text, status)
+        date_fetched = parse_smartone_date(row.get('date_fetched'))
+        c.execute(qmark("SELECT playlist_id FROM smartone_inventory WHERE playlist_id=?"), (playlist_id,))
+        exists = bool(fetchone(c))
+        if PG:
+            c.execute("""
+                INSERT INTO smartone_inventory
+                    (playlist_id, mac, expiration_text, license_status, license_expires_at, device_model,
+                     date_fetched, playlist_name, edit_url, imported_at, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (playlist_id) DO UPDATE SET
+                    mac=EXCLUDED.mac,
+                    expiration_text=EXCLUDED.expiration_text,
+                    license_status=EXCLUDED.license_status,
+                    license_expires_at=EXCLUDED.license_expires_at,
+                    device_model=EXCLUDED.device_model,
+                    date_fetched=EXCLUDED.date_fetched,
+                    playlist_name=EXCLUDED.playlist_name,
+                    edit_url=EXCLUDED.edit_url,
+                    updated_at=EXCLUDED.updated_at
+            """, (
+                playlist_id, mac, expiration_text, status, expires_iso,
+                (row.get('device') or '').strip(), date_fetched,
+                (row.get('playlist_name') or '').strip(), (row.get('edit_url') or '').strip(),
+                now, now
+            ))
+        else:
+            c.execute("""
+                INSERT INTO smartone_inventory
+                    (playlist_id, mac, expiration_text, license_status, license_expires_at, device_model,
+                     date_fetched, playlist_name, edit_url, imported_at, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(playlist_id) DO UPDATE SET
+                    mac=excluded.mac,
+                    expiration_text=excluded.expiration_text,
+                    license_status=excluded.license_status,
+                    license_expires_at=excluded.license_expires_at,
+                    device_model=excluded.device_model,
+                    date_fetched=excluded.date_fetched,
+                    playlist_name=excluded.playlist_name,
+                    edit_url=excluded.edit_url,
+                    updated_at=excluded.updated_at
+            """, (
+                playlist_id, mac, expiration_text, status, expires_iso,
+                (row.get('device') or '').strip(), date_fetched,
+                (row.get('playlist_name') or '').strip(), (row.get('edit_url') or '').strip(),
+                now, now
+            ))
+        procesadas += 1
+        if exists:
+            actualizadas += 1
+        else:
+            insertadas += 1
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'procesadas': procesadas, 'insertadas': insertadas, 'actualizadas': actualizadas, 'omitidas': omitidas})
 
 
 @app.route('/api/clientes/<username>/portal', methods=['POST'])

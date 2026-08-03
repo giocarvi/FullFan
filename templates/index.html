@@ -750,6 +750,10 @@ body {
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
         <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;" onclick="loadSmartOne()">Actualizar</button>
+        {% if rol == 'admin' %}
+        <button id="smartone-import-btn" class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#0f766e;" onclick="document.getElementById('smartone-csv-upload').click()">Importar CSV Smart One</button>
+        <input type="file" id="smartone-csv-upload" accept=".csv,text/csv" style="display:none" onchange="importarSmartOneCsv(this)">
+        {% endif %}
       </div>
     </div>
     <div class="analytics-kpi-grid">
@@ -1242,16 +1246,17 @@ async function loadSmartOne() {
   }
   list.innerHTML = rows.map(row => {
     const st = smartOneStatusLabel(row.license_status, row.license_expires_at);
-    const link = row.playlist_id ? `https://smartone-iptv.com/plugin/smart_one/client_main/edit_playlist/${row.playlist_id}/` : 'https://smartone-iptv.com/plugin/smart_one/client_main/index/';
+    const link = row.edit_url || (row.playlist_id ? `https://smartone-iptv.com/client/plugin/smart_one/client_main/edit_playlist/${row.playlist_id}/` : 'https://smartone-iptv.com/plugin/smart_one/client_main/index/');
+    const vencimiento = row.license_expires_at || row.expiration_text || 'sin fecha';
     return `
       <div class="pay-row" style="align-items:flex-start;gap:12px;">
-        <div style="flex:1;min-width:0;cursor:pointer;" onclick="openModal('${row.username}')">
-          <div style="font-weight:900;">${row.nombre || row.username || '—'}</div>
+        <div style="flex:1;min-width:0;${row.username ? 'cursor:pointer;' : ''}" ${row.username ? `onclick="openModal('${row.username}')"` : ''}>
+          <div style="font-weight:900;">${row.nombre || row.username || row.playlist_name || 'Smart One sin asociar'}</div>
           <div style="font-size:12px;color:var(--muted);font-family:monospace;word-break:break-word;">
-            ${row.username || '—'} · MAC: ${row.mac || 'sin MAC'} · ${row.device_model || 'sin dispositivo'}
+            ${row.username || 'sin cliente Fénix'} · MAC: ${row.mac || 'sin MAC'} · ${row.device_model || 'sin dispositivo'}
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:4px;">
-            Vence: ${row.license_expires_at || 'sin fecha'} · Playlist: ${row.playlist_id || '—'} · Cuenta: ${row.account_name || '—'}
+            Vence: ${vencimiento} · Playlist: ${row.playlist_id || '—'} · Nombre: ${row.playlist_name || row.account_name || '—'}
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
@@ -1260,6 +1265,34 @@ async function loadSmartOne() {
         </div>
       </div>`;
   }).join('');
+}
+
+async function importarSmartOneCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!confirm(`¿Importar "${file.name}" al inventario Smart One?\n\nEsto actualizará licencias por Playlist ID/MAC y no modifica clientes Fénix todavía.`)) {
+    input.value = '';
+    return;
+  }
+  const fd = new FormData();
+  fd.append('archivo', file);
+  const btn = document.getElementById('smartone-import-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Importando...'; }
+  try {
+    const r = await fetch('/api/smartone/importar', {method:'POST', body:fd});
+    const d = await r.json();
+    if (!r.ok || !d.ok) {
+      alert('Error: ' + (d.error || `HTTP ${r.status}`));
+      return;
+    }
+    alert(`✅ Smart One importado\nProcesadas: ${d.procesadas}\nNuevas: ${d.insertadas}\nActualizadas: ${d.actualizadas}\nOmitidas: ${d.omitidas}`);
+    loadSmartOne();
+  } catch(e) {
+    alert('Error de conexión: ' + e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Importar CSV Smart One'; }
+    input.value = '';
+  }
 }
 
 document.addEventListener('input', e => {
