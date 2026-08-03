@@ -524,6 +524,7 @@ def init_db():
             parent_username TEXT DEFAULT NULL,
             reseller_username TEXT DEFAULT NULL,
             reseller_status TEXT DEFAULT 'prospecto',
+            client_origin TEXT DEFAULT 'legacy',
             total_pagado REAL DEFAULT 0,
             notas TEXT DEFAULT '',
             created_at TEXT DEFAULT (NOW()::text)
@@ -561,6 +562,7 @@ def init_db():
                 parent_username TEXT DEFAULT NULL,
                 reseller_username TEXT DEFAULT NULL,
                 reseller_status TEXT DEFAULT 'prospecto',
+                client_origin TEXT DEFAULT 'legacy',
                 total_pagado REAL DEFAULT 0, notas TEXT DEFAULT '',
                 created_at TEXT DEFAULT (datetime('now'))
             );
@@ -601,6 +603,7 @@ def init_db():
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS parent_username TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reseller_username TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reseller_status TEXT DEFAULT 'prospecto'")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS client_origin TEXT DEFAULT 'legacy'")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS archived_at TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS archived_by TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS archive_reason TEXT DEFAULT NULL")
@@ -624,6 +627,7 @@ def init_db():
             "ALTER TABLE clientes ADD COLUMN parent_username TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN reseller_username TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN reseller_status TEXT DEFAULT 'prospecto'",
+            "ALTER TABLE clientes ADD COLUMN client_origin TEXT DEFAULT 'legacy'",
             "ALTER TABLE clientes ADD COLUMN archived_at TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN archived_by TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN archive_reason TEXT DEFAULT NULL",
@@ -2072,11 +2076,11 @@ def crear_cliente():
             db.close()
             return jsonify({'error': 'El reseller no existe'}), 400
     c.execute(qmark("""
-        INSERT INTO clientes (username, nombre, contacto, vencimiento, referido, parent_username, reseller_username, reseller_status, notas, total_pagado)
-        VALUES (?,?,?,?,?,?,?,?,?,0)
+        INSERT INTO clientes (username, nombre, contacto, vencimiento, referido, parent_username, reseller_username, reseller_status, client_origin, notas, total_pagado)
+        VALUES (?,?,?,?,?,?,?,?,?,?,0)
     """), (username, data.get('nombre',''), data.get('contacto',''),
            data.get('vencimiento') or None, data.get('referido','NO'), parent_username, reseller_username,
-           data.get('reseller_status') or 'prospecto', data.get('notas','')))
+           data.get('reseller_status') or 'prospecto', 'new', data.get('notas','')))
     db.commit()
     db.close()
     return jsonify({'ok': True})
@@ -2109,6 +2113,12 @@ def cliente_detalle(username):
         FROM client_service_credentials WHERE username=?
     """), (username,))
     service = fetchone(c) or {}
+    c.execute(qmark("""
+        SELECT username, is_enabled, created_at, updated_at
+        FROM client_portal_accounts
+        WHERE username=?
+    """), (username,))
+    portal = fetchone(c) or {}
     c.execute(qmark("SELECT * FROM smartone_records WHERE username=?"), (username,))
     smartone = fetchone(c) or {}
     parent = None
@@ -2126,7 +2136,7 @@ def cliente_detalle(username):
     """), (username,))
     asociados = fetchall(c)
     db.close()
-    return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol, 'service': service, 'smartone': smartone, 'parent': parent, 'asociados': asociados})
+    return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol, 'service': service, 'portal': portal, 'smartone': smartone, 'parent': parent, 'asociados': asociados})
 
 
 @app.route('/api/smartone')
@@ -3919,7 +3929,7 @@ def migracion_clientes():
     c = db.cursor()
     c.execute(qmark(f"""
         SELECT
-            cl.username, cl.nombre, cl.contacto, cl.vencimiento,
+            cl.username, cl.nombre, cl.contacto, cl.vencimiento, cl.client_origin,
             acc.username AS portal_username,
             acc.is_enabled AS portal_enabled,
             svc.service_username, svc.service_password, svc.maxplayer_user_id,
@@ -3960,6 +3970,7 @@ def migracion_clientes():
             'nombre': r.get('nombre'),
             'contacto': r.get('contacto'),
             'vencimiento': r.get('vencimiento'),
+            'client_origin': r.get('client_origin') or 'legacy',
             'portal_ok': portal_ok,
             'service_username': service_username,
             'has_service_password': bool(service_password),

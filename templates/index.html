@@ -1954,6 +1954,10 @@ async function openModal(username) {
 
   const c = d.cliente;
   const service = d.service || {};
+  const portal = d.portal || {};
+  const portalExists = !!portal.username;
+  const portalEnabled = portalExists && !!portal.is_enabled;
+  const isNewClient = c.client_origin === 'new';
   const smartone = d.smartone || {};
   const parent = d.parent || null;
   const asociados = d.asociados || [];
@@ -2038,7 +2042,6 @@ async function openModal(username) {
           <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'))}" target="_blank" rel="noopener">✅ Confirmar pago</a>
           <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_vencido || 'Hola {nombre}, tu servicio ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'))}" target="_blank" rel="noopener">❌ Servicio vencido</a>
           ${cfg.wa_nuevo_numero ? '<a class="wa-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border-color:rgba(245,158,11,0.35);" href="' + waBase + '?text=' + encMsg(waFill(cfg.wa_nuevo_numero)) + '" target="_blank" rel="noopener">📲 Nuevo número</a>' : ''}
-          <button class="wa-btn" style="background:rgba(249,115,22,0.16);color:#fb923c;border-color:rgba(249,115,22,0.38);" onclick="migrarFenixConMaxPlayer('${username}', ${service.service_password ? 'true' : 'false'})">🔥 Migración Fénix + Max Player</button>
         ` : `
           <button class="wa-btn" style="opacity:.65;cursor:not-allowed;" disabled>✅ Confirmar pago</button>
           <span style="font-size:12px;color:var(--muted);align-self:center;">Agrega un teléfono válido para habilitar WhatsApp.</span>
@@ -2087,10 +2090,20 @@ async function openModal(username) {
       <h3>Portal del cliente</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
         <span class="badge gray">Usuario: ${c.username}</span>
-        <span class="badge gray">Password temporal: ${portalPassword}</span>
+        ${portalExists
+          ? `<span class="badge ${portalEnabled ? 'green' : 'yellow'}">${portalEnabled ? 'Panel creado' : 'Panel creado · deshabilitado'}</span>`
+          : `<span class="badge yellow">Panel pendiente</span>`}
       </div>
-      <button class="btn-secondary" onclick="restablecerPasswordPortal('${username}')">Restablecer contraseña del portal</button>
-      <div style="font-size:12px;color:var(--muted);margin-top:8px;">Deja el acceso activo y vuelve a poner la contraseña del portal igual al password XUI guardado. No modifica XUI.</div>
+      ${portalExists ? `
+        <button class="btn-secondary" onclick="restablecerPasswordPortal('${username}')">${portalEnabled ? 'Restablecer contraseña del portal' : 'Reactivar panel y restablecer contraseña'}</button>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;">Este cliente ya tiene panel. No necesita volver a migrarse.</div>
+      ` : isNewClient ? `
+        <button class="ops-btn-primary" onclick="crearPanelCliente('${username}', ${service.service_password ? 'true' : 'false'})">Crear panel</button>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;">Cliente nuevo: crea únicamente su acceso al portal Fénix.</div>
+      ` : `
+        <button class="ops-btn-primary" onclick="migrarFenixConMaxPlayer('${username}', ${service.service_password ? 'true' : 'false'})">Migrar + Max Player</button>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px;">Cliente histórico sin panel: completa la migración y prepara el mensaje de WhatsApp.</div>
+      `}
     </div>
 
     <div class="pago-form" id="client-service-${username}">
@@ -2327,6 +2340,28 @@ async function restaurarMaxPlayer(username, hasSavedPassword = false) {
   openModal(username);
 }
 
+async function crearPanelCliente(username, hasSavedPassword = false) {
+  if (!confirm(`¿Crear el panel Fénix para ${username}?\n\nEl usuario quedará habilitado para ingresar al portal de clientes.`)) return;
+  let portalPassword = username;
+  if (hasSavedPassword) {
+    const detailR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
+    const detail = await detailR.json();
+    portalPassword = detail?.service?.service_password || username;
+  }
+  const r = await fetch(`/api/clientes/${encodeURIComponent(username)}/portal`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({portal_password: portalPassword, enabled: true})
+  });
+  const d = await r.json();
+  if (!r.ok) {
+    alert(d.error || 'No se pudo crear el panel del cliente.');
+    return;
+  }
+  showToast('Panel del cliente creado');
+  openModal(username);
+}
+
 async function migrarFenixConMaxPlayer(username, hasSavedPassword = false) {
   if (!confirm(`Enviar migración Fénix para ${username}?\n\nPrimero se restaurará/creará Max Player. Si todo sale bien, se abrirá WhatsApp con el mensaje listo.`)) return;
   const result = await ejecutarRestauracionMaxPlayer(username, hasSavedPassword);
@@ -2389,7 +2424,11 @@ async function loadMigrationClients() {
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
           <button class="ops-btn-secondary" onclick="openModal('${item.username}')">Perfil</button>
           <button class="ops-btn-secondary" onclick="copiarMensajeMigracion('${item.username}')">Copiar mensaje</button>
-          <button class="ops-btn-primary" onclick="migrarClienteDesdeLista('${item.username}', ${item.has_service_password ? 'true' : 'false'})">Migrar + Max Player</button>
+          ${item.portal_ok
+            ? '<span class="badge green">Panel creado · no migrar</span>'
+            : item.client_origin === 'new'
+              ? `<button class="ops-btn-primary" onclick="crearPanelCliente('${item.username}', ${item.has_service_password ? 'true' : 'false'})">Crear panel</button>`
+              : `<button class="ops-btn-primary" onclick="migrarClienteDesdeLista('${item.username}', ${item.has_service_password ? 'true' : 'false'})">Migrar + Max Player</button>`}
         </div>
       </div>
     </div>`;
