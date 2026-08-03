@@ -477,6 +477,25 @@ def fetchall(cursor):
     return [dict(r) for r in rows]
 
 
+def active_client_where(alias=''):
+    prefix = f"{alias}." if alias else ""
+    return f"({prefix}archived_at IS NULL OR {prefix}archived_at = '')"
+
+
+def active_payment_where(alias=''):
+    prefix = f"{alias}." if alias else ""
+    return f"COALESCE({prefix}is_void, {'FALSE' if PG else '0'}) = {'FALSE' if PG else '0'}"
+
+
+def audit_event(cursor, entity_type, entity_id, action, actor=None, reason='', metadata=None):
+    payload = json.dumps(metadata or {}, ensure_ascii=False)
+    created_at = now_gt().isoformat(timespec='seconds')
+    cursor.execute(qmark("""
+        INSERT INTO audit_log (entity_type, entity_id, action, actor, reason, metadata, created_at)
+        VALUES (?,?,?,?,?,?,?)
+    """), (entity_type, str(entity_id), action, actor or session.get('user'), reason or '', payload, created_at))
+
+
 # ── INICIALIZAR DB ────────────────────────────────────────────────────────────
 def init_db():
     conn = get_db()
@@ -572,12 +591,19 @@ def init_db():
     if PG:
         c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS comprobante TEXT DEFAULT NULL")
         c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS created_by TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS is_void BOOLEAN DEFAULT FALSE")
+        c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS voided_at TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS voided_by TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE pagos ADD COLUMN IF NOT EXISTS void_reason TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS contacto_secundario TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS email TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS datos_actualizados_at TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS parent_username TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reseller_username TEXT DEFAULT NULL")
         c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS reseller_status TEXT DEFAULT 'prospecto'")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS archived_at TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS archived_by TEXT DEFAULT NULL")
+        c.execute("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS archive_reason TEXT DEFAULT NULL")
     else:
         try:
             c.execute("ALTER TABLE pagos ADD COLUMN comprobante TEXT DEFAULT NULL")
@@ -588,17 +614,47 @@ def init_db():
         except Exception:
             pass
         for ddl in (
+            "ALTER TABLE pagos ADD COLUMN is_void INTEGER DEFAULT 0",
+            "ALTER TABLE pagos ADD COLUMN voided_at TEXT DEFAULT NULL",
+            "ALTER TABLE pagos ADD COLUMN voided_by TEXT DEFAULT NULL",
+            "ALTER TABLE pagos ADD COLUMN void_reason TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN contacto_secundario TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN email TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN datos_actualizados_at TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN parent_username TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN reseller_username TEXT DEFAULT NULL",
             "ALTER TABLE clientes ADD COLUMN reseller_status TEXT DEFAULT 'prospecto'",
+            "ALTER TABLE clientes ADD COLUMN archived_at TEXT DEFAULT NULL",
+            "ALTER TABLE clientes ADD COLUMN archived_by TEXT DEFAULT NULL",
+            "ALTER TABLE clientes ADD COLUMN archive_reason TEXT DEFAULT NULL",
         ):
             try:
                 c.execute(ddl)
             except Exception:
                 pass
+
+    if PG:
+        c.execute('''CREATE TABLE IF NOT EXISTS audit_log (
+            id SERIAL PRIMARY KEY,
+            entity_type TEXT,
+            entity_id TEXT,
+            action TEXT,
+            actor TEXT,
+            reason TEXT DEFAULT '',
+            metadata TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT (NOW()::text)
+        )''')
+    else:
+        c.execute('''CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity_type TEXT,
+            entity_id TEXT,
+            action TEXT,
+            actor TEXT,
+            reason TEXT DEFAULT '',
+            metadata TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT (datetime('now'))
+        )''')
 
     # Tabla de configuración
     if PG:
@@ -1530,7 +1586,7 @@ def client_portal():
                 'expires_at': latest.get('expires_at'),
                 'devices': 3,
             }
-    c.execute(qmark("SELECT mes, monto, fecha_registro FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 6"), (username,))
+    c.execute(qmark(f"SELECT mes, monto, fecha_registro FROM pagos WHERE username=? AND {active_payment_where()} ORDER BY mes DESC LIMIT 6"), (username,))
     payments = fetchall(c)
     parent = None
     asociados = []
@@ -1538,18 +1594,18 @@ def client_portal():
     if parent_username:
         c.execute(qmark("SELECT username, nombre, contacto, vencimiento FROM clientes WHERE username=?"), (parent_username,))
         parent = fetchone(c)
-        c.execute(qmark("""
+        c.execute(qmark(f"""
             SELECT username, nombre, contacto, vencimiento
             FROM clientes
-            WHERE parent_username=? AND username<>?
+            WHERE parent_username=? AND username<>? AND {active_client_where()}
             ORDER BY nombre, username
         """), (parent_username, username))
         asociados = fetchall(c)
     else:
-        c.execute(qmark("""
+        c.execute(qmark(f"""
             SELECT username, nombre, contacto, vencimiento
             FROM clientes
-            WHERE parent_username=?
+            WHERE parent_username=? AND {active_client_where()}
             ORDER BY nombre, username
         """), (username,))
         asociados = fetchall(c)
@@ -1672,18 +1728,18 @@ def api_reseller_dashboard():
     in_7 = (today_gt() + timedelta(days=7)).isoformat()
     db = get_db()
     c = db.cursor()
-    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE reseller_username=?"), (reseller,))
+    c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND {active_client_where()}"), (reseller,))
     total = fetchone(c)['c']
-    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND vencimiento>=?"), (reseller, today))
+    c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND vencimiento>=? AND {active_client_where()}"), (reseller, today))
     activos = fetchone(c)['c']
-    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND (vencimiento<? OR vencimiento IS NULL)"), (reseller, today))
+    c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND (vencimiento<? OR vencimiento IS NULL) AND {active_client_where()}"), (reseller, today))
     vencidos = fetchone(c)['c']
-    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND vencimiento>=? AND vencimiento<=?"), (reseller, today, in_7))
+    c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes WHERE reseller_username=? AND vencimiento>=? AND vencimiento<=? AND {active_client_where()}"), (reseller, today, in_7))
     por_vencer = fetchone(c)['c']
-    c.execute(qmark("""
+    c.execute(qmark(f"""
         SELECT username, nombre, contacto, vencimiento, reseller_status, notas
         FROM clientes
-        WHERE reseller_username=? AND vencimiento>=? AND vencimiento<=?
+        WHERE reseller_username=? AND vencimiento>=? AND vencimiento<=? AND {active_client_where()}
         ORDER BY vencimiento ASC, nombre ASC
         LIMIT 12
     """), (reseller, today, in_7))
@@ -1855,7 +1911,7 @@ def api_resellers():
                COUNT(c.username) as clientes,
                COALESCE(SUM(CASE WHEN c.vencimiento>=? THEN 1 ELSE 0 END),0) as activos
         FROM usuarios u
-        LEFT JOIN clientes c ON c.reseller_username = u.username
+        LEFT JOIN clientes c ON c.reseller_username = u.username AND (c.archived_at IS NULL OR c.archived_at = '')
         WHERE u.rol='reseller'
         GROUP BY u.username
         ORDER BY u.username ASC
@@ -1874,16 +1930,16 @@ def dashboard():
     in_30 = today_gt().replace(day=min(today_gt().day + 30, 28)).isoformat()
     mes_actual = today_gt().strftime('%Y-%m')
 
-    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE vencimiento >= ?"), (today,))
+    c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes WHERE vencimiento >= ? AND {active_client_where()}"), (today,))
     activos = fetchone(c)['c']
 
-    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE vencimiento < ? OR vencimiento IS NULL"), (today,))
+    c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes WHERE (vencimiento < ? OR vencimiento IS NULL) AND {active_client_where()}"), (today,))
     vencidos = fetchone(c)['c']
 
-    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE vencimiento >= ? AND vencimiento <= ?"), (today, in_30))
+    c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes WHERE vencimiento >= ? AND vencimiento <= ? AND {active_client_where()}"), (today, in_30))
     por_vencer = fetchone(c)['c']
 
-    c.execute(qmark("SELECT COALESCE(SUM(monto),0) as t FROM pagos WHERE mes LIKE ?"), (f'{mes_actual}%',))
+    c.execute(qmark(f"SELECT COALESCE(SUM(monto),0) as t FROM pagos WHERE mes LIKE ? AND {active_payment_where()}"), (f'{mes_actual}%',))
     ingresos = fetchone(c)['t']
 
     t = today_gt()
@@ -1897,7 +1953,7 @@ def dashboard():
                    SUM(monto) as total,
                    COUNT(DISTINCT username) as clientes,
                    COUNT(*) as unidades
-            FROM pagos WHERE SUBSTRING(mes,1,7) >= %s
+            FROM pagos WHERE SUBSTRING(mes,1,7) >= %s AND COALESCE(is_void, FALSE) = FALSE
             GROUP BY m ORDER BY m
         """, (six_ago_str,))
     else:
@@ -1906,14 +1962,14 @@ def dashboard():
                    SUM(monto) as total,
                    COUNT(DISTINCT username) as clientes,
                    COUNT(*) as unidades
-            FROM pagos WHERE substr(mes,1,7) >= ?
+            FROM pagos WHERE substr(mes,1,7) >= ? AND COALESCE(is_void, 0) = 0
             GROUP BY m ORDER BY m
         """, (six_ago_str,))
     ultimos_meses = fetchall(c)
 
-    c.execute(qmark("""
+    c.execute(qmark(f"""
         SELECT username, nombre, contacto, vencimiento FROM clientes
-        WHERE vencimiento >= ? AND vencimiento <= ?
+        WHERE vencimiento >= ? AND vencimiento <= ? AND {active_client_where()}
         ORDER BY vencimiento LIMIT 20
     """), (today, in_30))
     pronto = fetchall(c)
@@ -1946,12 +2002,17 @@ def clientes():
     q = request.args.get('q', '').strip()
     estado = request.args.get('estado', '')
     fecha = request.args.get('fecha', '').strip()
+    archivados = request.args.get('archivados', '').strip().lower()
     page = int(request.args.get('page', 1))
     per_page = 20
     offset = (page - 1) * per_page
     today = today_gt().isoformat()
 
     where, params = [], []
+    if archivados in ('1', 'true', 'solo'):
+        where.append("archived_at IS NOT NULL AND archived_at <> ''")
+    elif archivados not in ('all', 'todos'):
+        where.append(active_client_where())
     if q:
         where.append("(nombre ILIKE ? OR username ILIKE ? OR contacto ILIKE ?)" if PG else
                      "(nombre LIKE ? OR username LIKE ? OR contacto LIKE ?)")
@@ -1972,7 +2033,7 @@ def clientes():
     c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes {where_sql}"), params)
     total = fetchone(c)['c']
     c.execute(qmark(f"""
-        SELECT username, nombre, contacto, vencimiento, referido, parent_username, reseller_username, reseller_status, total_pagado, notas
+        SELECT username, nombre, contacto, vencimiento, referido, parent_username, reseller_username, reseller_status, total_pagado, notas, archived_at, archived_by, archive_reason
         FROM clientes {where_sql} ORDER BY vencimiento DESC, username ASC LIMIT ? OFFSET ?
     """), params + [per_page, offset])
     rows = fetchall(c)
@@ -2033,7 +2094,14 @@ def cliente_detalle(username):
 
     rol = session.get('rol', 'atencion')
     # Ambos roles ven el historial de pagos reciente
-    c.execute(qmark("SELECT id, mes, monto, fecha_registro, (comprobante IS NOT NULL) as has_comprobante FROM pagos WHERE username=? ORDER BY mes DESC LIMIT 24"), (username,))
+    c.execute(qmark("""
+        SELECT id, mes, monto, fecha_registro, (comprobante IS NOT NULL) as has_comprobante,
+               is_void, voided_at, voided_by, void_reason
+        FROM pagos
+        WHERE username=?
+        ORDER BY mes DESC, id DESC
+        LIMIT 24
+    """), (username,))
     pagos = fetchall(c)
     c.execute(qmark("""
         SELECT service_username, service_password, expires_at,
@@ -2045,15 +2113,15 @@ def cliente_detalle(username):
     smartone = fetchone(c) or {}
     parent = None
     if cliente.get('parent_username'):
-        c.execute(qmark("""
-            SELECT username, nombre, contacto, vencimiento, total_pagado
-            FROM clientes WHERE username=?
+        c.execute(qmark(f"""
+        SELECT username, nombre, contacto, vencimiento, total_pagado
+            FROM clientes WHERE username=? AND {active_client_where()}
         """), (cliente.get('parent_username'),))
         parent = fetchone(c)
-    c.execute(qmark("""
+    c.execute(qmark(f"""
         SELECT username, nombre, contacto, vencimiento, total_pagado
         FROM clientes
-        WHERE parent_username=?
+        WHERE parent_username=? AND {active_client_where()}
         ORDER BY nombre ASC, username ASC
     """), (username,))
     asociados = fetchall(c)
@@ -2968,20 +3036,27 @@ def eliminar_cliente(username):
         return jsonify({'error': 'Acceso denegado'}), 403
     db = get_db()
     c = db.cursor()
-    c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
-    if not fetchone(c):
+    c.execute(qmark("SELECT username, archived_at FROM clientes WHERE username=?"), (username,))
+    cliente = fetchone(c)
+    if not cliente:
         db.close()
         return jsonify({'error': 'Cliente no encontrado'}), 404
-    c.execute(qmark("UPDATE clientes SET parent_username=NULL WHERE parent_username=?"), (username,))
-    # Eliminar pagos asociados primero
-    c.execute(qmark("DELETE FROM pagos WHERE username=?"), (username,))
-    c.execute(qmark("DELETE FROM smartone_records WHERE username=?"), (username,))
-    c.execute(qmark("UPDATE smartone_inventory SET username=NULL WHERE username=?"), (username,))
-    # Luego eliminar el cliente
-    c.execute(qmark("DELETE FROM clientes WHERE username=?"), (username,))
+    archived_at = now_gt().isoformat(timespec='seconds')
+    actor = session.get('user')
+    reason = (request.json or {}).get('reason') if request.is_json else ''
+    if cliente.get('archived_at'):
+        db.close()
+        return jsonify({'ok': True, 'archived': True, 'already_archived': True})
+    c.execute(qmark("""
+        UPDATE clientes
+        SET archived_at=?, archived_by=?, archive_reason=?
+        WHERE username=?
+    """), (archived_at, actor, reason or 'Archivado desde administración', username))
+    c.execute(qmark("UPDATE client_portal_accounts SET is_enabled=? WHERE username=?"), (False if PG else 0, username))
+    audit_event(c, 'cliente', username, 'archived', actor, reason, {'username': username})
     db.commit()
     db.close()
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'archived': True})
 
 # ── API: PAGOS ────────────────────────────────────────────────────────────────
 @app.route('/api/pagos', methods=['POST'])
@@ -3062,18 +3137,29 @@ def eliminar_pago(pago_id):
         return jsonify({'error': 'Acceso denegado'}), 403
     db = get_db()
     c = db.cursor()
-    c.execute(qmark("SELECT username, monto FROM pagos WHERE id=?"), (pago_id,))
+    c.execute(qmark("SELECT id, username, monto, is_void FROM pagos WHERE id=?"), (pago_id,))
     pago = fetchone(c)
     if not pago:
         db.close()
         return jsonify({'error': 'Pago no encontrado'}), 404
-    c.execute(qmark("DELETE FROM pagos WHERE id=?"), (pago_id,))
+    if pago.get('is_void'):
+        db.close()
+        return jsonify({'ok': True, 'already_void': True, 'username': pago['username'], 'monto': pago['monto']})
+    voided_at = now_gt().isoformat(timespec='seconds')
+    actor = session.get('user')
+    reason = (request.json or {}).get('reason') if request.is_json else ''
+    c.execute(qmark("""
+        UPDATE pagos
+        SET is_void=?, voided_at=?, voided_by=?, void_reason=?
+        WHERE id=?
+    """), (True if PG else 1, voided_at, actor, reason or 'Anulado desde administración', pago_id))
     c.execute(qmark("""UPDATE clientes SET total_pagado =
         CASE WHEN total_pagado - ? < 0 THEN 0 ELSE total_pagado - ? END
         WHERE username=?"""), (pago['monto'], pago['monto'], pago['username']))
+    audit_event(c, 'pago', pago_id, 'voided', actor, reason, {'username': pago['username'], 'monto': pago['monto']})
     db.commit()
     db.close()
-    return jsonify({'ok': True, 'username': pago['username'], 'monto': pago['monto']})
+    return jsonify({'ok': True, 'voided': True, 'username': pago['username'], 'monto': pago['monto']})
 
 @app.route('/api/pagos/<int:pago_id>/comprobante')
 @login_required
@@ -3425,14 +3511,21 @@ def api_delete_activation_task(task_id):
         if order and order.get('payment_id'):
             c.execute(qmark("SELECT * FROM pagos WHERE id=?"), (order['payment_id'],))
             pago = fetchone(c)
-            if pago:
-                c.execute(qmark("DELETE FROM pagos WHERE id=?"), (order['payment_id'],))
+            if pago and not pago.get('is_void'):
+                c.execute(qmark("""
+                    UPDATE pagos
+                    SET is_void=?, voided_at=?, voided_by=?, void_reason=?
+                    WHERE id=?
+                """), (True if PG else 1, now_gt().isoformat(timespec='seconds'), session.get('user'),
+                      'Anulado al revertir tarea de activación', order['payment_id']))
                 if PG:
                     c.execute("UPDATE clientes SET total_pagado = GREATEST(total_pagado - %s, 0) WHERE username=%s",
                               (float(pago.get('monto') or 0), pago['username']))
                 else:
                     c.execute("UPDATE clientes SET total_pagado = MAX(total_pagado - ?, 0) WHERE username=?",
                               (float(pago.get('monto') or 0), pago['username']))
+                audit_event(c, 'pago', order['payment_id'], 'voided_by_task_revert', session.get('user'), '',
+                            {'task_id': task_id, 'username': pago['username'], 'monto': pago.get('monto')})
                 pago_revertido = True
 
     c.execute(qmark("DELETE FROM activation_tasks WHERE id=?"), (task_id,))
@@ -3461,14 +3554,14 @@ def analytics():
             SELECT TO_CHAR(mes::date, 'YYYY-MM') as m,
                    SUM(monto) as total, COUNT(*) as n_pagos,
                    COUNT(DISTINCT username) as clientes
-            FROM pagos GROUP BY m ORDER BY m
+            FROM pagos WHERE COALESCE(is_void, FALSE) = FALSE GROUP BY m ORDER BY m
         """)
     else:
         c.execute("""
             SELECT strftime('%Y-%m', mes) as m,
                    SUM(monto) as total, COUNT(*) as n_pagos,
                    COUNT(DISTINCT username) as clientes
-            FROM pagos GROUP BY m ORDER BY m
+            FROM pagos WHERE COALESCE(is_void, 0) = 0 GROUP BY m ORDER BY m
         """)
     ventas_mensuales = fetchall(c)
 
@@ -3477,13 +3570,13 @@ def analytics():
         c.execute("""
             SELECT TO_CHAR(mes::date, 'YYYY') as y,
                    SUM(monto) as total, COUNT(DISTINCT username) as clientes
-            FROM pagos GROUP BY y ORDER BY y
+            FROM pagos WHERE COALESCE(is_void, FALSE) = FALSE GROUP BY y ORDER BY y
         """)
     else:
         c.execute("""
             SELECT strftime('%Y', mes) as y,
                    SUM(monto) as total, COUNT(DISTINCT username) as clientes
-            FROM pagos GROUP BY y ORDER BY y
+            FROM pagos WHERE COALESCE(is_void, 0) = 0 GROUP BY y ORDER BY y
         """)
     ventas_anuales = fetchall(c)
 
@@ -3499,7 +3592,7 @@ def analytics():
                     ELSE 'Más de 1 año'
                 END as plan,
                 COUNT(*) as n, SUM(monto) as total
-            FROM pagos GROUP BY plan ORDER BY n DESC
+            FROM pagos WHERE COALESCE(is_void, FALSE) = FALSE GROUP BY plan ORDER BY n DESC
         """)
     else:
         c.execute("""
@@ -3512,7 +3605,7 @@ def analytics():
                     ELSE 'Más de 1 año'
                 END as plan,
                 COUNT(*) as n, SUM(monto) as total
-            FROM pagos GROUP BY plan ORDER BY n DESC
+            FROM pagos WHERE COALESCE(is_void, 0) = 0 GROUP BY plan ORDER BY n DESC
         """)
     planes = fetchall(c)
 
@@ -3521,14 +3614,16 @@ def analytics():
         c.execute("""
             SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as nuevos
             FROM pagos p
-            WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            WHERE COALESCE(p.is_void, FALSE) = FALSE
+              AND p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, FALSE) = FALSE)
             GROUP BY m ORDER BY m
         """)
     else:
         c.execute("""
             SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as nuevos
             FROM pagos p
-            WHERE p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            WHERE COALESCE(p.is_void, 0) = 0
+              AND p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, 0) = 0)
             GROUP BY m ORDER BY m
         """)
     nuevos_por_mes = fetchall(c)
@@ -3538,28 +3633,30 @@ def analytics():
         c.execute("""
             SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as renovaciones
             FROM pagos p
-            WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            WHERE COALESCE(p.is_void, FALSE) = FALSE
+              AND p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, FALSE) = FALSE)
             GROUP BY m ORDER BY m
         """)
     else:
         c.execute("""
             SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as renovaciones
             FROM pagos p
-            WHERE p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username)
+            WHERE COALESCE(p.is_void, 0) = 0
+              AND p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, 0) = 0)
             GROUP BY m ORDER BY m
         """)
     renovaciones_por_mes = fetchall(c)
 
     # Clientes que no renovaron (vencidos con pagos históricos)
     today = today_gt().isoformat()
-    c.execute(qmark("SELECT COUNT(*) as c FROM clientes WHERE (vencimiento < ? OR vencimiento IS NULL) AND total_pagado > 0"), (today,))
+    c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes WHERE (vencimiento < ? OR vencimiento IS NULL) AND total_pagado > 0 AND {active_client_where()}"), (today,))
     no_renovaron = fetchone(c)['c']
 
     # Total histórico
-    c.execute("SELECT COALESCE(SUM(monto),0) as t FROM pagos")
+    c.execute(f"SELECT COALESCE(SUM(monto),0) as t FROM pagos WHERE {active_payment_where()}")
     total_historico = round(float(fetchone(c)['t']), 2)
 
-    c.execute("SELECT COUNT(*) as c FROM clientes")
+    c.execute(f"SELECT COUNT(*) as c FROM clientes WHERE {active_client_where()}")
     total_clientes = fetchone(c)['c']
 
     # Ventas por día (últimos 60 días)
@@ -3570,7 +3667,7 @@ def analytics():
             SELECT TO_CHAR(mes::date, 'YYYY-MM-DD') as dia,
                    SUM(monto) as total, COUNT(*) as n_pagos
             FROM pagos
-            WHERE SUBSTRING(mes,1,7) IN (%s, %s)
+            WHERE SUBSTRING(mes,1,7) IN (%s, %s) AND COALESCE(is_void, FALSE) = FALSE
             GROUP BY dia ORDER BY dia
         """, (mes_actual, mes_anterior))
     else:
@@ -3578,15 +3675,15 @@ def analytics():
             SELECT strftime('%Y-%m-%d', mes) as dia,
                    SUM(monto) as total, COUNT(*) as n_pagos
             FROM pagos
-            WHERE substr(mes,1,7) IN (?, ?)
+            WHERE substr(mes,1,7) IN (?, ?) AND COALESCE(is_void, 0) = 0
             GROUP BY dia ORDER BY dia
         """, (mes_actual, mes_anterior))
     ventas_por_dia = fetchall(c)
 
     # Créditos históricos estimados desde pagos antiguos; no modifica historial.
-    c.execute("SELECT COALESCE(SUM(monto),0) as ingresos, COUNT(*) as pagos FROM pagos")
+    c.execute(f"SELECT COALESCE(SUM(monto),0) as ingresos, COUNT(*) as pagos FROM pagos WHERE {active_payment_where()}")
     retro_base = fetchone(c)
-    c.execute("SELECT monto FROM pagos")
+    c.execute(f"SELECT monto FROM pagos WHERE {active_payment_where()}")
     retro_pagos = fetchall(c)
     retro_creditos = sum(estimate_credits_from_amount(p.get('monto')) for p in retro_pagos)
     retro_ingresos = float(retro_base['ingresos'] or 0)
@@ -3865,7 +3962,8 @@ def exportar_clientes():
                    MAX(p.mes) as ultimo_pago,
                    COUNT(p.id) as num_pagos
             FROM clientes cl
-            LEFT JOIN pagos p ON p.username = cl.username
+            LEFT JOIN pagos p ON p.username = cl.username AND COALESCE(p.is_void, FALSE) = FALSE
+            WHERE cl.archived_at IS NULL OR cl.archived_at = ''
             GROUP BY cl.username, cl.nombre, cl.contacto, cl.vencimiento, cl.total_pagado
             ORDER BY cl.vencimiento DESC NULLS LAST, cl.username ASC
         """)
@@ -3876,7 +3974,8 @@ def exportar_clientes():
                    MAX(p.mes) as ultimo_pago,
                    COUNT(p.id) as num_pagos
             FROM clientes cl
-            LEFT JOIN pagos p ON p.username = cl.username
+            LEFT JOIN pagos p ON p.username = cl.username AND COALESCE(p.is_void, 0) = 0
+            WHERE cl.archived_at IS NULL OR cl.archived_at = ''
             GROUP BY cl.username, cl.nombre, cl.contacto, cl.vencimiento, cl.total_pagado
             ORDER BY CASE WHEN cl.vencimiento IS NULL THEN 1 ELSE 0 END,
                      cl.vencimiento DESC, cl.username ASC
