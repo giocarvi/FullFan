@@ -2055,6 +2055,10 @@ def smartone_listado():
     elif estado == 'vencida':
         where.append("(s.license_status='vencida' OR (s.license_expires_at IS NOT NULL AND s.license_expires_at<?))")
         params.append(today)
+    elif estado == 'sin_asociar':
+        where.append("(s.username IS NULL OR s.username='')")
+    elif estado == 'asociados':
+        where.append("(s.username IS NOT NULL AND s.username<>'')")
     elif estado:
         where.append("s.license_status=?")
         params.append(estado)
@@ -2093,6 +2097,79 @@ def smartone_listado():
         'vencidas': vencidas,
         'por_vencer': por_vencer,
     })
+
+
+@app.route('/api/smartone/<playlist_id>/asociar', methods=['POST'])
+@login_required
+def smartone_asociar(playlist_id):
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Solo admin puede asociar Smart One'}), 403
+    data = request.json or {}
+    username = (data.get('username') or '').strip()
+    if not username:
+        return jsonify({'error': 'Indica el usuario Fénix'}), 400
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT * FROM clientes WHERE username=?"), (username,))
+    cliente = fetchone(c)
+    if not cliente:
+        db.close()
+        return jsonify({'error': 'El usuario Fénix no existe'}), 404
+    c.execute(qmark("SELECT * FROM smartone_inventory WHERE playlist_id=?"), (playlist_id,))
+    inv = fetchone(c)
+    if not inv:
+        db.close()
+        return jsonify({'error': 'Registro Smart One no encontrado'}), 404
+    now = now_gt().isoformat(timespec='seconds')
+    if PG:
+        c.execute("UPDATE smartone_inventory SET username=%s, updated_at=%s WHERE playlist_id=%s", (username, now, playlist_id))
+        c.execute("""
+            INSERT INTO smartone_records
+                (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
+                 smartone_username, smartone_password, device_model, license_status, license_expires_at,
+                 date_fetched, note, updated_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (username) DO UPDATE SET
+                mac=EXCLUDED.mac,
+                playlist_id=EXCLUDED.playlist_id,
+                account_name=EXCLUDED.account_name,
+                device_model=EXCLUDED.device_model,
+                license_status=EXCLUDED.license_status,
+                license_expires_at=EXCLUDED.license_expires_at,
+                date_fetched=EXCLUDED.date_fetched,
+                note=EXCLUDED.note,
+                updated_at=EXCLUDED.updated_at
+        """, (
+            username, inv.get('mac'), None, playlist_id, inv.get('playlist_name') or 'Fenix',
+            None, None, None, None, inv.get('device_model'), inv.get('license_status'),
+            inv.get('license_expires_at'), inv.get('date_fetched'), inv.get('expiration_text'), now
+        ))
+    else:
+        c.execute("UPDATE smartone_inventory SET username=?, updated_at=? WHERE playlist_id=?", (username, now, playlist_id))
+        c.execute("""
+            INSERT INTO smartone_records
+                (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
+                 smartone_username, smartone_password, device_model, license_status, license_expires_at,
+                 date_fetched, note, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(username) DO UPDATE SET
+                mac=excluded.mac,
+                playlist_id=excluded.playlist_id,
+                account_name=excluded.account_name,
+                device_model=excluded.device_model,
+                license_status=excluded.license_status,
+                license_expires_at=excluded.license_expires_at,
+                date_fetched=excluded.date_fetched,
+                note=excluded.note,
+                updated_at=excluded.updated_at
+        """, (
+            username, inv.get('mac'), None, playlist_id, inv.get('playlist_name') or 'Fenix',
+            None, None, None, None, inv.get('device_model'), inv.get('license_status'),
+            inv.get('license_expires_at'), inv.get('date_fetched'), inv.get('expiration_text'), now
+        ))
+    db.commit()
+    db.close()
+    return jsonify({'ok': True})
 
 
 @app.route('/api/smartone/importar', methods=['POST'])
@@ -2416,6 +2493,7 @@ def actualizar_cliente(username):
         c.execute(qmark("UPDATE client_portal_accounts SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE client_service_credentials SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE smartone_records SET username=? WHERE username=?"), (nuevo_username, username))
+        c.execute(qmark("UPDATE smartone_inventory SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE activation_tasks SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE clientes SET parent_username=? WHERE parent_username=?"), (nuevo_username, username))
         # Actualizar cliente
@@ -2776,6 +2854,7 @@ def eliminar_cliente(username):
     # Eliminar pagos asociados primero
     c.execute(qmark("DELETE FROM pagos WHERE username=?"), (username,))
     c.execute(qmark("DELETE FROM smartone_records WHERE username=?"), (username,))
+    c.execute(qmark("UPDATE smartone_inventory SET username=NULL WHERE username=?"), (username,))
     # Luego eliminar el cliente
     c.execute(qmark("DELETE FROM clientes WHERE username=?"), (username,))
     db.commit()

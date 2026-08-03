@@ -742,6 +742,8 @@ body {
             <option value="trial">Trial</option>
             <option value="por_vencer">Por vencer 15 días</option>
             <option value="vencida">Vencidas</option>
+            <option value="sin_asociar">Sin asociar</option>
+            <option value="asociados">Asociados</option>
             <option value="pendiente">Pendientes</option>
             <option value="sin_registro">Sin registro</option>
             <option value="no_usar">No usar Smart One</option>
@@ -1262,9 +1264,40 @@ async function loadSmartOne() {
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
           <span class="badge ${st.cls}">${st.label}</span>
           <a class="ops-btn-secondary" href="${link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Abrir Smart One</a>
+          ${row.username ? `
+            <button class="ops-btn-secondary" onclick="openModal('${row.username}')">Ver cliente</button>
+          ` : `
+            <input id="smartone-assoc-${row.playlist_id}" placeholder="Usuario Fénix" style="width:150px;padding:8px 10px;border-radius:10px;">
+            <button class="ops-btn-primary" onclick="asociarSmartOne('${row.playlist_id}')">Asociar</button>
+          `}
         </div>
       </div>`;
   }).join('');
+}
+
+async function asociarSmartOne(playlistId) {
+  const input = document.getElementById(`smartone-assoc-${playlistId}`);
+  const username = input?.value.trim();
+  if (!username) {
+    showToast('⚠️ Escribe el usuario Fénix');
+    return;
+  }
+  try {
+    const r = await fetch(`/api/smartone/${encodeURIComponent(playlistId)}/asociar`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username})
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) {
+      showToast('❌ ' + (d.error || 'No se pudo asociar'));
+      return;
+    }
+    showToast('✅ Smart One asociado');
+    loadSmartOne();
+  } catch(e) {
+    showToast('❌ Error de conexión al asociar');
+  }
 }
 
 async function importarSmartOneCsv(input) {
