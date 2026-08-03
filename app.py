@@ -3058,6 +3058,30 @@ def eliminar_cliente(username):
     db.close()
     return jsonify({'ok': True, 'archived': True})
 
+
+@app.route('/api/clientes/<username>/restore', methods=['POST'])
+@login_required
+def restaurar_cliente(username):
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT username, archived_at FROM clientes WHERE username=?"), (username,))
+    cliente = fetchone(c)
+    if not cliente:
+        db.close()
+        return jsonify({'error': 'Cliente no encontrado'}), 404
+    c.execute(qmark("""
+        UPDATE clientes
+        SET archived_at=NULL, archived_by=NULL, archive_reason=NULL
+        WHERE username=?
+    """), (username,))
+    c.execute(qmark("UPDATE client_portal_accounts SET is_enabled=? WHERE username=?"), (True if PG else 1, username))
+    audit_event(c, 'cliente', username, 'restored', session.get('user'), '', {'username': username})
+    db.commit()
+    db.close()
+    return jsonify({'ok': True, 'restored': True})
+
 # ── API: PAGOS ────────────────────────────────────────────────────────────────
 @app.route('/api/pagos', methods=['POST'])
 @login_required

@@ -607,6 +607,11 @@ body {
     <button class="filter-tab" data-estado="por_vencer">⚠️ Por vencer</button>
     <button class="filter-tab" data-estado="vencido">❌ Vencidos</button>
   </div>
+  <div class="filter-tabs" id="archive-tabs" style="margin-top:-6px;">
+    <button class="filter-tab active" data-archivados="">Clientes activos</button>
+    <button class="filter-tab" data-archivados="1">Archivados</button>
+    <button class="filter-tab" data-archivados="all">Todos con archivados</button>
+  </div>
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
     <span style="font-size:13px;color:var(--muted);white-space:nowrap;">📅 Vence el:</span>
     <input type="date" id="fecha-filter" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:7px 12px;font-size:13px;">
@@ -1172,7 +1177,7 @@ function normalizeWhatsAppPhone(value, defaultPrefix='502') {
 }
 
 // ── STATE ──────────────────────────────────────────────────────────────────
-let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', loadingClientes = false, totalClientes = 0;
+let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', currentArchivados = '', loadingClientes = false, totalClientes = 0;
 let searchTimeout;
 let activationPlansLoaded = false;
 let currentActivationStatus = 'open';
@@ -1704,7 +1709,7 @@ async function loadClientes(reset = false) {
     document.getElementById('clientes-list').innerHTML = '<div class="loading">Cargando...</div>';
   }
 
-  const r = await fetch(`/api/clientes?q=${encodeURIComponent(currentQ)}&estado=${currentEstado}&fecha=${currentFecha}&page=${currentPage}`);
+  const r = await fetch(`/api/clientes?q=${encodeURIComponent(currentQ)}&estado=${currentEstado}&fecha=${currentFecha}&archivados=${currentArchivados}&page=${currentPage}`);
   const d = await r.json();
   totalClientes = d.total;
 
@@ -1752,9 +1757,19 @@ document.getElementById('search-input').addEventListener('input', e => {
 
 document.querySelectorAll('.filter-tab').forEach(tab => {
   tab.addEventListener('click', () => {
-    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    if (tab.dataset.archivados !== undefined) return;
+    document.querySelectorAll('.filter-tab[data-estado]').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     currentEstado = tab.dataset.estado;
+    loadClientes(true);
+  });
+});
+
+document.querySelectorAll('#archive-tabs .filter-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('#archive-tabs .filter-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentArchivados = tab.dataset.archivados || '';
     loadClientes(true);
   });
 });
@@ -1822,7 +1837,7 @@ async function openModal(username) {
   const smartone = d.smartone || {};
   const parent = d.parent || null;
   const asociados = d.asociados || [];
-  const status = clienteStatus(c.vencimiento);
+  const status = c.archived_at ? { cls: 'red', label: 'Archivado' } : clienteStatus(c.vencimiento);
   const initial = (c.nombre || c.username || '?')[0].toUpperCase();
 
   const esAtencion = d.rol === 'atencion';
@@ -2111,7 +2126,8 @@ async function openModal(username) {
       </div>
       <div style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">El portal del cliente muestra el password XUI como contraseña Fénix y como contraseña de Max Player cuando se usa Migrar + Max Player.</div>
       <button class="btn-primary" onclick="guardarEdicion('${username}')">💾 Guardar cambios</button>
-      ${esAdmin ? `<button class="btn-danger" style="background:var(--red);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-left:6px;" onclick="eliminarCliente('${username}', '${(c.nombre||username).replace(/'/g,"\\'") }')">Archivar cliente</button>` : ''}
+      ${esAdmin && !c.archived_at ? `<button class="btn-danger" style="background:var(--red);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-left:6px;" onclick="eliminarCliente('${username}', '${(c.nombre||username).replace(/'/g,"\\'") }')">Archivar cliente</button>` : ''}
+      ${esAdmin && c.archived_at ? `<button class="btn-primary" style="margin-left:6px;" onclick="restaurarCliente('${username}', '${(c.nombre||username).replace(/'/g,"\\'") }')">Restaurar cliente</button>` : ''}
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
     </div>
 
@@ -2870,6 +2886,21 @@ async function eliminarPagoSeguro(pagoId, monto, username) {
     openModal(username);
   } else {
     showToast('❌ ' + (d.error || 'Error al anular el pago'));
+  }
+}
+
+async function restaurarCliente(username, nombre) {
+  if (!confirm(`¿Restaurar a "${nombre}" (${username})?\n\nVolverá a aparecer en los listados activos y se habilitará su acceso al portal si existe.`)) return;
+  const r = await fetch(`/api/clientes/${username}/restore`, { method: 'POST' });
+  const d = await r.json();
+  if (d.ok) {
+    closeModal();
+    showToast('Cliente restaurado.');
+    analyticsData = null;
+    loadClientes(true);
+    loadDashboard();
+  } else {
+    showToast('❌ ' + (d.error || 'Error al restaurar'));
   }
 }
 
