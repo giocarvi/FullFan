@@ -679,6 +679,23 @@ def init_db():
         c.execute("ALTER TABLE client_service_credentials ADD COLUMN IF NOT EXISTS maxplayer_user_id TEXT DEFAULT NULL")
         c.execute("ALTER TABLE client_service_credentials ADD COLUMN IF NOT EXISTS maxplayer_synced_at TEXT DEFAULT NULL")
         c.execute("ALTER TABLE client_service_credentials ADD COLUMN IF NOT EXISTS maxplayer_sync_status TEXT DEFAULT NULL")
+        c.execute('''CREATE TABLE IF NOT EXISTS smartone_records (
+            username TEXT PRIMARY KEY REFERENCES clientes(username) ON DELETE CASCADE,
+            mac TEXT,
+            smart_key_id TEXT,
+            playlist_id TEXT,
+            account_name TEXT,
+            server_address TEXT,
+            server_port TEXT,
+            smartone_username TEXT,
+            smartone_password TEXT,
+            device_model TEXT,
+            license_status TEXT DEFAULT 'sin_registro',
+            license_expires_at TEXT,
+            date_fetched TEXT,
+            note TEXT,
+            updated_at TEXT DEFAULT (NOW()::text)
+        )''')
         c.execute('''CREATE TABLE IF NOT EXISTS device_apps (
             id SERIAL PRIMARY KEY,
             device_type TEXT NOT NULL,
@@ -780,6 +797,23 @@ def init_db():
                 maxplayer_user_id TEXT,
                 maxplayer_synced_at TEXT,
                 maxplayer_sync_status TEXT,
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS smartone_records (
+                username TEXT PRIMARY KEY,
+                mac TEXT,
+                smart_key_id TEXT,
+                playlist_id TEXT,
+                account_name TEXT,
+                server_address TEXT,
+                server_port TEXT,
+                smartone_username TEXT,
+                smartone_password TEXT,
+                device_model TEXT,
+                license_status TEXT DEFAULT 'sin_registro',
+                license_expires_at TEXT,
+                date_fetched TEXT,
+                note TEXT,
                 updated_at TEXT DEFAULT (datetime('now'))
             );
             CREATE TABLE IF NOT EXISTS device_apps (
@@ -1917,6 +1951,8 @@ def cliente_detalle(username):
         FROM client_service_credentials WHERE username=?
     """), (username,))
     service = fetchone(c) or {}
+    c.execute(qmark("SELECT * FROM smartone_records WHERE username=?"), (username,))
+    smartone = fetchone(c) or {}
     parent = None
     if cliente.get('parent_username'):
         c.execute(qmark("""
@@ -1932,7 +1968,65 @@ def cliente_detalle(username):
     """), (username,))
     asociados = fetchall(c)
     db.close()
-    return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol, 'service': service, 'parent': parent, 'asociados': asociados})
+    return jsonify({'cliente': cliente, 'pagos': pagos, 'rol': rol, 'service': service, 'smartone': smartone, 'parent': parent, 'asociados': asociados})
+
+
+@app.route('/api/smartone')
+@login_required
+def smartone_listado():
+    today = today_gt().isoformat()
+    in_15 = (today_gt() + timedelta(days=15)).isoformat()
+    estado = (request.args.get('estado') or '').strip()
+    q = (request.args.get('q') or '').strip()
+    db = get_db()
+    c = db.cursor()
+
+    where = ["1=1"]
+    params = []
+    if estado == 'por_vencer':
+        where.append("s.license_expires_at IS NOT NULL AND s.license_expires_at>=? AND s.license_expires_at<=?")
+        params += [today, in_15]
+    elif estado == 'vencida':
+        where.append("(s.license_status='vencida' OR (s.license_expires_at IS NOT NULL AND s.license_expires_at<?))")
+        params.append(today)
+    elif estado:
+        where.append("s.license_status=?")
+        params.append(estado)
+    if q:
+        like = f'%{q}%'
+        where.append("(c.nombre ILIKE ? OR c.username ILIKE ? OR c.contacto ILIKE ? OR s.mac ILIKE ? OR s.device_model ILIKE ?)" if PG else
+                     "(c.nombre LIKE ? OR c.username LIKE ? OR c.contacto LIKE ? OR s.mac LIKE ? OR s.device_model LIKE ?)")
+        params += [like, like, like, like, like]
+
+    select_sql = f"""
+        SELECT s.*, c.nombre, c.contacto, c.vencimiento
+        FROM smartone_records s
+        LEFT JOIN clientes c ON c.username=s.username
+        WHERE {' AND '.join(where)}
+    """
+    order_sql = " ORDER BY s.license_expires_at ASC NULLS LAST, c.nombre ASC" if PG else " ORDER BY s.license_expires_at IS NULL, s.license_expires_at ASC, c.nombre ASC"
+    c.execute(qmark(select_sql + order_sql), params)
+    rows = fetchall(c)
+
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records"))
+    total = fetchone(c)['c']
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records WHERE license_status='activa'"))
+    activas = fetchone(c)['c']
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records WHERE license_status='trial'"))
+    trial = fetchone(c)['c']
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records WHERE license_status='vencida' OR (license_expires_at IS NOT NULL AND license_expires_at<?)"), (today,))
+    vencidas = fetchone(c)['c']
+    c.execute(qmark("SELECT COUNT(*) as c FROM smartone_records WHERE license_expires_at IS NOT NULL AND license_expires_at>=? AND license_expires_at<=?"), (today, in_15))
+    por_vencer = fetchone(c)['c']
+    db.close()
+    return jsonify({
+        'rows': rows,
+        'total': total,
+        'activas': activas,
+        'trial': trial,
+        'vencidas': vencidas,
+        'por_vencer': por_vencer,
+    })
 
 
 @app.route('/api/clientes/<username>/portal', methods=['POST'])
@@ -2158,6 +2252,7 @@ def actualizar_cliente(username):
         related_tables = [
             ('client_portal_accounts', 'portal del cliente'),
             ('client_service_credentials', 'credenciales del servicio'),
+            ('smartone_records', 'control Smart One'),
         ]
         for table, label in related_tables:
             c.execute(qmark(f"SELECT username FROM {table} WHERE username=?"), (nuevo_username,))
@@ -2168,6 +2263,7 @@ def actualizar_cliente(username):
         c.execute(qmark("UPDATE pagos SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE client_portal_accounts SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE client_service_credentials SET username=? WHERE username=?"), (nuevo_username, username))
+        c.execute(qmark("UPDATE smartone_records SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE activation_tasks SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE clientes SET parent_username=? WHERE parent_username=?"), (nuevo_username, username))
         # Actualizar cliente
@@ -2266,6 +2362,82 @@ def actualizar_cliente(username):
                     END,
                     updated_at=excluded.updated_at
             """, (username, 'Max Player', service_username, service_password, expires_at, 3, now))
+
+    if 'smartone' in data:
+        smartone_data = data.get('smartone') or {}
+        allowed_status = {'sin_registro', 'trial', 'activa', 'vencida', 'pendiente', 'no_usar'}
+        license_status = (smartone_data.get('license_status') or 'sin_registro').strip()
+        if license_status not in allowed_status:
+            db.close()
+            return jsonify({'error': 'Estado Smart One inválido'}), 400
+        now = now_gt().isoformat(timespec='seconds')
+        values = {
+            'mac': (smartone_data.get('mac') or '').strip().upper(),
+            'smart_key_id': (smartone_data.get('smart_key_id') or '').strip(),
+            'playlist_id': (smartone_data.get('playlist_id') or '').strip(),
+            'account_name': (smartone_data.get('account_name') or '').strip(),
+            'server_address': (smartone_data.get('server_address') or '').strip(),
+            'server_port': (smartone_data.get('server_port') or '').strip(),
+            'smartone_username': (smartone_data.get('smartone_username') or '').strip(),
+            'smartone_password': (smartone_data.get('smartone_password') or '').strip(),
+            'device_model': (smartone_data.get('device_model') or '').strip(),
+            'license_status': license_status,
+            'license_expires_at': (smartone_data.get('license_expires_at') or '').strip() or None,
+            'date_fetched': (smartone_data.get('date_fetched') or '').strip() or None,
+            'note': (smartone_data.get('note') or '').strip(),
+        }
+        if PG:
+            c.execute("""
+                INSERT INTO smartone_records
+                    (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
+                     smartone_username, smartone_password, device_model, license_status, license_expires_at,
+                     date_fetched, note, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (username) DO UPDATE SET
+                    mac=EXCLUDED.mac,
+                    smart_key_id=EXCLUDED.smart_key_id,
+                    playlist_id=EXCLUDED.playlist_id,
+                    account_name=EXCLUDED.account_name,
+                    server_address=EXCLUDED.server_address,
+                    server_port=EXCLUDED.server_port,
+                    smartone_username=EXCLUDED.smartone_username,
+                    smartone_password=EXCLUDED.smartone_password,
+                    device_model=EXCLUDED.device_model,
+                    license_status=EXCLUDED.license_status,
+                    license_expires_at=EXCLUDED.license_expires_at,
+                    date_fetched=EXCLUDED.date_fetched,
+                    note=EXCLUDED.note,
+                    updated_at=EXCLUDED.updated_at
+            """, (username, values['mac'], values['smart_key_id'], values['playlist_id'], values['account_name'],
+                  values['server_address'], values['server_port'], values['smartone_username'], values['smartone_password'],
+                  values['device_model'], values['license_status'], values['license_expires_at'], values['date_fetched'],
+                  values['note'], now))
+        else:
+            c.execute("""
+                INSERT INTO smartone_records
+                    (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
+                     smartone_username, smartone_password, device_model, license_status, license_expires_at,
+                     date_fetched, note, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(username) DO UPDATE SET
+                    mac=excluded.mac,
+                    smart_key_id=excluded.smart_key_id,
+                    playlist_id=excluded.playlist_id,
+                    account_name=excluded.account_name,
+                    server_address=excluded.server_address,
+                    server_port=excluded.server_port,
+                    smartone_username=excluded.smartone_username,
+                    smartone_password=excluded.smartone_password,
+                    device_model=excluded.device_model,
+                    license_status=excluded.license_status,
+                    license_expires_at=excluded.license_expires_at,
+                    date_fetched=excluded.date_fetched,
+                    note=excluded.note,
+                    updated_at=excluded.updated_at
+            """, (username, values['mac'], values['smart_key_id'], values['playlist_id'], values['account_name'],
+                  values['server_address'], values['server_port'], values['smartone_username'], values['smartone_password'],
+                  values['device_model'], values['license_status'], values['license_expires_at'], values['date_fetched'],
+                  values['note'], now))
 
     db.commit()
     db.close()
@@ -2451,6 +2623,7 @@ def eliminar_cliente(username):
     c.execute(qmark("UPDATE clientes SET parent_username=NULL WHERE parent_username=?"), (username,))
     # Eliminar pagos asociados primero
     c.execute(qmark("DELETE FROM pagos WHERE username=?"), (username,))
+    c.execute(qmark("DELETE FROM smartone_records WHERE username=?"), (username,))
     # Luego eliminar el cliente
     c.execute(qmark("DELETE FROM clientes WHERE username=?"), (username,))
     db.commit()

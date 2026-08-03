@@ -723,6 +723,49 @@ body {
   </div>
 </div>
 
+<!-- SMART ONE VIEW -->
+<div id="view-smartone" class="view">
+  <div class="config-form">
+    <div class="config-section">
+      <h3>📺 Control Smart One</h3>
+      <p class="config-hint">Registra MAC, dispositivo, estado de licencia y vencimiento anual de Smart One. Esta fase es control interno; no modifica Smart One automáticamente.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Buscar</label>
+          <input id="smartone-search" placeholder="Cliente, usuario, teléfono, MAC o dispositivo">
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="smartone-status">
+            <option value="">Todos</option>
+            <option value="activa">Activas</option>
+            <option value="trial">Trial</option>
+            <option value="por_vencer">Por vencer 15 días</option>
+            <option value="vencida">Vencidas</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="sin_registro">Sin registro</option>
+            <option value="no_usar">No usar Smart One</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;" onclick="loadSmartOne()">Actualizar</button>
+      </div>
+    </div>
+    <div class="analytics-kpi-grid">
+      <div class="kpi-card"><div class="kpi-val" id="so-total">—</div><div class="kpi-lbl">Registros</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="so-activas">—</div><div class="kpi-lbl">Activas</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="so-trial">—</div><div class="kpi-lbl">Trial</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="so-vencidas">—</div><div class="kpi-lbl">Vencidas</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="so-por-vencer">—</div><div class="kpi-lbl">Por vencer</div></div>
+    </div>
+    <div class="analytics-chart-card">
+      <h3>Licencias / dispositivos Smart One</h3>
+      <div id="smartone-list"><div class="loading">Cargando...</div></div>
+    </div>
+  </div>
+</div>
+
 {% if rol == 'admin' %}
 <div id="view-resellers" class="view">
   <div class="config-form">
@@ -933,6 +976,9 @@ body {
   </button>
   <button class="nav-btn" data-view="migracion">
     <span class="icon">🚀</span>Migrar
+  </button>
+  <button class="nav-btn" data-view="smartone">
+    <span class="icon">📺</span>SmartOne
   </button>
   {% if rol == 'admin' %}
   <button class="nav-btn" data-view="resellers">
@@ -1153,11 +1199,77 @@ function switchView(view, estado) {
   if (view === 'analytics') loadAnalytics();
   if (view === 'config') loadConfigView();
   if (view === 'migracion') loadMigrationClients();
+  if (view === 'smartone') loadSmartOne();
   if (view === 'resellers') loadResellers();
 }
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
   if (btn.dataset.view) btn.addEventListener('click', () => switchView(btn.dataset.view));
+});
+
+// ── SMART ONE ────────────────────────────────────────────────────────────────
+function smartOneStatusLabel(status, expiresAt) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (expiresAt && expiresAt < today) return {label:'Vencida', cls:'red'};
+  const map = {
+    activa: {label:'Activa', cls:'green'},
+    trial: {label:'Trial', cls:'yellow'},
+    vencida: {label:'Vencida', cls:'red'},
+    pendiente: {label:'Pendiente', cls:'yellow'},
+    sin_registro: {label:'Sin registro', cls:'gray'},
+    no_usar: {label:'No usar', cls:'gray'}
+  };
+  return map[status] || map.sin_registro;
+}
+
+async function loadSmartOne() {
+  const list = document.getElementById('smartone-list');
+  if (!list) return;
+  list.innerHTML = '<div class="loading">Cargando...</div>';
+  const q = document.getElementById('smartone-search')?.value.trim() || '';
+  const estado = document.getElementById('smartone-status')?.value || '';
+  const r = await fetch(`/api/smartone?q=${encodeURIComponent(q)}&estado=${encodeURIComponent(estado)}`);
+  const d = await r.json();
+  document.getElementById('so-total').textContent = (d.total || 0).toLocaleString();
+  document.getElementById('so-activas').textContent = (d.activas || 0).toLocaleString();
+  document.getElementById('so-trial').textContent = (d.trial || 0).toLocaleString();
+  document.getElementById('so-vencidas').textContent = (d.vencidas || 0).toLocaleString();
+  document.getElementById('so-por-vencer').textContent = (d.por_vencer || 0).toLocaleString();
+  const rows = d.rows || [];
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty-state"><p>No hay registros Smart One para este filtro.</p></div>';
+    return;
+  }
+  list.innerHTML = rows.map(row => {
+    const st = smartOneStatusLabel(row.license_status, row.license_expires_at);
+    const link = row.playlist_id ? `https://smartone-iptv.com/plugin/smart_one/client_main/edit_playlist/${row.playlist_id}/` : 'https://smartone-iptv.com/plugin/smart_one/client_main/index/';
+    return `
+      <div class="pay-row" style="align-items:flex-start;gap:12px;">
+        <div style="flex:1;min-width:0;cursor:pointer;" onclick="openModal('${row.username}')">
+          <div style="font-weight:900;">${row.nombre || row.username || '—'}</div>
+          <div style="font-size:12px;color:var(--muted);font-family:monospace;word-break:break-word;">
+            ${row.username || '—'} · MAC: ${row.mac || 'sin MAC'} · ${row.device_model || 'sin dispositivo'}
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">
+            Vence: ${row.license_expires_at || 'sin fecha'} · Playlist: ${row.playlist_id || '—'} · Cuenta: ${row.account_name || '—'}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+          <span class="badge ${st.cls}">${st.label}</span>
+          <a class="ops-btn-secondary" href="${link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Abrir Smart One</a>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.addEventListener('input', e => {
+  if (e.target && e.target.id === 'smartone-search') {
+    clearTimeout(window._smartOneSearchTimer);
+    window._smartOneSearchTimer = setTimeout(loadSmartOne, 350);
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'smartone-status') loadSmartOne();
 });
 
 // ── RESELLERS ───────────────────────────────────────────────────────────────
@@ -1624,6 +1736,7 @@ async function openModal(username) {
 
   const c = d.cliente;
   const service = d.service || {};
+  const smartone = d.smartone || {};
   const parent = d.parent || null;
   const asociados = d.asociados || [];
   const status = clienteStatus(c.vencimiento);
@@ -1757,6 +1870,89 @@ async function openModal(username) {
       </div>
       <button class="btn-secondary" onclick="restaurarMaxPlayer('${username}', ${service.service_password ? 'true' : 'false'})">Restaurar usuario Max Player</button>
       <div style="font-size:12px;color:var(--muted);margin-top:8px;">Borra el usuario anterior si lo encuentra y lo crea nuevamente. Max Player queda con password igual al password XUI.</div>
+    </div>
+
+    <div class="pago-form">
+      <h3>📺 Smart One</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+        <span class="badge ${smartOneStatusLabel(smartone.license_status, smartone.license_expires_at).cls}">${smartOneStatusLabel(smartone.license_status, smartone.license_expires_at).label}</span>
+        <span class="badge gray">MAC: ${smartone.mac || 'Sin MAC'}</span>
+        <span class="badge gray">Vence: ${smartone.license_expires_at || 'Sin fecha'}</span>
+      </div>
+      ${smartone.playlist_id ? `<a class="btn-secondary" href="https://smartone-iptv.com/plugin/smart_one/client_main/edit_playlist/${smartone.playlist_id}/" target="_blank" rel="noopener">Abrir en Smart One</a>` : `<a class="btn-secondary" href="https://smartone-iptv.com/plugin/smart_one/client_main/index/" target="_blank" rel="noopener">Abrir panel Smart One</a>`}
+      <button class="btn-secondary" onclick="copiarDatosSmartOne('${username}')">Copiar datos para cargar</button>
+      <div class="section-divider">Control interno Smart One</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>MAC del dispositivo</label>
+          <input type="text" id="smartone-mac" value="${smartone.mac || ''}" placeholder="Ej: D0:CD:BF:27:92:B2" style="font-family:monospace;font-size:14px;">
+        </div>
+        <div class="form-group">
+          <label>Dispositivo / modelo</label>
+          <input type="text" id="smartone-device-model" value="${smartone.device_model || ''}" placeholder="Ej: LG 2025, Hisense, Samsung 2024">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Estado licencia</label>
+          <select id="smartone-license-status">
+            <option value="sin_registro" ${(smartone.license_status||'sin_registro')==='sin_registro'?'selected':''}>Sin registro</option>
+            <option value="trial" ${(smartone.license_status||'')==='trial'?'selected':''}>Trial</option>
+            <option value="activa" ${(smartone.license_status||'')==='activa'?'selected':''}>Activa</option>
+            <option value="vencida" ${(smartone.license_status||'')==='vencida'?'selected':''}>Vencida</option>
+            <option value="pendiente" ${(smartone.license_status||'')==='pendiente'?'selected':''}>Pendiente</option>
+            <option value="no_usar" ${(smartone.license_status||'')==='no_usar'?'selected':''}>No usar Smart One</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Vencimiento licencia Smart One</label>
+          <input type="date" id="smartone-license-expires-at" value="${smartone.license_expires_at || ''}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Smart Key ID</label>
+          <input type="text" id="smartone-smart-key-id" value="${smartone.smart_key_id || ''}" placeholder="ID visible en Smart One">
+        </div>
+        <div class="form-group">
+          <label>Playlist ID</label>
+          <input type="text" id="smartone-playlist-id" value="${smartone.playlist_id || ''}" placeholder="ID de la URL edit_playlist/...">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Account name</label>
+          <input type="text" id="smartone-account-name" value="${smartone.account_name || 'Fenix'}" placeholder="Fenix">
+        </div>
+        <div class="form-group">
+          <label>Fecha capturada</label>
+          <input type="date" id="smartone-date-fetched" value="${smartone.date_fetched || ''}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Servidor</label>
+          <input type="text" id="smartone-server-address" value="${smartone.server_address || ''}" placeholder="http://servidor.com">
+        </div>
+        <div class="form-group">
+          <label>Puerto</label>
+          <input type="text" id="smartone-server-port" value="${smartone.server_port || '80'}" placeholder="80">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Usuario cargado en Smart One</label>
+          <input type="text" id="smartone-username" value="${smartone.smartone_username || service.service_username || c.username}" style="font-family:monospace;font-size:14px;">
+        </div>
+        <div class="form-group">
+          <label>Password cargado en Smart One</label>
+          <input type="password" id="smartone-password" value="${smartone.smartone_password || service.service_password || ''}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Nota Smart One</label>
+        <textarea id="smartone-note" rows="2" placeholder="Licencia pagada, pendiente de MAC, instrucciones, etc." style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-size:14px;resize:vertical;">${smartone.note || ''}</textarea>
+      </div>
     </div>
 
     <div class="pago-form" id="edit-form-${username}">
@@ -2396,6 +2592,31 @@ async function autoAsociarClientes(username) {
   }
 }
 
+async function copiarDatosSmartOne(username) {
+  const accountName = document.getElementById('smartone-account-name')?.value.trim() || 'Fenix';
+  const mac = document.getElementById('smartone-mac')?.value.trim() || 'Pendiente';
+  const server = document.getElementById('smartone-server-address')?.value.trim() || 'Pendiente';
+  const port = document.getElementById('smartone-server-port')?.value.trim() || '80';
+  const user = document.getElementById('smartone-username')?.value.trim() || document.getElementById('edit-service-username')?.value.trim() || username;
+  const pass = document.getElementById('smartone-password')?.value.trim() || document.getElementById('edit-service-password')?.value.trim() || '';
+  const text = [
+    'Datos para Smart One',
+    `Cliente: ${username}`,
+    `MAC: ${mac}`,
+    `Account name: ${accountName}`,
+    `Server Address: ${server}`,
+    `Server Port: ${port}`,
+    `Username: ${user}`,
+    `Password: ${pass}`,
+  ].join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('✅ Datos Smart One copiados');
+  } catch(e) {
+    prompt('Copia los datos Smart One:', text);
+  }
+}
+
 async function guardarEdicion(username) {
   const nombre     = document.getElementById('edit-nombre').value.trim();
   const contacto   = document.getElementById('edit-contacto').value.trim();
@@ -2413,13 +2634,28 @@ async function guardarEdicion(username) {
   const reseller_status = resellerStatusEl ? resellerStatusEl.value : undefined;
   const usernameEl = document.getElementById('edit-username');
   const nuevo_username = usernameEl ? usernameEl.value.trim() : username;
+  const smartone = {
+    mac: document.getElementById('smartone-mac')?.value.trim() || '',
+    smart_key_id: document.getElementById('smartone-smart-key-id')?.value.trim() || '',
+    playlist_id: document.getElementById('smartone-playlist-id')?.value.trim() || '',
+    account_name: document.getElementById('smartone-account-name')?.value.trim() || '',
+    server_address: document.getElementById('smartone-server-address')?.value.trim() || '',
+    server_port: document.getElementById('smartone-server-port')?.value.trim() || '',
+    smartone_username: document.getElementById('smartone-username')?.value.trim() || '',
+    smartone_password: document.getElementById('smartone-password')?.value.trim() || '',
+    device_model: document.getElementById('smartone-device-model')?.value.trim() || '',
+    license_status: document.getElementById('smartone-license-status')?.value || 'sin_registro',
+    license_expires_at: document.getElementById('smartone-license-expires-at')?.value || '',
+    date_fetched: document.getElementById('smartone-date-fetched')?.value || '',
+    note: document.getElementById('smartone-note')?.value.trim() || ''
+  };
 
   // Advertencia si cambia el username
   if (nuevo_username && nuevo_username !== username) {
     if (!confirm(`¿Cambiar el username de "${username}" a "${nuevo_username}"?\n\nEsto actualizará también todo el historial de pagos.`)) return;
   }
 
-  const body = { nombre, contacto, vencimiento, referido, notas, parent_username, service_username, service_password };
+  const body = { nombre, contacto, vencimiento, referido, notas, parent_username, service_username, service_password, smartone };
   if (reseller_username !== undefined) body.reseller_username = reseller_username;
   if (reseller_status !== undefined) body.reseller_status = reseller_status;
   if (nuevo_username && nuevo_username !== username) body.nuevo_username = nuevo_username;
