@@ -1228,6 +1228,15 @@ function localDateStr() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+function normalizeDateForSave(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const m = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (m) return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+  return text;
+}
+
 function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
     '&': '&amp;',
@@ -2985,7 +2994,7 @@ async function copiarDatosSmartOne(username) {
 async function guardarEdicion(username) {
   const nombre     = document.getElementById('edit-nombre').value.trim();
   const contacto   = document.getElementById('edit-contacto').value.trim();
-  const vencimiento= document.getElementById('edit-vencimiento').value || null;
+  const vencimiento= normalizeDateForSave(document.getElementById('edit-vencimiento').value);
   const referido   = document.getElementById('edit-referido').value;
   const notas      = document.getElementById('edit-notas').value.trim();
   const parent_username = document.getElementById('edit-parent-username')?.value.trim() || '';
@@ -3010,8 +3019,8 @@ async function guardarEdicion(username) {
     smartone_password: document.getElementById('smartone-password')?.value.trim() || '',
     device_model: document.getElementById('smartone-device-model')?.value.trim() || '',
     license_status: document.getElementById('smartone-license-status')?.value || 'sin_registro',
-    license_expires_at: document.getElementById('smartone-license-expires-at')?.value || '',
-    date_fetched: document.getElementById('smartone-date-fetched')?.value || '',
+    license_expires_at: normalizeDateForSave(document.getElementById('smartone-license-expires-at')?.value || ''),
+    date_fetched: normalizeDateForSave(document.getElementById('smartone-date-fetched')?.value || ''),
     note: document.getElementById('smartone-note')?.value.trim() || ''
   };
 

@@ -14,6 +14,7 @@ from urllib.parse import urlencode
 from datetime import date, datetime, timezone, timedelta
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.exceptions import HTTPException
 
 # Zona horaria Guatemala (UTC-6)
 GT_TZ = timezone(timedelta(hours=-6))
@@ -64,6 +65,19 @@ def parse_smartone_date(value):
             pass
     return None
 
+def normalize_date_input(value):
+    """Acepta yyyy-mm-dd o dd/mm/yyyy y devuelve yyyy-mm-dd para guardar."""
+    text = str(value or '').strip()
+    if not text:
+        return None
+    text = text[:10].replace('\\', '/')
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%m/%d/%Y'):
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            pass
+    return text
+
 def normalize_smartone_status(expiration_text, status=''):
     raw = f"{status or ''} {expiration_text or ''}".lower()
     if 'expired' in raw or 'vencid' in raw:
@@ -105,6 +119,16 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or os.environ.get('FLASK_SECRET_KEY')
 if not app.secret_key:
     raise RuntimeError('SECRET_KEY environment variable is required')
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(exc):
+    if isinstance(exc, HTTPException):
+        return exc
+    traceback.print_exc()
+    if request.path.startswith('/api/'):
+        message = str(exc) if session.get('rol') == 'admin' else 'Error interno del servidor'
+        return jsonify({'ok': False, 'error': message}), 500
+    raise exc
 
 PASSWORD_HASH_PREFIXES = ('scrypt:', 'pbkdf2:', 'argon2:')
 CREDIT_COST_USD = float(os.environ.get('CREDIT_COST_USD', '1.25'))
@@ -2663,6 +2687,8 @@ def restaurar_maxplayer_cliente(username):
 @login_required
 def actualizar_cliente(username):
     data = request.json or {}
+    if 'vencimiento' in data:
+        data['vencimiento'] = normalize_date_input(data.get('vencimiento'))
     db = get_db()
     c = db.cursor()
     c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
@@ -2815,8 +2841,8 @@ def actualizar_cliente(username):
             'smartone_password': (smartone_data.get('smartone_password') or '').strip(),
             'device_model': (smartone_data.get('device_model') or '').strip(),
             'license_status': license_status,
-            'license_expires_at': (smartone_data.get('license_expires_at') or '').strip() or None,
-            'date_fetched': (smartone_data.get('date_fetched') or '').strip() or None,
+            'license_expires_at': normalize_date_input(smartone_data.get('license_expires_at')),
+            'date_fetched': normalize_date_input(smartone_data.get('date_fetched')),
             'note': (smartone_data.get('note') or '').strip(),
         }
         if PG:
