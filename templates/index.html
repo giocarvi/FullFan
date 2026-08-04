@@ -2467,6 +2467,7 @@ async function loadBaseHealth() {
 
   const renderClientRows = (rows, opts={}) => {
     if (!rows || !rows.length) return '<div class="empty-state"><p>Sin hallazgos en esta categoria.</p></div>';
+    const total = Number.isFinite(opts.total) ? opts.total : rows.length;
     return `<div style="overflow:auto;"><table class="data-table"><thead><tr>
       <th>Cliente</th><th>Usuario</th><th>Telefono</th><th>Vence</th>${opts.extraHead || ''}
     </tr></thead><tbody>${rows.slice(0, 80).map(x => `
@@ -2476,7 +2477,7 @@ async function loadBaseHealth() {
         <td>${escHtml(x.contacto || '—')}</td>
         <td>${escHtml(x.vencimiento || '—')}</td>${opts.extraRow ? opts.extraRow(x) : ''}
       </tr>
-    `).join('')}</tbody></table>${rows.length > 80 ? `<p class="config-hint">Mostrando 80 de ${rows.length}. Descarga Excel para ver todo.</p>` : ''}</div>`;
+    `).join('')}</tbody></table>${total > 80 ? `<p class="config-hint">Mostrando ${Math.min(80, rows.length)} de ${total}. Descarga Excel para ver todo.</p>` : ''}</div>`;
   };
 
   const renderGroups = (groups, keyName) => {
@@ -2519,14 +2520,14 @@ async function loadBaseHealth() {
   };
 
   list.innerHTML = `
-    <div class="ops-task-meta" style="margin-bottom:12px;">Lectura segura: este reporte no elimina, no archiva y no cambia pagos.</div>
-    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Clientes con portal activo (${(d.con_portal || []).length})</summary>${renderClientRows(d.con_portal, {extraHead:'<th>Actualizado</th>', extraRow:x => `<td>${escHtml(x.updated_at || '—')}</td>`})}</details>
-    <details class="config-section" open><summary style="cursor:pointer;font-weight:900;">Clientes sin acceso al portal (${(d.sin_portal || []).length})</summary>${renderClientRows(d.sin_portal)}</details>
-    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Clientes sin credenciales Fenix/XUI completas (${(d.sin_xui || []).length})</summary>${renderClientRows(d.sin_xui, {extraHead:'<th>Usuario Fenix</th><th>Password</th>', extraRow:x => `<td>${escHtml(x.service_username || '—')}</td><td>${x.service_password ? 'OK' : 'Falta'}</td>`})}</details>
-    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Datos incompletos (${(d.datos_incompletos || []).length})</summary>${renderClientRows(d.datos_incompletos)}</details>
-    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Duplicados probables por telefono (${(d.duplicados_telefono || []).length})</summary>${renderGroups(d.duplicados_telefono, 'telefono')}</details>
-    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Duplicados probables por nombre (${(d.duplicados_nombre || []).length})</summary>${renderGroups(d.duplicados_nombre, 'nombre_key')}</details>
-    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Accesos de portal sin cliente (${(d.portal_sin_cliente || []).length})</summary>${renderPortalOrphans(d.portal_sin_cliente)}</details>
+    <div class="ops-task-meta" style="margin-bottom:12px;">Lectura segura: este reporte no elimina, no archiva y no cambia pagos. Los indicadores son conteos completos; los listados visuales muestran una muestra para mantener la pantalla agil.</div>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Clientes con portal activo (${c.con_portal || 0})</summary>${renderClientRows(d.con_portal, {total:c.con_portal || 0, extraHead:'<th>Actualizado</th>', extraRow:x => `<td>${escHtml(x.updated_at || '—')}</td>`})}</details>
+    <details class="config-section" open><summary style="cursor:pointer;font-weight:900;">Clientes sin acceso al portal (${c.sin_portal || 0})</summary>${renderClientRows(d.sin_portal, {total:c.sin_portal || 0})}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Clientes sin credenciales Fenix/XUI completas (${c.sin_xui || 0})</summary>${renderClientRows(d.sin_xui, {total:c.sin_xui || 0, extraHead:'<th>Usuario Fenix</th><th>Password</th>', extraRow:x => `<td>${escHtml(x.service_username || '—')}</td><td>${x.service_password ? 'OK' : 'Falta'}</td>`})}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Datos incompletos (${c.datos_incompletos || 0})</summary>${renderClientRows(d.datos_incompletos, {total:c.datos_incompletos || 0})}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Duplicados probables por telefono (${c.duplicados_telefono || 0})</summary>${renderGroups(d.duplicados_telefono, 'telefono')}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Duplicados probables por nombre (${c.duplicados_nombre || 0})</summary>${renderGroups(d.duplicados_nombre, 'nombre_key')}</details>
+    <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Accesos de portal sin cliente (${c.portal_sin_cliente || 0})</summary>${renderPortalOrphans(d.portal_sin_cliente)}</details>
     <details class="config-section"><summary style="cursor:pointer;font-weight:900;">Pagos anulados conservados en historial (${(d.pagos_anulados || []).length})</summary>${renderVoids(d.pagos_anulados)}</details>
   `;
   return d;

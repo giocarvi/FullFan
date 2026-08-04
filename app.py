@@ -4015,6 +4015,40 @@ def base_health():
         'clientes_vencidos': scalar(f"SELECT COUNT(*) as c FROM clientes WHERE (vencimiento<? OR vencimiento IS NULL OR vencimiento='') AND {active_client_where()}", (today,)),
         'clientes_archivados': scalar("SELECT COUNT(*) as c FROM clientes WHERE archived_at IS NOT NULL AND archived_at<>''"),
         'pagos_anulados': scalar(pagos_void_sql),
+        # Los indicadores son conteos completos. Las consultas de detalle más abajo
+        # conservan límites solo para no cargar miles de filas en el navegador.
+        'con_portal': scalar(f"""
+            SELECT COUNT(*) as c
+            FROM clientes cl
+            JOIN client_portal_accounts acc ON acc.username=cl.username
+            WHERE {active_client_where('cl')}
+              AND COALESCE(acc.is_enabled, FALSE)=TRUE
+        """),
+        'sin_portal': scalar(f"""
+            SELECT COUNT(*) as c
+            FROM clientes cl
+            LEFT JOIN client_portal_accounts acc ON acc.username=cl.username
+            WHERE {active_client_where('cl')}
+              AND (acc.username IS NULL OR COALESCE(acc.is_enabled, FALSE)=FALSE)
+        """),
+        'sin_xui': scalar(f"""
+            SELECT COUNT(*) as c
+            FROM clientes cl
+            LEFT JOIN client_service_credentials svc ON svc.username=cl.username
+            WHERE {active_client_where('cl')}
+              AND (svc.username IS NULL OR COALESCE(svc.service_username, '')='' OR COALESCE(svc.service_password, '')='')
+        """),
+        'datos_incompletos': scalar(f"""
+            SELECT COUNT(*) as c FROM clientes
+            WHERE {active_client_where()}
+              AND (COALESCE(nombre, '')='' OR COALESCE(contacto, '')='' OR COALESCE(vencimiento, '')='')
+        """),
+        'portal_sin_cliente': scalar("""
+            SELECT COUNT(*) as c
+            FROM client_portal_accounts acc
+            LEFT JOIN clientes cl ON cl.username=acc.username
+            WHERE cl.username IS NULL
+        """),
     }
 
     c.execute(qmark(f"""
@@ -4139,18 +4173,13 @@ def base_health():
                 } for i in items],
             })
         groups.sort(key=lambda g: (-g['total'], str(g.get(key_label) or '')))
-        return groups[:200]
+        return groups
 
-    duplicados_telefono = group_payload(by_phone, 'telefono')
-    duplicados_nombre = group_payload(by_name, 'nombre_key')
+    duplicados_telefono_all = group_payload(by_phone, 'telefono')
+    duplicados_nombre_all = group_payload(by_name, 'nombre_key')
     counts.update({
-        'con_portal': len(con_portal),
-        'sin_portal': len(sin_portal),
-        'sin_xui': len(sin_xui),
-        'datos_incompletos': len(datos_incompletos),
-        'duplicados_telefono': len(duplicados_telefono),
-        'duplicados_nombre': len(duplicados_nombre),
-        'portal_sin_cliente': len(portal_sin_cliente),
+        'duplicados_telefono': len(duplicados_telefono_all),
+        'duplicados_nombre': len(duplicados_nombre_all),
     })
 
     return jsonify({
@@ -4160,8 +4189,8 @@ def base_health():
         'sin_portal': sin_portal,
         'sin_xui': sin_xui,
         'datos_incompletos': datos_incompletos,
-        'duplicados_telefono': duplicados_telefono,
-        'duplicados_nombre': duplicados_nombre,
+        'duplicados_telefono': duplicados_telefono_all[:200],
+        'duplicados_nombre': duplicados_nombre_all[:200],
         'portal_sin_cliente': portal_sin_cliente,
         'pagos_anulados': pagos_anulados,
     })
