@@ -732,52 +732,6 @@ body {
   </div>
 </div>
 
-<!-- ACTIVACIONES VIEW -->
-<div id="view-activaciones" class="view">
-  <div class="ops-grid">
-    <div class="ops-card">
-      <h3>🔥 Nueva tarea de activación / renovación</h3>
-      <div class="ops-form">
-        <input id="act-username" placeholder="Usuario del cliente, ej: juanperez01">
-        <select id="act-plan"></select>
-        <select id="act-type">
-          <option value="renewal">Renovación</option>
-          <option value="new">Cliente nuevo</option>
-        </select>
-        <input id="act-amount" type="number" min="0" step="0.01" placeholder="Monto pagado, ej: 90">
-        <select id="act-currency">
-          <option value="GTQ">GTQ</option>
-          <option value="USD">USD</option>
-        </select>
-        <input id="act-payment-method" placeholder="Método, ej: transferencia">
-        <div class="form-group full">
-          <label>Comprobante de pago (imagen)</label>
-          <input type="file" id="act-payment-proof" accept="image/*" style="display:none" onchange="onActivationProofSelected(this)">
-          <label for="act-payment-proof" class="file-upload-label" id="act-proof-label">📎 Adjuntar comprobante de pago</label>
-        </div>
-        <textarea id="act-notes" class="full" rows="2" placeholder="Notas internas opcionales"></textarea>
-        <button class="config-save-btn full" onclick="crearActivationTask()">Crear tarea pendiente</button>
-      </div>
-      <p class="config-hint" style="margin-top:10px;">Esta cola no crea nada en XUI automáticamente. Sirve para controlar lo que el operador debe crear o renovar manualmente.</p>
-    </div>
-
-    <div class="ops-card">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
-        <h3 style="margin:0;">📋 Cola pendiente</h3>
-        <button class="ops-btn-secondary" onclick="loadActivationTasks()" style="border:none;border-radius:10px;padding:9px 12px;color:#fff;cursor:pointer;">Actualizar</button>
-      </div>
-      <div class="ops-tabs" id="activation-tabs">
-        <button class="ops-tab active" data-status="open">Abiertas <span id="act-count-open"></span></button>
-        <button class="ops-tab" data-status="pending">Pendientes <span id="act-count-pending"></span></button>
-        <button class="ops-tab" data-status="in_progress">En proceso <span id="act-count-in_progress"></span></button>
-        <button class="ops-tab" data-status="blocked">Bloqueadas <span id="act-count-blocked"></span></button>
-        <button class="ops-tab" data-status="done">Completadas <span id="act-count-done"></span></button>
-      </div>
-      <div id="activation-list"><div class="loading">Cargando...</div></div>
-    </div>
-  </div>
-</div>
-
 <!-- MIGRACION VIEW -->
 <div id="view-migracion" class="view">
   <div class="config-form">
@@ -1101,9 +1055,6 @@ body {
   </button>
   <button class="nav-btn" data-view="clientes">
     <span class="icon">👥</span>Clientes
-  </button>
-  <button class="nav-btn" data-view="activaciones">
-    <span class="icon">🔥</span>Activar
   </button>
   <button class="nav-btn" data-view="migracion">
     <span class="icon">🚀</span>Migrar
