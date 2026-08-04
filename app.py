@@ -2698,6 +2698,7 @@ def actualizar_cliente(username):
 
     # Cambio de username (solo admin)
     nuevo_username = data.get('nuevo_username', '').strip()
+    smartone_existing = None
     if nuevo_username and nuevo_username != username:
         if session.get('rol') != 'admin':
             db.close()
@@ -2717,11 +2718,14 @@ def actualizar_cliente(username):
             if fetchone(c):
                 db.close()
                 return jsonify({'error': f'El nuevo username ya existe en {label}. Revisa si ese usuario fue creado antes.'}), 409
+        c.execute(qmark("SELECT * FROM smartone_records WHERE username=?"), (username,))
+        smartone_existing = fetchone(c)
+        if smartone_existing:
+            c.execute(qmark("DELETE FROM smartone_records WHERE username=?"), (username,))
         # Actualizar pagos primero (FK)
         c.execute(qmark("UPDATE pagos SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE client_portal_accounts SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE client_service_credentials SET username=? WHERE username=?"), (nuevo_username, username))
-        c.execute(qmark("UPDATE smartone_records SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE smartone_inventory SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE activation_tasks SET username=? WHERE username=?"), (nuevo_username, username))
         c.execute(qmark("UPDATE clientes SET parent_username=? WHERE parent_username=?"), (nuevo_username, username))
@@ -2829,23 +2833,38 @@ def actualizar_cliente(username):
         if license_status not in allowed_status:
             db.close()
             return jsonify({'error': 'Estado Smart One inválido'}), 400
+        smartone_has_data = any((smartone_data.get(k) or '').strip() for k in (
+            'mac', 'smart_key_id', 'playlist_id', 'account_name', 'server_address', 'server_port',
+            'smartone_username', 'smartone_password', 'device_model', 'license_expires_at',
+            'date_fetched', 'note'
+        )) or license_status != 'sin_registro'
+        if not smartone_has_data and smartone_existing:
+            smartone_data = dict(smartone_existing)
+            license_status = (smartone_data.get('license_status') or 'sin_registro').strip()
+            smartone_has_data = True
+        if not smartone_has_data:
+            smartone_data = None
+        if smartone_data:
+            license_status = (smartone_data.get('license_status') or 'sin_registro').strip()
         now = now_gt().isoformat(timespec='seconds')
-        values = {
-            'mac': (smartone_data.get('mac') or '').strip().upper(),
-            'smart_key_id': (smartone_data.get('smart_key_id') or '').strip(),
-            'playlist_id': (smartone_data.get('playlist_id') or '').strip(),
-            'account_name': (smartone_data.get('account_name') or '').strip(),
-            'server_address': (smartone_data.get('server_address') or '').strip(),
-            'server_port': (smartone_data.get('server_port') or '').strip(),
-            'smartone_username': (smartone_data.get('smartone_username') or '').strip(),
-            'smartone_password': (smartone_data.get('smartone_password') or '').strip(),
-            'device_model': (smartone_data.get('device_model') or '').strip(),
-            'license_status': license_status,
-            'license_expires_at': normalize_date_input(smartone_data.get('license_expires_at')),
-            'date_fetched': normalize_date_input(smartone_data.get('date_fetched')),
-            'note': (smartone_data.get('note') or '').strip(),
-        }
-        if PG:
+        values = None
+        if smartone_data:
+            values = {
+                'mac': (smartone_data.get('mac') or '').strip().upper(),
+                'smart_key_id': (smartone_data.get('smart_key_id') or '').strip(),
+                'playlist_id': (smartone_data.get('playlist_id') or '').strip(),
+                'account_name': (smartone_data.get('account_name') or '').strip(),
+                'server_address': (smartone_data.get('server_address') or '').strip(),
+                'server_port': (smartone_data.get('server_port') or '').strip(),
+                'smartone_username': (smartone_data.get('smartone_username') or '').strip(),
+                'smartone_password': (smartone_data.get('smartone_password') or '').strip(),
+                'device_model': (smartone_data.get('device_model') or '').strip(),
+                'license_status': license_status,
+                'license_expires_at': normalize_date_input(smartone_data.get('license_expires_at')),
+                'date_fetched': normalize_date_input(smartone_data.get('date_fetched')),
+                'note': (smartone_data.get('note') or '').strip(),
+            }
+        if values and PG:
             c.execute("""
                 INSERT INTO smartone_records
                     (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
@@ -2871,7 +2890,7 @@ def actualizar_cliente(username):
                   values['server_address'], values['server_port'], values['smartone_username'], values['smartone_password'],
                   values['device_model'], values['license_status'], values['license_expires_at'], values['date_fetched'],
                   values['note'], now))
-        else:
+        elif values:
             c.execute("""
                 INSERT INTO smartone_records
                     (username, mac, smart_key_id, playlist_id, account_name, server_address, server_port,
