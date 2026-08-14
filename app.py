@@ -144,7 +144,7 @@ PAYPAL_CLIENT_ID = os.environ.get(
 )
 PAYPAL_HOSTED_BUTTON_ID = os.environ.get('PAYPAL_HOSTED_BUTTON_ID', 'EQVWPWA4RD6Y4')
 QUINIELA_ENTRY_FEE_GTQ = 10
-QUINIELA_FORM_URL = os.environ.get('QUINIELA_FORM_URL', '').strip()
+QUINIELA_FORM_URL = os.environ.get('QUINIELA_FORM_URL', 'https://penka.io?id=FD3FD6').strip()
 
 PAYMENT_PLANS = [
     {
@@ -1371,7 +1371,12 @@ def quiniela_participate(access_token):
 def quiniela_admin():
     if session.get('rol') not in ('admin', 'atencion'):
         return redirect(url_for('index'))
-    return render_template('quiniela_admin.html', user=session.get('user'), rol=session.get('rol'))
+    return render_template(
+        'quiniela_admin.html',
+        user=session.get('user'),
+        rol=session.get('rol'),
+        form_url=QUINIELA_FORM_URL,
+    )
 
 
 @app.route('/api/quiniela/inscripciones')
@@ -1458,12 +1463,11 @@ def quiniela_entry_update_status(entry_id):
     db.commit()
     db.close()
 
-    participation_url = url_for('quiniela_participate', access_token=entry['access_token'], _external=True)
     status_url = url_for('quiniela_status', public_code=entry['public_code'], _external=True)
     return jsonify({
         'ok': True,
         'status': status,
-        'participation_url': participation_url if status == 'approved' else None,
+        'participation_url': QUINIELA_FORM_URL if status == 'approved' else None,
         'status_url': status_url,
     })
 
