@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Quiniela Bimestral | Fénix Digital TV</title>
+  <meta name="description" content="Participa en la Quiniela Bimestral de Fénix Digital TV por Q10.">
+  <link rel="stylesheet" href="{{ url_for('static', filename='quiniela.css') }}">
+</head>
+<body>
+  <header class="topbar"><div class="topbar-inner">
+    <a class="brand" href="{{ url_for('public_home') }}"><img src="{{ url_for('static', filename='logo.png') }}" alt="Fénix Digital TV"></a>
+    <a class="top-link" href="#inscripcion">Participar</a>
+  </div></header>
+
+  <main>
+    <section class="hero"><div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">La pasión se premia</span>
+        <h1>Quiniela <span>Bimestral</span> Fénix</h1>
+        <p>Demuestra cuánto sabes de fútbol, compite durante cada período y participa por una Smart TV de 32 pulgadas y meses gratis de servicio.</p>
+      </div>
+      <aside class="prize-card">
+        <div class="fee">Q{{ entry_fee|int }} <small>por participación</small></div>
+        <ul><li>Inscripción sencilla</li><li>Comprobante validado por nuestro equipo</li><li>Acceso personal a la quiniela</li></ul>
+      </aside>
+    </div></section>
+
+    <section class="section"><div class="wrap">
+      <h2>¿Cómo participar?</h2><p class="section-lead">Completa estos tres pasos y conserva tu enlace de seguimiento.</p>
+      <div class="grid-3">
+        <article class="info-card"><div class="num">1</div><h3>Realiza tu pago</h3><p>Deposita o transfiere Q{{ entry_fee|int }}. Si necesitas los datos bancarios, solicítalos por WhatsApp.</p></article>
+        <article class="info-card"><div class="num">2</div><h3>Envía el comprobante</h3><p>Completa el formulario y adjunta una imagen o PDF legible del pago.</p></article>
+        <article class="info-card"><div class="num">3</div><h3>Recibe tu acceso</h3><p>Te daremos un enlace de seguimiento. Al validar el pago, allí aparecerá tu acceso personal.</p></article>
+      </div>
+      <div class="actions" style="margin-top:20px"><a class="btn btn-secondary" target="_blank" rel="noopener" href="https://wa.me/50241562336?text=Hola%2C%20necesito%20los%20datos%20para%20pagar%20mi%20participaci%C3%B3n%20en%20la%20Quiniela%20F%C3%A9nix.">Solicitar datos bancarios por WhatsApp</a></div>
+    </div></section>
+
+    <section class="section" style="background:#fff"><div class="wrap rules">
+      <div><span class="eyebrow" style="color:#b45309;background:#fff7ed">Información importante</span><h2 style="margin-top:16px">Bases de participación</h2><p class="section-lead">Reglas claras para una competencia justa.</p><div class="notice">La inscripción tiene un costo de <strong>Q{{ entry_fee|int }}</strong>. El comprobante será visible únicamente para el equipo autorizado de Fénix.</div></div>
+      <ol class="rules-list">
+        <li><span class="check">✓</span><span>La participación es personal y queda activa únicamente después de validar el pago.</span></li>
+        <li><span class="check">✓</span><span>Cada participante debe registrar datos reales y un número de WhatsApp vigente.</span></li>
+        <li><span class="check">✓</span><span>Los pronósticos deben enviarse antes del cierre indicado en cada jornada; después no podrán modificarse.</span></li>
+        <li><span class="check">✓</span><span>La puntuación, jornadas incluidas y criterios de desempate se mostrarán dentro del formulario de participación.</span></li>
+        <li><span class="check">✓</span><span>El uso de comprobantes falsos, cuentas duplicadas o cualquier intento de manipulación causa descalificación.</span></li>
+        <li><span class="check">✓</span><span>Los premios y condiciones de entrega corresponden a la edición anunciada por Fénix Digital TV.</span></li>
+      </ol>
+    </div></section>
+
+    <section class="section" id="inscripcion"><div class="wrap" style="max-width:760px">
+      <div class="form-card form-shell">
+        <span class="eyebrow" style="color:#b45309;background:#fff7ed">Inscripción</span>
+        <h2 style="margin-top:16px">Sube tu comprobante</h2>
+        <p class="section-lead">Al finalizar recibirás un código y enlace de seguimiento. Guárdalos.</p>
+        <form id="entryForm" enctype="multipart/form-data" novalidate>
+          <div class="field"><label for="nombre">Nombre completo</label><input id="nombre" name="nombre" autocomplete="name" required maxlength="120" placeholder="Ej. Andrea López"></div>
+          <div class="field"><label for="telefono">WhatsApp</label><input id="telefono" name="telefono" type="tel" inputmode="tel" autocomplete="tel" required maxlength="20" placeholder="Ej. 502 5555 1234"></div>
+          <div class="field"><label for="email">Correo electrónico <span style="font-weight:500;color:#64748b">(opcional)</span></label><input id="email" name="email" type="email" autocomplete="email" maxlength="160" placeholder="tu@correo.com"></div>
+          <div class="field hp" aria-hidden="true"><label for="website">Sitio web</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+          <div class="field upload"><label for="comprobante">Comprobante de depósito o transferencia</label><input id="comprobante" name="comprobante" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required><small>JPG, PNG, WEBP o PDF · máximo 5 MB</small></div>
+          <label style="display:flex;gap:10px;align-items:flex-start;font-size:14px"><input type="checkbox" required style="margin-top:5px"> <span>Confirmo que los datos y el comprobante son reales, y acepto las bases de participación.</span></label>
+          <button class="btn btn-primary" id="submitBtn" type="submit">Enviar inscripción y comprobante</button>
+          <div class="form-message" id="formMessage" role="status" aria-live="polite"></div>
+          <p class="privacy">Tus datos se utilizarán únicamente para gestionar esta quiniela, validar el pago y comunicarnos contigo.</p>
+        </form>
+      </div>
+    </div></section>
+  </main>
+  <footer><div class="wrap">© 2026 Fénix Digital TV · Tu entretenimiento, sin fronteras</div></footer>
+  <script>
+    const form=document.getElementById('entryForm'),btn=document.getElementById('submitBtn'),msg=document.getElementById('formMessage');
+    form.addEventListener('submit',async(e)=>{e.preventDefault();msg.className='form-message';if(!form.reportValidity())return;const file=form.comprobante.files[0];if(file&&file.size>5*1024*1024){msg.textContent='El comprobante no puede superar 5 MB.';msg.className='form-message error show';return}btn.disabled=true;btn.textContent='Enviando…';try{const res=await fetch('/api/quiniela/inscripciones',{method:'POST',body:new FormData(form)});const data=await res.json();if(!res.ok)throw new Error(data.error||'No fue posible enviar la inscripción.');msg.innerHTML=`¡Listo! Código: <strong>${data.code}</strong>. Abriendo tu seguimiento…`;msg.className='form-message success show';setTimeout(()=>location.href=data.status_url,900)}catch(err){msg.textContent=err.message;msg.className='form-message error show';btn.disabled=false;btn.textContent='Enviar inscripción y comprobante'}});
+  </script>
+</body></html>

@@ -6,6 +6,8 @@ import time
 import re
 import csv
 import io
+import base64
+import secrets
 import unicodedata
 import traceback
 from urllib import request as urlrequest
@@ -141,6 +143,8 @@ PAYPAL_CLIENT_ID = os.environ.get(
     'BAAysVQngxEwR-B24HNggrsLWDm0VZjMaXvQkcVhBrU2vRG5_2nU9mRJNJYNIzmxZeQT5qok6JuVWHI0NE'
 )
 PAYPAL_HOSTED_BUTTON_ID = os.environ.get('PAYPAL_HOSTED_BUTTON_ID', 'EQVWPWA4RD6Y4')
+QUINIELA_ENTRY_FEE_GTQ = 10
+QUINIELA_FORM_URL = os.environ.get('QUINIELA_FORM_URL', '').strip()
 
 PAYMENT_PLANS = [
     {
@@ -1056,6 +1060,43 @@ def init_db():
             except Exception:
                 pass
 
+    # Inscripciones independientes para la Quiniela Fénix. No se mezclan con
+    # pagos de suscripciones y, por tanto, no alteran el historial de clientes.
+    if PG:
+        c.execute('''CREATE TABLE IF NOT EXISTS quiniela_entries (
+            id SERIAL PRIMARY KEY,
+            public_code TEXT UNIQUE NOT NULL,
+            access_token TEXT UNIQUE NOT NULL,
+            nombre TEXT NOT NULL,
+            telefono TEXT NOT NULL,
+            email TEXT DEFAULT '',
+            payment_amount REAL NOT NULL DEFAULT 10,
+            payment_proof TEXT NOT NULL,
+            payment_filename TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'pending',
+            reviewed_by TEXT DEFAULT NULL,
+            reviewed_at TEXT DEFAULT NULL,
+            rejection_reason TEXT DEFAULT '',
+            created_at TEXT DEFAULT (NOW()::text)
+        )''')
+    else:
+        c.execute('''CREATE TABLE IF NOT EXISTS quiniela_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            public_code TEXT UNIQUE NOT NULL,
+            access_token TEXT UNIQUE NOT NULL,
+            nombre TEXT NOT NULL,
+            telefono TEXT NOT NULL,
+            email TEXT DEFAULT '',
+            payment_amount REAL NOT NULL DEFAULT 10,
+            payment_proof TEXT NOT NULL,
+            payment_filename TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'pending',
+            reviewed_by TEXT DEFAULT NULL,
+            reviewed_at TEXT DEFAULT NULL,
+            rejection_reason TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        )''')
+
     conn.commit()
 
     # Migrar Excel si DB está vacía
@@ -1213,7 +1254,218 @@ def public_home():
 
 @app.route('/')
 def public_root():
+    host = request.host.split(':', 1)[0].lower()
+    if host.startswith('quiniela.'):
+        return redirect(url_for('quiniela_home'))
     return redirect(url_for('public_home'))
+
+
+# ── QUINIELA FÉNIX ───────────────────────────────────────────────────────────
+QUINIELA_ALLOWED_MIMES = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'application/pdf': 'pdf',
+}
+QUINIELA_MAX_PROOF_BYTES = 5 * 1024 * 1024
+
+
+def quiniela_entry_by(field, value):
+    if field not in {'public_code', 'access_token'}:
+        raise ValueError('Campo de búsqueda inválido')
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark(f"SELECT * FROM quiniela_entries WHERE {field}=?"), (value,))
+    row = fetchone(c)
+    db.close()
+    return row
+
+
+@app.route('/quiniela')
+def quiniela_home():
+    return render_template('quiniela.html', entry_fee=QUINIELA_ENTRY_FEE_GTQ)
+
+
+@app.route('/api/quiniela/inscripciones', methods=['POST'])
+def quiniela_register():
+    nombre = (request.form.get('nombre') or '').strip()
+    telefono = normalize_phone(request.form.get('telefono'))
+    email = (request.form.get('email') or '').strip().lower()
+    proof = request.files.get('comprobante')
+    website = (request.form.get('website') or '').strip()  # honeypot anti-spam
+
+    if website:
+        return jsonify({'ok': True}), 200
+    if len(nombre) < 3:
+        return jsonify({'error': 'Escribe tu nombre completo.'}), 400
+    if len(telefono) < 8 or len(telefono) > 15:
+        return jsonify({'error': 'Escribe un número de WhatsApp válido.'}), 400
+    if email and not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+        return jsonify({'error': 'El correo electrónico no es válido.'}), 400
+    if not proof or not proof.filename:
+        return jsonify({'error': 'Adjunta la imagen o PDF de tu comprobante.'}), 400
+
+    mime = (proof.mimetype or '').lower()
+    if mime not in QUINIELA_ALLOWED_MIMES:
+        return jsonify({'error': 'El comprobante debe ser JPG, PNG, WEBP o PDF.'}), 400
+    raw = proof.read(QUINIELA_MAX_PROOF_BYTES + 1)
+    if not raw:
+        return jsonify({'error': 'El archivo está vacío.'}), 400
+    if len(raw) > QUINIELA_MAX_PROOF_BYTES:
+        return jsonify({'error': 'El comprobante no puede superar 5 MB.'}), 413
+
+    data_url = f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"
+    db = get_db()
+    c = db.cursor()
+    for _ in range(5):
+        public_code = secrets.token_hex(4).upper()
+        access_token = secrets.token_urlsafe(24)
+        c.execute(qmark("SELECT 1 AS found FROM quiniela_entries WHERE public_code=? OR access_token=?"),
+                  (public_code, access_token))
+        if not fetchone(c):
+            break
+    else:
+        db.close()
+        return jsonify({'error': 'No fue posible generar tu acceso. Intenta nuevamente.'}), 500
+
+    created_at = now_gt().isoformat(timespec='seconds')
+    c.execute(qmark('''
+        INSERT INTO quiniela_entries
+            (public_code, access_token, nombre, telefono, email, payment_amount,
+             payment_proof, payment_filename, status, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
+    '''), (public_code, access_token, nombre, telefono, email,
+           QUINIELA_ENTRY_FEE_GTQ, data_url, proof.filename[:180], 'pending', created_at))
+    db.commit()
+    db.close()
+
+    return jsonify({
+        'ok': True,
+        'code': public_code,
+        'status_url': url_for('quiniela_status', public_code=public_code, _external=True),
+        'message': 'Recibimos tu inscripción y comprobante.'
+    })
+
+
+@app.route('/quiniela/estado/<public_code>')
+def quiniela_status(public_code):
+    entry = quiniela_entry_by('public_code', public_code.strip().upper())
+    if not entry:
+        return render_template('quiniela_status.html', entry=None), 404
+    participation_url = None
+    if entry.get('status') == 'approved':
+        participation_url = url_for('quiniela_participate', access_token=entry['access_token'], _external=True)
+    return render_template('quiniela_status.html', entry=entry, participation_url=participation_url)
+
+
+@app.route('/quiniela/participar/<access_token>')
+def quiniela_participate(access_token):
+    entry = quiniela_entry_by('access_token', access_token)
+    if not entry or entry.get('status') != 'approved':
+        return render_template('quiniela_participate.html', entry=None, form_url=''), 403
+    return render_template('quiniela_participate.html', entry=entry, form_url=QUINIELA_FORM_URL)
+
+
+@app.route('/quiniela/admin')
+@login_required
+def quiniela_admin():
+    if session.get('rol') not in ('admin', 'atencion'):
+        return redirect(url_for('index'))
+    return render_template('quiniela_admin.html', user=session.get('user'), rol=session.get('rol'))
+
+
+@app.route('/api/quiniela/inscripciones')
+@login_required
+def quiniela_entries_list():
+    if session.get('rol') not in ('admin', 'atencion'):
+        return jsonify({'error': 'Acceso denegado'}), 403
+    status = (request.args.get('status') or '').strip()
+    db = get_db()
+    c = db.cursor()
+    params = []
+    where = ''
+    if status in ('pending', 'approved', 'rejected'):
+        where = 'WHERE status=?'
+        params.append(status)
+    c.execute(qmark(f'''
+        SELECT id, public_code, nombre, telefono, email, payment_amount, payment_filename,
+               status, reviewed_by, reviewed_at, rejection_reason, created_at
+        FROM quiniela_entries {where}
+        ORDER BY CASE status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, id DESC
+    '''), params)
+    rows = fetchall(c)
+    db.close()
+    for row in rows:
+        row['status_url'] = url_for('quiniela_status', public_code=row['public_code'], _external=True)
+    return jsonify({'ok': True, 'entries': rows})
+
+
+@app.route('/api/quiniela/inscripciones/<int:entry_id>/comprobante')
+@login_required
+def quiniela_entry_proof(entry_id):
+    if session.get('rol') not in ('admin', 'atencion'):
+        return jsonify({'error': 'Acceso denegado'}), 403
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT payment_proof, payment_filename FROM quiniela_entries WHERE id=?"), (entry_id,))
+    row = fetchone(c)
+    db.close()
+    if not row or not row.get('payment_proof'):
+        return jsonify({'error': 'Comprobante no encontrado'}), 404
+    match = re.match(r'^data:([^;]+);base64,(.+)$', row['payment_proof'], re.S)
+    if not match:
+        return jsonify({'error': 'Formato de comprobante inválido'}), 500
+    try:
+        content = base64.b64decode(match.group(2), validate=True)
+    except Exception:
+        return jsonify({'error': 'No fue posible leer el comprobante'}), 500
+    disposition = 'inline' if match.group(1).startswith('image/') or match.group(1) == 'application/pdf' else 'attachment'
+    return Response(content, mimetype=match.group(1), headers={
+        'Content-Disposition': f'{disposition}; filename="{row.get("payment_filename") or "comprobante"}"',
+        'Cache-Control': 'private, no-store',
+    })
+
+
+@app.route('/api/quiniela/inscripciones/<int:entry_id>/estado', methods=['POST'])
+@login_required
+def quiniela_entry_update_status(entry_id):
+    if session.get('rol') not in ('admin', 'atencion'):
+        return jsonify({'error': 'Acceso denegado'}), 403
+    data = request.get_json(silent=True) or {}
+    status = (data.get('status') or '').strip()
+    reason = (data.get('reason') or '').strip()[:300]
+    if status not in ('approved', 'rejected', 'pending'):
+        return jsonify({'error': 'Estado inválido'}), 400
+    if status == 'rejected' and not reason:
+        return jsonify({'error': 'Indica el motivo del rechazo.'}), 400
+
+    db = get_db()
+    c = db.cursor()
+    c.execute(qmark("SELECT id, public_code, access_token, nombre, telefono FROM quiniela_entries WHERE id=?"), (entry_id,))
+    entry = fetchone(c)
+    if not entry:
+        db.close()
+        return jsonify({'error': 'Inscripción no encontrada'}), 404
+    reviewed_at = now_gt().isoformat(timespec='seconds') if status != 'pending' else None
+    reviewed_by = session.get('user') if status != 'pending' else None
+    c.execute(qmark('''
+        UPDATE quiniela_entries
+        SET status=?, reviewed_by=?, reviewed_at=?, rejection_reason=?
+        WHERE id=?
+    '''), (status, reviewed_by, reviewed_at, reason if status == 'rejected' else '', entry_id))
+    audit_event(c, 'quiniela_entry', entry_id, f'status_{status}', session.get('user'), reason,
+                {'public_code': entry['public_code'], 'nombre': entry['nombre']})
+    db.commit()
+    db.close()
+
+    participation_url = url_for('quiniela_participate', access_token=entry['access_token'], _external=True)
+    status_url = url_for('quiniela_status', public_code=entry['public_code'], _external=True)
+    return jsonify({
+        'ok': True,
+        'status': status,
+        'participation_url': participation_url if status == 'approved' else None,
+        'status_url': status_url,
+    })
 
 
 DEVICE_GUIDES = {
