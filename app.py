@@ -4018,6 +4018,54 @@ def analytics():
         """, (mes_actual, mes_anterior))
     ventas_por_dia = fetchall(c)
 
+    if PG:
+        c.execute("""
+            SELECT TO_CHAR(p.mes::date, 'YYYY-MM-DD') as dia,
+                   p.id,
+                   p.username,
+                   COALESCE(cl.nombre, p.username) as nombre,
+                   COALESCE(cl.contacto, '') as contacto,
+                   p.monto,
+                   p.fecha_registro,
+                   COALESCE(p.created_by, '') as created_by
+            FROM pagos p
+            LEFT JOIN clientes cl ON cl.username = p.username
+            WHERE SUBSTRING(p.mes,1,7) IN (%s, %s)
+              AND COALESCE(p.is_void, FALSE) = FALSE
+            ORDER BY dia DESC, p.id DESC
+        """, (mes_actual, mes_anterior))
+    else:
+        c.execute("""
+            SELECT strftime('%Y-%m-%d', p.mes) as dia,
+                   p.id,
+                   p.username,
+                   COALESCE(cl.nombre, p.username) as nombre,
+                   COALESCE(cl.contacto, '') as contacto,
+                   p.monto,
+                   p.fecha_registro,
+                   COALESCE(p.created_by, '') as created_by
+            FROM pagos p
+            LEFT JOIN clientes cl ON cl.username = p.username
+            WHERE substr(p.mes,1,7) IN (?, ?)
+              AND COALESCE(p.is_void, 0) = 0
+            ORDER BY dia DESC, p.id DESC
+        """, (mes_actual, mes_anterior))
+    pagos_por_dia_rows = fetchall(c)
+    pagos_por_dia_detalle = {}
+    for pago in pagos_por_dia_rows:
+        dia = pago.get('dia') or ''
+        if not dia:
+            continue
+        pagos_por_dia_detalle.setdefault(dia, []).append({
+            'id': pago.get('id'),
+            'username': pago.get('username') or '',
+            'nombre': pago.get('nombre') or pago.get('username') or '',
+            'contacto': pago.get('contacto') or '',
+            'monto': float(pago.get('monto') or 0),
+            'fecha_registro': str(pago.get('fecha_registro') or ''),
+            'created_by': pago.get('created_by') or ''
+        })
+
     # Créditos históricos estimados desde pagos antiguos; no modifica historial.
     c.execute(f"SELECT COALESCE(SUM(monto),0) as ingresos, COUNT(*) as pagos FROM pagos WHERE {active_payment_where()}")
     retro_base = fetchone(c)
@@ -4137,6 +4185,7 @@ def analytics():
         'total_historico': total_historico,
         'total_clientes': total_clientes,
         'ventas_por_dia': ventas_por_dia,
+        'pagos_por_dia_detalle': pagos_por_dia_detalle,
         'operacion': {
             'mes': mes_actual,
             'credit_cost_usd': credit_cost_usd,
