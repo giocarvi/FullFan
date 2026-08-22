@@ -21,7 +21,8 @@ TODAY = dt.date.fromisoformat(os.environ.get("ANALYSIS_DATE", dt.date.today().is
 LIMIT = int(os.environ.get("XUI_APPLY_LIMIT", "0") or "0")
 DRY_RUN = os.environ.get("XUI_DRY_RUN", "0") == "1"
 
-SUPPORTED_MONTHS = {1, 3, 6, 12, 18, 24}
+MAX_MONTHS_TO_ALIGN = int(os.environ.get("XUI_MAX_MONTHS_TO_ALIGN", "36") or "36")
+PREFERRED_PACKAGE_MONTHS = [12, 6, 3, 1]
 PACKAGE_MAP = {
     (3, False, 1): "60",
     (3, True, 1): "61",
@@ -174,20 +175,31 @@ def month_delta(target):
     return (target.year - TODAY.year) * 12 + (target.month - TODAY.month)
 
 
-def package_sequence(months):
-    if months in (1, 3, 6, 12):
-        return [months]
-    if months == 18:
-        return [12, 6]
-    if months == 24:
-        return [12, 12]
-    return []
-
-
-def package_for(form, months):
+def available_package_months(form):
     orig = form_value(form, "orig_package")
     max_conn = int(form_value(form, "max_connections", "3") or 3)
     has_xxx = "Con XXX" in orig
+    months = [m for m in PREFERRED_PACKAGE_MONTHS if (max_conn, has_xxx, m) in PACKAGE_MAP]
+    if not months:
+        raise RuntimeError(f"No existen paquetes para {max_conn} conexiones, {'Con XXX' if has_xxx else 'Sin XXX'}")
+    return months, orig, max_conn, has_xxx
+
+
+def package_sequence(form, months):
+    available_months, _orig, _max_conn, _has_xxx = available_package_months(form)
+    remaining = months
+    sequence = []
+    while remaining > 0:
+        step = next((m for m in available_months if m <= remaining), None)
+        if not step:
+            raise RuntimeError(f"No se pudo armar secuencia de paquetes para {months} meses. Disponibles: {available_months}")
+        sequence.append(step)
+        remaining -= step
+    return sequence
+
+
+def package_for(form, months):
+    _available_months, orig, max_conn, has_xxx = available_package_months(form)
     package_id = PACKAGE_MAP.get((max_conn, has_xxx, months))
     if not package_id:
         raise RuntimeError(f"No existe paquete para {max_conn} conexiones, {'Con XXX' if has_xxx else 'Sin XXX'}, {months} meses")
@@ -264,7 +276,7 @@ def load_candidates():
             continue
         target = parse_date(row[idx["fenix_vencimiento"]])
         months = month_delta(target) if target else None
-        if months not in SUPPORTED_MONTHS:
+        if months is None or months < 1 or months > MAX_MONTHS_TO_ALIGN:
             continue
         out.append({
             "xui_id": str(row[idx["xui_id"]]).strip(),
@@ -281,7 +293,7 @@ def save_log(results):
     wb = Workbook()
     ws = wb.active
     ws.title = "Resultado"
-    fields = ["xui_id_anterior", "xui_usuario", "xui_vencimiento_anterior", "fenix_vencimiento", "months", "xui_id_nuevo", "vencimiento_nuevo", "status", "detalle"]
+    fields = ["xui_id_anterior", "xui_usuario", "xui_vencimiento_anterior", "fenix_vencimiento", "months", "package_sequence", "xui_id_nuevo", "vencimiento_nuevo", "status", "detalle"]
     ws.append(fields)
     for r in results:
         ws.append([r.get(k, "") for k in fields])
@@ -321,7 +333,8 @@ def main():
             if not DRY_RUN and not delete_response.get("result"):
                 raise RuntimeError(f"No se pudo eliminar linea anterior: {delete_response}")
             responses = [delete_response]
-            for months in package_sequence(c["months"]):
+            sequence = package_sequence(form, c["months"])
+            for months in sequence:
                 responses.append(create_line(opener, snapshot, months, c["xui_usuario"]))
                 found_after_step = find_user(opener, c["xui_usuario"])
                 if not found_after_step:
@@ -331,8 +344,8 @@ def main():
             found = find_user(opener, c["xui_usuario"])
             new = found[0] if found else {}
             ok = DRY_RUN or new.get("vencimiento") == c["fenix_vencimiento"]
-            results.append({**c, "xui_id_anterior": c["xui_id"], "xui_id_nuevo": new.get("xui_id", ""), "vencimiento_nuevo": new.get("vencimiento", ""), "status": "OK" if ok else "REVISION", "detalle": json.dumps(responses, ensure_ascii=False)[:800]})
-            print(f"{i}/{len(candidates)} {c['xui_usuario']} {c['xui_vencimiento']} -> {c['fenix_vencimiento']} {'OK' if ok else 'REVISION'}")
+            results.append({**c, "xui_id_anterior": c["xui_id"], "package_sequence": "+".join(str(x) for x in sequence), "xui_id_nuevo": new.get("xui_id", ""), "vencimiento_nuevo": new.get("vencimiento", ""), "status": "OK" if ok else "REVISION", "detalle": json.dumps(responses, ensure_ascii=False)[:800]})
+            print(f"{i}/{len(candidates)} {c['xui_usuario']} {c['xui_vencimiento']} -> {c['fenix_vencimiento']} paquetes={'+'.join(str(x) for x in sequence)} {'OK' if ok else 'REVISION'}")
         except Exception as exc:
             results.append({**c, "xui_id_anterior": c.get("xui_id", ""), "status": "ERROR", "detalle": str(exc)})
             print(f"{i}/{len(candidates)} {c.get('xui_usuario')} ERROR {exc}")

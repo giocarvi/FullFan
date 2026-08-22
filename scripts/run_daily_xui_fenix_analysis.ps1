@@ -1,7 +1,8 @@
 param(
   [string]$AnalysisDate = (Get-Date -Format 'yyyy-MM-dd'),
   [string]$DownloadsDir = 'C:\Users\GC\Downloads',
-  [string]$RepoDir = 'C:\Users\GC\Documents\Codex\2026-07-07\pu\work\FullFan-git'
+  [string]$RepoDir = 'C:\Users\GC\Documents\Codex\2026-07-07\pu\work\FullFan-git',
+  [switch]$DryRun
 )
 
 $ErrorActionPreference = 'Stop'
@@ -38,6 +39,9 @@ function Invoke-PythonLogged {
 
 try {
   Write-Log "Iniciando analisis diario XUI vs Fenix. Fecha=$AnalysisDate"
+  if ($DryRun) {
+    Write-Log "MODO PRUEBA activo: se simula la recreacion, no se elimina ni crea en XUI."
+  }
 
   if (-not (Test-Path $python)) {
     throw "No se encontro Python empaquetado en: $python"
@@ -140,7 +144,12 @@ try {
 
   $env:XUI_CANDIDATES_XLSX = $candidatesXlsx
   $env:XUI_APPLY_LIMIT = '0'
-  Remove-Item Env:\XUI_DRY_RUN -ErrorAction SilentlyContinue
+  if ($DryRun) {
+    $env:XUI_DRY_RUN = '1'
+  }
+  else {
+    Remove-Item Env:\XUI_DRY_RUN -ErrorAction SilentlyContinue
+  }
 
   Write-Log "Ejecutando recreacion XUI exacta para candidatos compatibles con paquetes..."
   Push-Location $RepoDir
@@ -151,7 +160,29 @@ try {
     Pop-Location
   }
 
-  Write-Log "OK. Ciclo diario completado: analisis + candidatos + recreacion exacta."
+  $postOutXlsx = Join-Path $logDir "analisis_xui_fenix_post_alineacion_$AnalysisDate.xlsx"
+  if (Test-Path $postOutXlsx) {
+    try {
+      Remove-Item -LiteralPath $postOutXlsx -Force
+    }
+    catch {
+      $postOutXlsx = Join-Path $logDir "analisis_xui_fenix_post_alineacion_$($AnalysisDate)_$timestamp.xlsx"
+      Write-Log "El reporte posterior esta abierto o bloqueado. Se usara archivo alterno: $postOutXlsx"
+    }
+  }
+
+  $env:ANALYSIS_OUT_XLSX = $postOutXlsx
+  Write-Log "Generando analisis posterior XUI vs Fenix despues de la recreacion..."
+  Push-Location $RepoDir
+  try {
+    Invoke-PythonLogged (Join-Path $RepoDir 'scripts\analyze_xui_fenix_alignment.py')
+  }
+  finally {
+    Pop-Location
+  }
+
+  Write-Log "OK. Reporte posterior generado: $postOutXlsx"
+  Write-Log "OK. Ciclo diario completado: analisis inicial + candidatos + recreacion + analisis posterior."
   exit 0
 }
 catch {
