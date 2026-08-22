@@ -115,6 +115,14 @@ def current_bouquets(page):
     return re.findall(r"name='bouquets_selected\[\]' value='(\d+)' checked", frag)
 
 
+def current_exp(form):
+    value = form_value(form, "exp_date")
+    m = re.search(r"(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})", value)
+    if not m:
+        raise RuntimeError(f"No pude leer exp_date actual: {value}")
+    return dt.date.fromisoformat(m.group(1)), m.group(2)
+
+
 def encode_multipart(fields):
     boundary = "----FenixBoundary" + uuid.uuid4().hex
     body = bytearray()
@@ -264,6 +272,44 @@ def create_line(opener, snapshot, package_months, username):
     return post_line(opener, fields)
 
 
+def apply_package_to_existing_line(opener, page, form, line_id, package_months):
+    package_id, orig_package, max_conn = package_for(form, package_months)
+    exp, exp_time = current_exp(form)
+    bouquets = current_bouquets(page)
+    if not bouquets:
+        raise RuntimeError(f"No encontre bouquets actuales para linea {line_id}; se omite para no alterar listas")
+    fields = [
+        ("edit", form_value(form, "edit", line_id)),
+        ("bouquets_selected", ""),
+        ("username", form_value(form, "username")),
+        ("password", form_value(form, "password")),
+        ("member_id", selected_value(form, "member_id", "3652")),
+        ("orig_package", orig_package),
+        ("package", package_id),
+        ("package_cost", ""),
+        ("package_duration", ""),
+        ("max_connections", str(max_conn)),
+        ("exp_date", f"{exp.isoformat()} {exp_time}"),
+        ("contact", form_value(form, "contact")),
+        ("reseller_notes", textarea_value(form, "reseller_notes")),
+    ]
+    for value in selected_multi_values(form, "allowed_ips[]"):
+        fields.append(("allowed_ips[]", value))
+    for value in selected_multi_values(form, "allowed_ua[]"):
+        fields.append(("allowed_ua[]", value))
+    if is_checked(form, "bypass_ua"):
+        fields.append(("bypass_ua", "on"))
+    if is_checked(form, "is_isplock"):
+        fields.append(("is_isplock", "on"))
+    fields.append(("isp_clear", form_value(form, "isp_clear")))
+    for b in bouquets:
+        fields.append(("bouquets_selected[]", b))
+    fields.append(("submit_line", "Purchase"))
+    if DRY_RUN:
+        return {"dry_run": True, "package_id": package_id, "months": package_months, "mode": "extend"}
+    return post_line(opener, fields)
+
+
 def load_candidates():
     wb = load_workbook(INPUT_XLSX, read_only=True, data_only=True)
     ws = wb["Acreditar"]
@@ -334,8 +380,11 @@ def main():
                 raise RuntimeError(f"No se pudo eliminar linea anterior: {delete_response}")
             responses = [delete_response]
             sequence = package_sequence(form, c["months"])
-            for months in sequence:
-                responses.append(create_line(opener, snapshot, months, c["xui_usuario"]))
+            for step_index, months in enumerate(sequence):
+                if step_index == 0:
+                    responses.append(create_line(opener, snapshot, months, c["xui_usuario"]))
+                else:
+                    responses.append(apply_package_to_existing_line(opener, snapshot["page"], snapshot["form"], found_after_step[0]["xui_id"], months))
                 found_after_step = find_user(opener, c["xui_usuario"])
                 if not found_after_step:
                     raise RuntimeError(f"No se encontro usuario recreado despues de paquete {months}: {responses[-1]}")
