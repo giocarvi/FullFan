@@ -3,6 +3,7 @@ import io
 import json
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError, URLError
 import test_control as fixture
 from maxplayer_report import MaxReportError, normalize_customer, parse_csv, fetch_customers, compare_accounts
 from scripts.snapshot_payment_history import capture
@@ -102,6 +103,28 @@ class MaxReportRouteTests(unittest.TestCase):
             response=self.client.get('/api/admin/maxplayer-comparacion')
         self.assertEqual(response.status_code,502);self.assertNotIn('TOKEN_SECRET',response.get_data(as_text=True))
         self.assertEqual(self.client.get('/api/admin/maxplayer-comparacion?min_dias=-1').status_code,400)
+
+    def test_http_failures_are_distinguished_without_returning_provider_body(self):
+        for status,body,kind in [(401,b'TOKEN_SECRET','authentication'),(403,b'cloudflare TOKEN_SECRET','edge_block'),
+                                 (403,b'TOKEN_SECRET','forbidden'),(404,b'TOKEN_SECRET','endpoint'),
+                                 (422,b'TOKEN_SECRET','parameters'),(429,b'TOKEN_SECRET','rate_limit'),
+                                 (503,b'TOKEN_SECRET','provider_unavailable')]:
+            with self.subTest(status=status,kind=kind),patch.object(fixture.module,'maxplayer_configured',return_value=True),\
+                 patch.object(fixture.module.urlrequest,'urlopen',side_effect=HTTPError('https://api.maxplayer.tv/',status,'error',{},io.BytesIO(body))):
+                response=self.client.get('/api/admin/maxplayer-comparacion')
+                self.assertEqual(response.status_code,502)
+                self.assertEqual(response.json['diagnostic'],{'kind':kind,'http_status':status})
+                self.assertNotIn('TOKEN_SECRET',response.get_data(as_text=True))
+                self.assertEqual(response.headers['Cache-Control'],'no-store')
+
+    def test_network_failures_and_provider_domain_rejections_are_not_assumed_invalid_token(self):
+        with patch.object(fixture.module,'maxplayer_configured',return_value=True),\
+             patch.object(fixture.module.urlrequest,'urlopen',side_effect=URLError('NETWORK_SECRET')):
+            response=self.client.get('/api/admin/maxplayer-comparacion')
+        self.assertEqual(response.json['diagnostic']['kind'],'network')
+        self.assertNotIn('NETWORK_SECRET',response.get_data(as_text=True))
+        self.assertEqual(fixture.module.maxplayer_error_kind(200,'Invalid domain ID: SECRET'),'domain')
+        self.assertEqual(fixture.module.maxplayer_error_kind(200,'API token is not valid: SECRET'),'authentication')
 
 
 if __name__=='__main__':unittest.main()
