@@ -322,8 +322,9 @@ def maxplayer_configured(require_domain=True):
 
 def maxplayer_request(method, path, payload=None, *, include_pagination=False):
     users_read = method.upper() == 'GET' and path.split('?', 1)[0] == '/users'
+    customer_support_read = method.upper() == 'GET' and re.fullmatch(r'/customers/[1-9]\d*(?:/devices)?', path) is not None
     single_user_delete = method.upper() == 'DELETE' and re.fullmatch(r'/users/[1-9]\d*', path) is not None
-    if not maxplayer_configured(require_domain=not (users_read or single_user_delete)):
+    if not maxplayer_configured(require_domain=not (users_read or customer_support_read or single_user_delete)):
         raise MaxPlayerError('Max Player no está configurado. Agrega MAXPLAYER_API_TOKEN y MAXPLAYER_DOMAIN_ID en Railway.', kind='not_configured')
     url = f"{MAXPLAYER_API_BASE}{path}"
     body = None

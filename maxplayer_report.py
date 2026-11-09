@@ -56,7 +56,10 @@ def normalize_customer(raw):
         lists=raw.get(list_key,[])
         if isinstance(lists,list):
             for item in lists:
-                if isinstance(item,dict):aliases.append(clean(pick(item,'username','iptv_user','list_username')))
+                if isinstance(item,dict):
+                    aliases.append(clean(pick(item,'username','iptv_user','list_username')))
+                    iptv_info=item.get('iptv_info')
+                    if isinstance(iptv_info,dict):aliases.append(clean(pick(iptv_info,'username','iptv_username')))
     aliases=list(dict.fromkeys(v for v in aliases if v))
     if not username and not aliases:
         raise MaxReportError('Falta el usuario de una cuenta de Max Player. No se puede comparar una lista incompleta.')

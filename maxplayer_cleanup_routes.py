@@ -5,7 +5,7 @@ import secrets
 from urllib.parse import urlparse
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from flask import request, session, jsonify
-from maxplayer_cleanup import deletion_block, fingerprint, supported_endpoint
+from maxplayer_cleanup import deletion_block, review_block, device_presence, fingerprint, supported_endpoint
 from maxplayer_report import normalize_page
 
 TTL=180
@@ -31,12 +31,16 @@ def decorate_report(api, report, live):
     by_id={r['maxplayer_id']:r for r in operations(api)}
     for row in report['rows']:
         reason=deletion_block(row,live and report['source_complete'])
-        if not supported_endpoint(api.MAXPLAYER_API_BASE):reason='El borrado requiere el endpoint HTTPS oficial documentado de Max Player.'
+        can_check=review_block(row,live and report['source_complete']) is None and row['maxplayer'].get('online') is not True
+        if not supported_endpoint(api.MAXPLAYER_API_BASE):
+            reason='El borrado requiere el endpoint HTTPS oficial documentado de Max Player.';can_check=False
         operation=by_id.get(row['maxplayer']['id'])
         if operation and operation['status'] in TERMINAL_OR_PENDING:
             reason='Existe una eliminación registrada o pendiente. Revisa el historial; no se enviará otra orden.'
+            can_check=False
         row['deletion_block']=reason
         row['can_prepare_deletion']=reason is None
+        row['can_check_connection']=can_check
         row['cleanup_status']=operation['status'] if operation else None
     return report
 
@@ -91,6 +95,24 @@ def register_routes(app,api):
             accounts=[a for a in accounts if a['id']!=str(account_id)]+target_rows
         report=api.compare_max_accounts(api.load_max_comparison_clients(),accounts,api.today_gt(),grace)
         report.update(source='API Max Player',source_complete=complete,exported_on=api.today_gt().isoformat())
+        row=target(report,account_id) if account_id is not None else None
+        if row and complete and review_block(row,complete) is None and row['maxplayer'].get('online') is not True:
+            # OpenAPI 1.5.0: GET /users/{id} lists a RESELLER's customers.
+            # Single-customer identity and heartbeat have separate documented routes.
+            api.time.sleep(1.05)
+            details=api.maxplayer_request('GET',f'/customers/{account_id}')
+            if not isinstance(details,dict) or type(details.get('success')) is not int or details['success']!=1 or not isinstance(details.get('data'),dict):
+                raise api.MaxReportError('Max Player no devolvió una identidad individual verificable. No se permite borrar.')
+            identity=details['data']
+            if identity.get('id')!=str(account_id) or identity.get('username')!=row['maxplayer']['username']:
+                raise api.MaxReportError('La identidad individual ya no coincide con el reporte. Actualiza la consulta; no se permite borrar.')
+            api.time.sleep(1.05)
+            presence=device_presence(api.maxplayer_request('GET',f'/customers/{account_id}/devices'),api.time.time())
+            for account in accounts:
+                if account['id']==str(account_id):account.update(presence)
+            # Reload Fénix AFTER the latest provider heartbeat.
+            report=api.compare_max_accounts(api.load_max_comparison_clients(),accounts,api.today_gt(),grace)
+            report.update(source='API Max Player',source_complete=complete,exported_on=api.today_gt().isoformat())
         return report
 
     def target(report,account_id):

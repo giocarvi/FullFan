@@ -27,6 +27,13 @@ class MaxReportTests(unittest.TestCase):
         self.assertIsNone(row['last_connection']);self.assertNotIn('SECRET',json.dumps(row));self.assertNotIn('CLIENT_PASSWORD',json.dumps(row))
         self.assertEqual(account(last_login=0)['last_connection'],'Nunca')
 
+    def test_documented_nested_iptv_alias_is_matched_without_exposing_credentials(self):
+        row=account(lists=[{'id':'42','iptv_info':{'username':'SERVICE','password':'UPSTREAM_SECRET','fqdn':'PRIVATE_HOST'}}])
+        self.assertEqual(row['list_usernames'],['SERVICE'])
+        self.assertNotIn('UPSTREAM_SECRET',json.dumps(row));self.assertNotIn('PRIVATE_HOST',json.dumps(row))
+        compared=compare_accounts([customer('SERVICE',expiry='2026-12-01')],[row],TODAY)['rows'][0]
+        self.assertFalse(compared['candidate']);self.assertIn('conservar_activo',compared['flags'])
+
     def test_active_any_alias_duplicate_or_online_is_reserved(self):
         clients=[customer(expiry='2026-12-01')]
         row=compare_accounts(clients,[account(last_login=0)],TODAY)['rows'][0]
@@ -148,6 +155,17 @@ class MaxReportRouteTests(unittest.TestCase):
             response=self.client.get('/api/admin/maxplayer-comparacion')
         self.assertEqual(response.status_code,502);self.assertNotIn('TOKEN_SECRET',response.get_data(as_text=True))
         self.assertEqual(self.client.get('/api/admin/maxplayer-comparacion?min_dias=-1').status_code,400)
+
+    def test_customer_support_gets_need_only_token_and_use_documented_paths(self):
+        response=MagicMock();response.read.return_value=b'{"success":1,"data":[]}'
+        context=MagicMock();context.__enter__.return_value=response
+        with patch.object(fixture.module,'MAXPLAYER_API_TOKEN','SYNTHETIC_TOKEN'),patch.object(fixture.module,'MAXPLAYER_DOMAIN_ID',''),patch.object(fixture.module.urlrequest,'urlopen',return_value=context) as network:
+            for path in ('/customers/101','/customers/101/devices'):
+                fixture.module.maxplayer_request('GET',path)
+                self.assertEqual(network.call_args.args[0].get_method(),'GET')
+                self.assertEqual(network.call_args.args[0].full_url,'https://api.maxplayer.tv/v3/api/public'+path)
+            with self.assertRaises(fixture.module.MaxPlayerError):fixture.module.maxplayer_request('POST','/customers/101/devices')
+            self.assertEqual(network.call_count,2)
 
     def test_http_failures_are_distinguished_without_returning_provider_body(self):
         for status,body,kind in [(401,b'TOKEN_SECRET','authentication'),(403,b'cloudflare TOKEN_SECRET','edge_block'),

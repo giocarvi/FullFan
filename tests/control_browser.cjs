@@ -83,15 +83,18 @@ fs.mkdirSync(out,{recursive:true});
     assert.equal(xuiRequests,2);
     // Synthetic sources only; the cleanup routes below never reach a real provider.
     const maxRows=[
-      {maxplayer:{id:'1',username:'DEMO_OLD',list_usernames:['DEMO_OLD'],state:'no_confirmado',online:false,last_connection:'Nunca'},fenix:[],flags:['sin_fenix','candidato_revision','nunca_conecto'],candidate:true,can_prepare_deletion:true,deletion_block:null},
+      {maxplayer:{id:'1',username:'DEMO_OLD',list_usernames:['DEMO_OLD'],state:'no_confirmado',online:null,last_connection:'Nunca'},fenix:[],flags:['sin_fenix','candidato_revision','nunca_conecto'],candidate:true,can_prepare_deletion:false,can_check_connection:true,deletion_block:'Conexión actual no confirmada'},
       {maxplayer:{id:'2',username:'DEMO_FAMILIAR',list_usernames:['DEMO_FAMILIAR'],state:'activo',online:false,last_connection:null},fenix:[{username:'DEMO_FAMILIAR',name:'Familia de ejemplo',expiry:'2026-12-01',state:'activo',days_expired:0,last_payment:'2026-11-09',recent_payment:true,pending_activation:false}],flags:['conservar_activo','pago_reciente'],candidate:false}
     ];
-    let maxRequests=0,cleanupDeleted=false;const cleanupCalls=[];
+    let maxRequests=0,cleanupDeleted=false,presenceBlocked=true;const cleanupCalls=[];
     await page.route('**/api/admin/maxplayer-eliminaciones',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({csrf:'SYNTHETIC_CSRF',operations:cleanupDeleted?[{maxplayer_id:'1',username:'DEMO_OLD',actor:'DEMO_ADMIN',status:'deleted',reason:'No renovó el servicio',updated_at:'2026-11-09T10:00:00-06:00'}]:[]})}));
     await page.route('**/api/admin/maxplayer/1/**',route=>{
       cleanupCalls.push(route.request().url());assert.equal(route.request().method(),'POST');
       assert.equal(route.request().headers()['x-csrf-token'],'SYNTHETIC_CSRF');
-      if(route.request().url().endsWith('/preparar-eliminacion'))return route.fulfill({contentType:'application/json',body:JSON.stringify({confirmation:'SYNTHETIC_CONFIRMATION',account:maxRows[0].maxplayer,fenix:[],flags:['sin_fenix'],expires_in:180,checked_at:'2026-11-09T10:00:00-06:00'})});
+      if(route.request().url().endsWith('/preparar-eliminacion')){
+        if(presenceBlocked)return route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'Un dispositivo está conectado. No se eliminará.'})});
+        return route.fulfill({contentType:'application/json',body:JSON.stringify({confirmation:'SYNTHETIC_CONFIRMATION',account:{...maxRows[0].maxplayer,online:false,presence_device_count:1},fenix:[],flags:['sin_fenix'],expires_in:180,checked_at:'2026-11-09T10:00:00-06:00'})});
+      }
       assert.ok(route.request().url().endsWith('/eliminar'));
       const body=route.request().postDataJSON();assert.equal(body.confirmation,'SYNTHETIC_CONFIRMATION');assert.equal(body.typed_username,'DEMO_OLD');assert.equal(body.acknowledged,true);assert.ok(body.reason);
       cleanupDeleted=true;return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,status:'deleted',message:'Cuenta eliminada de Max Player. Cliente y pagos Fénix conservados.'})});
@@ -107,8 +110,13 @@ fs.mkdirSync(out,{recursive:true});
     await page.screenshot({path:path.join(out,'admin_maxplayer_reporte.png')});
     const maxDownloadPromise=page.waitForEvent('download');await page.locator('#max-export').click();
     assert.equal((await maxDownloadPromise).suggestedFilename(),'fenix_vs_maxplayer_2026-11-09.csv');
+    assert.equal(await page.locator('[data-max-delete="1"]').isEnabled(),true);
+    assert.ok((await page.locator('[data-max-delete="1"]').textContent()).includes('Comprobar conexión'));
+    await page.locator('[data-max-delete="1"]').click();await page.getByRole('heading',{name:'Eliminación bloqueada',exact:true}).waitFor();
+    assert.equal(cleanupCalls.length,1);assert.equal(await page.locator('#max-delete-submit').count(),0);
+    await page.locator('#max-cleanup-dialog [data-cleanup-close]').click();presenceBlocked=false;
     await page.locator('[data-max-delete="1"]').click();await page.locator('#max-delete-submit').waitFor();
-    assert.equal(cleanupCalls.length,1);assert.equal(await page.locator('#max-delete-submit').isDisabled(),true);
+    assert.equal(cleanupCalls.length,2);assert.equal(await page.locator('#max-delete-submit').isDisabled(),true);
     await page.locator('#max-delete-typed').fill('wrong');await page.locator('#max-delete-ack').check();await page.locator('#max-delete-reason').selectOption({label:'No renovó el servicio'});
     assert.equal(await page.locator('#max-delete-submit').isDisabled(),true);
     await page.locator('#max-delete-typed').fill('DEMO_OLD');assert.equal(await page.locator('#max-delete-submit').isEnabled(),true);
@@ -116,7 +124,7 @@ fs.mkdirSync(out,{recursive:true});
     await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.setViewportSize({width,height});
     await page.locator('#max-delete-form').evaluate(form=>{form.requestSubmit();form.requestSubmit();});
     await page.getByRole('heading',{name:'Eliminación confirmada',exact:true}).waitFor();
-    assert.equal(cleanupCalls.length,2);await page.locator('#max-cleanup-dialog [data-cleanup-close]').click();
+    assert.equal(cleanupCalls.length,3);await page.locator('#max-cleanup-dialog [data-cleanup-close]').click();
     await page.locator('#max-cleanup-history summary').click();await page.locator('#max-cleanup-history-list tbody tr').waitFor();
     assert.ok((await page.locator('#max-cleanup-history-list').textContent()).includes('Ausencia confirmada'));
     await page.locator('#max-category').selectOption('conservar_activo');assert.equal(await page.locator('#max-list tbody tr').count(),1);
