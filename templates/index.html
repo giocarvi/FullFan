@@ -639,10 +639,11 @@ body {
   .stat-card .val { font-size: 24px; }
 }
 </style>
+<link rel="stylesheet" href="/static/control.css?v=20261109">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
-<body>
+<body data-role="{{ rol }}">
 
 <!-- TOP BAR -->
 <div class="topbar">
@@ -651,7 +652,6 @@ body {
       <span style="display:none;align-items:center;gap:6px;"><span>🔥</span> Fénix</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
-    <a href="/quiniela/admin" class="logout-btn" style="text-decoration:none;color:#ffb020;font-weight:700;">⚽ Quiniela</a>
     <span style="font-size:13px;color:var(--muted)">{{ user }}</span>
     <button class="logout-btn" onclick="document.getElementById('modal-password').style.display='flex'" style="background:none;border:none;cursor:pointer;font-size:13px;padding:4px 8px;">🔑</button>
     <a href="/logout" class="logout-btn">Salir</a>
@@ -681,7 +681,7 @@ body {
   {% if rol == 'admin' %}
   <div id="stats-grid" class="stats-grid">
     <div class="stat-card green"><div class="val" id="stat-activos">—</div><div class="lbl">Activos</div></div>
-    <div class="stat-card yellow"><div class="val" id="stat-por-vencer">—</div><div class="lbl">Por vencer</div></div>
+    <div class="stat-card yellow"><div class="val" id="stat-por-vencer">—</div><div class="lbl">Vencen en 30 días</div></div>
     <div class="stat-card red"><div class="val" id="stat-vencidos">—</div><div class="lbl">Vencidos</div></div>
     <div class="stat-card purple"><div class="val" id="stat-ingresos">—</div><div class="lbl">Ingresos mes</div></div>
   </div>
@@ -699,9 +699,7 @@ body {
   </div>
   {% else %}
   <!-- Vista de atención al cliente -->
-  <div style="text-align:center;padding:32px 16px 20px;">
-      <img src="/static/logo.png" alt="Fénix Digital TV" style="height:80px;object-fit:contain;margin-bottom:16px;"
-         onerror="this.style.display='none'">
+  <div class="staff-welcome" style="padding:8px 0 18px;">
     <div style="font-size:16px;font-weight:600;color:var(--text);">Bienvenido, {{ user }}</div>
     <div style="font-size:13px;color:var(--muted);margin-top:4px;">Panel de Atención al Cliente</div>
   </div>
@@ -735,11 +733,13 @@ body {
   <div class="filter-tabs">
     <button class="filter-tab active" data-estado="">Todos</button>
     <button class="filter-tab" data-estado="activo">✅ Activos</button>
+    <button class="filter-tab" data-estado="hoy">Vencen hoy</button>
+    <button class="filter-tab" data-estado="semana">En 7 días</button>
     <button class="filter-tab" data-estado="por_vencer">⚠️ Por vencer</button>
     <button class="filter-tab" data-estado="vencido">❌ Vencidos</button>
   </div>
   <div class="filter-tabs" id="archive-tabs" style="margin-top:-6px;">
-    <button class="filter-tab active" data-archivados="">Clientes activos</button>
+    <button class="filter-tab active" data-archivados="">No archivados</button>
     <button class="filter-tab" data-archivados="1">Archivados</button>
     <button class="filter-tab" data-archivados="all">Todos con archivados</button>
   </div>
@@ -756,75 +756,42 @@ body {
   </div>
 </div>
 
-<!-- MIGRACION VIEW -->
-<div id="view-migracion" class="view">
-  <div class="config-form">
-    <div class="config-section">
-      <h3>🔥 Migración masiva Fénix</h3>
-      <p class="config-hint">Controla qué clientes tienen portal, credenciales XUI/Max Player y sincronización lista antes de enviar el mensaje de migración.</p>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Buscar</label>
-          <input id="migration-search" placeholder="Nombre, usuario, teléfono o usuario XUI">
-        </div>
-        <div class="form-group">
-          <label>Estado</label>
-          <select id="migration-status">
-            <option value="">Todos</option>
-            <option value="activos">Activos</option>
-            <option value="vencidos">Vencidos / sin fecha</option>
-          </select>
-        </div>
+<!-- PAYMENTS AND OPERATIONS -->
+{% if rol == 'admin' %}
+<div id="view-pagos" class="view">
+  <div class="page-heading"><div><h1>Pagos</h1><p>Consulta cobros y comprobantes. Las anulaciones permanecen en el historial.</p></div><button class="btn-secondary" id="payments-export">Exportar CSV</button></div>
+  <form id="payments-filters" class="ledger-filters">
+    <div class="form-group"><label for="payments-from">Desde</label><input id="payments-from" type="date" required></div>
+    <div class="form-group"><label for="payments-to">Hasta</label><input id="payments-to" type="date" required></div>
+    <div class="form-group"><label for="payments-search">Cliente, usuario o agente</label><input id="payments-search" type="search" placeholder="Buscar pagos"></div>
+    <div class="form-group"><label for="payments-status">Estado</label><select id="payments-status"><option value="validos">Válidos</option><option value="anulados">Anulados</option><option value="todos">Todos</option></select></div>
+    <button class="btn-primary" type="submit">Consultar</button>
+  </form>
+  <div id="payments-summary" class="stats-grid"></div><div id="payments-list" class="ledger-results"></div>
+  <div class="ledger-pagination"><button class="btn-secondary" id="payments-prev">Anterior</button><span id="payments-page" aria-live="polite"></span><button class="btn-secondary" id="payments-next">Siguiente</button></div>
+  <p class="view-note">La fecha del pago es la que quedó guardada. Los registros históricos con fecha mensual conservan su fecha original.</p>
+</div>
+{% endif %}
+<div id="view-activaciones" class="view">
+  <div class="page-heading"><div><h1>Operación</h1><p>Prepara y da seguimiento a activaciones y renovaciones.</p></div></div>
+  <div class="ops-grid">
+    <section class="ops-card"><h3>Crear tarea</h3>
+      <div class="ops-form">
+        <div class="form-group"><label for="act-username">Usuario Fénix</label><input id="act-username" required autocomplete="off"></div>
+        <div class="form-group"><label for="act-type">Solicitud</label><select id="act-type"><option value="renewal">Renovación</option><option value="new">Nueva activación</option></select></div>
+        <div class="form-group full"><label for="act-plan">Plan contratado</label><select id="act-plan"></select></div>
+        <div class="form-group"><label for="act-amount">Monto</label><input id="act-amount" type="number" min="0" step="0.01"></div>
+        <div class="form-group"><label for="act-currency">Moneda</label><select id="act-currency"><option value="GTQ">Quetzales</option><option value="USD">Dólares</option></select></div>
+        <div class="form-group"><label for="act-payment-method">Método de pago</label><input id="act-payment-method" placeholder="Transferencia, efectivo…"></div>
+        <div class="form-group"><label for="act-payment-proof" id="act-proof-label" class="file-upload-label">Adjuntar comprobante</label><input id="act-payment-proof" type="file" accept="image/*" onchange="onActivationProofSelected(this)"></div>
+        <div class="form-group full"><label for="act-notes">Notas</label><textarea id="act-notes" rows="2"></textarea></div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;" onclick="loadMigrationClients()">Actualizar lista</button>
-        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#334155;" onclick="loadPhoneGroups()">Ver posibles grupos por teléfono</button>
-        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#475569;" onclick="loadDuplicateClients()">Ver posibles duplicados</button>
-        {% if rol == 'admin' %}
-        <button class="config-save-btn" style="margin-top:0;width:auto;padding:10px 18px;background:#6c3483;" onclick="document.getElementById('xui-credentials-upload').click()">Importar Excel XUI</button>
-        {% endif %}
-      </div>
-    </div>
-    <div class="analytics-chart-card">
-      <h3>Salud de base de clientes</h3>
-      <p class="config-hint">Diagnostico de la plataforma sin borrar ni modificar datos. Usalo para revisar accesos al portal, credenciales incompletas, duplicados probables y registros por limpiar.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px;">
-        <button class="ops-btn-primary" onclick="loadBaseHealth()">Analizar base</button>
-        <button class="ops-btn-secondary" onclick="exportBaseHealth()">Descargar Excel</button>
-      </div>
-      <div class="analytics-kpi-grid" id="base-health-kpis">
-        <div class="kpi-card"><div class="kpi-val">—</div><div class="kpi-lbl">Presiona analizar</div></div>
-      </div>
-      <div id="base-health-list"><div class="empty-state"><p>Presiona “Analizar base” para generar el diagnostico.</p></div></div>
-    </div>
-    <div class="analytics-kpi-grid" id="migration-kpis">
-      <div class="kpi-card"><div class="kpi-val" id="mig-total">—</div><div class="kpi-lbl">En lista</div></div>
-      <div class="kpi-card"><div class="kpi-val" id="mig-sin-portal">—</div><div class="kpi-lbl">Sin portal</div></div>
-      <div class="kpi-card"><div class="kpi-val" id="mig-sin-xui">—</div><div class="kpi-lbl">Sin XUI completo</div></div>
-      <div class="kpi-card"><div class="kpi-val" id="mig-mp-pend">—</div><div class="kpi-lbl">Max Player pendiente</div></div>
-    </div>
-    <div class="analytics-chart-card">
-      <h3>Clientes para migración</h3>
-      <div id="migration-list"><div class="loading">Cargando...</div></div>
-    </div>
-    <div class="analytics-chart-card">
-      <h3>Posibles grupos por teléfono</h3>
-      <p class="config-hint">Muestra teléfonos con 2 o más clientes activos. Úsalo para asociar familias o clientes con varios usuarios.</p>
-      <div id="phone-groups-list"><div class="empty-state"><p>Presiona “Ver posibles grupos por teléfono”.</p></div></div>
-    </div>
-    <div class="analytics-chart-card">
-      <h3>Posibles duplicados por nombre o usuario</h3>
-      <p class="config-hint">Revisa clientes activos con el mismo nombre normalizado o usernames parecidos. Solo usa datos guardados en la plataforma.</p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 12px;">
-        <button class="ops-btn-secondary" onclick="loadDuplicateClients('grouped')">Ver agrupado</button>
-        <button class="ops-btn-secondary" onclick="loadDuplicateClients('flat')">Ver listado</button>
-        <button class="ops-btn-primary" onclick="exportDuplicateClients()">Descargar Excel</button>
-      </div>
-      <div id="duplicates-list"><div class="empty-state"><p>Presiona “Ver posibles duplicados”.</p></div></div>
-    </div>
+      <p class="view-note">Crear la tarea no registra un pago ni renueva XUI. Si el cobro ya está registrado, desmarca «Registrar pago en historial» al completarla.</p>
+      <button class="btn-primary" onclick="crearActivationTask()">Crear tarea</button>
+    </section>
+    <section class="ops-card"><h3>Seguimiento</h3><div id="activation-tabs" class="ops-tabs"><button class="ops-tab active" data-status="open">Abiertas <span id="act-count-open"></span></button><button class="ops-tab" data-status="in_progress">En proceso <span id="act-count-in_progress"></span></button><button class="ops-tab" data-status="blocked">Bloqueadas <span id="act-count-blocked"></span></button><button class="ops-tab" data-status="done">Completadas <span id="act-count-done"></span></button></div><div id="activation-list"></div></section>
   </div>
 </div>
-
 <!-- SMART ONE VIEW -->
 <div id="view-smartone" class="view">
   <div class="config-form">
@@ -1084,16 +1051,16 @@ body {
 {% endif %}
 
 <!-- BOTTOM NAV -->
-<nav class="bottom-nav">
+<nav class="bottom-nav" aria-label="Navegación principal">
+  <div class="sidebar-brand">FÉNIX<span>Control de clientes</span></div>
   <button class="nav-btn active" data-view="dashboard">
-    <span class="icon">📊</span>Dashboard
+    <span class="icon">📊</span>Inicio
   </button>
   <button class="nav-btn" data-view="clientes">
     <span class="icon">👥</span>Clientes
   </button>
-  <button class="nav-btn" data-view="migracion">
-    <span class="icon">🚀</span>Migrar
-  </button>
+  {% if rol == 'admin' %}<button class="nav-btn" data-view="pagos"><span class="icon">💳</span>Pagos</button>{% endif %}
+  <button class="nav-btn" data-view="activaciones"><span class="icon">🗂️</span>Operación</button>
   <button class="nav-btn" data-view="smartone">
     <span class="icon">📺</span>SmartOne
   </button>
@@ -1109,7 +1076,7 @@ body {
   </button>
   {% endif %}
   <button class="nav-btn" onclick="openNuevoCliente()">
-    <span class="icon">➕</span>Nuevo
+    <span class="icon">➕</span>Nuevo cliente
   </button>
 </nav>
 
@@ -1203,7 +1170,7 @@ body {
 
 <!-- CLIENT DETAIL MODAL -->
 <div class="modal-overlay" id="modal-overlay">
-  <div class="modal" id="modal-content">
+  <div class="modal" id="modal-content" role="dialog" aria-modal="true" aria-label="Ficha del cliente" tabindex="-1">
     <div class="modal-handle"></div>
     <div id="modal-body-inner"></div>
   </div>
@@ -1293,6 +1260,7 @@ function normalizeWhatsAppPhone(value, defaultPrefix='502') {
 // ── STATE ──────────────────────────────────────────────────────────────────
 let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', currentArchivados = '', loadingClientes = false, totalClientes = 0;
 let searchTimeout;
+let detailRequestVersion = 0;
 let activationPlansLoaded = false;
 let currentActivationStatus = 'open';
 let baseHealthData = null;
@@ -1325,7 +1293,6 @@ function switchView(view, estado) {
   }
   if (view === 'analytics') loadAnalytics();
   if (view === 'config') loadConfigView();
-  if (view === 'migracion') loadMigrationClients();
   if (view === 'smartone') loadSmartOne();
   if (view === 'resellers') loadResellers();
 }
@@ -1563,7 +1530,7 @@ function activationTaskItem(t) {
   const plan = t.plan_name || 'Plan no definido';
   const proofBtn = t.has_payment_proof ? `<button class="ops-btn-secondary" onclick="openActivationPaymentProof(${t.order_id})">Ver comprobante</button>` : '';
   const pagoEstado = t.payment_registered_at ? ' · Pago en historial' : '';
-  const deleteBtn = IS_ADMIN ? `<button class="ops-btn-danger" onclick="eliminarActivationTask(${t.id})">Eliminar prueba</button>` : '';
+  const deleteBtn = IS_ADMIN && t.status !== 'cancelled' ? `<button class="ops-btn-danger" onclick="eliminarActivationTask(${t.id})">Cancelar tarea</button>` : '';
   return `
     <div class="ops-task">
       <div class="ops-task-head">
@@ -1665,14 +1632,14 @@ async function marcarActivationTask(id, status) {
 }
 
 async function eliminarActivationTask(id) {
-  if (!confirm('¿Eliminar esta tarea de prueba? Si generó un pago automático, también se revertirá del historial.')) return;
+  if (!confirm('¿Cancelar esta tarea? Si generó un pago automático, se anulará y dejará de contar en totales. La tarea, orden, pago y comprobante permanecerán en el historial.')) return;
   const r = await fetch(`/api/activation-tasks/${id}`, { method: 'DELETE' });
   const d = await r.json();
   if (!r.ok) {
     alert(d.error || 'No se pudo eliminar la tarea.');
     return;
   }
-  showToast(d.pago_revertido ? '🗑️ Tarea eliminada y pago revertido' : '🗑️ Tarea eliminada');
+  showToast(d.pago_revertido ? 'Tarea cancelada y pago anulado. Historial conservado.' : 'Tarea cancelada. Historial conservado.');
   analyticsData = null;
   loadActivationTasks();
   if (document.getElementById('view-dashboard').classList.contains('active')) loadDashboard();
@@ -1889,17 +1856,6 @@ document.querySelectorAll('#archive-tabs .filter-tab').forEach(tab => {
   });
 });
 
-if (document.getElementById('migration-search')) {
-  let migrationSearchTimeout;
-  document.getElementById('migration-search').addEventListener('input', () => {
-    clearTimeout(migrationSearchTimeout);
-    migrationSearchTimeout = setTimeout(loadMigrationClients, 350);
-  });
-}
-if (document.getElementById('migration-status')) {
-  document.getElementById('migration-status').addEventListener('change', loadMigrationClients);
-}
-
 // ── CLIENT CARD HTML ────────────────────────────────────────────────────────
 function clienteItem(c, showDays) {
   const initial = (c.nombre || c.username || '?')[0].toUpperCase();
@@ -1938,6 +1894,7 @@ function clienteStatus(vencimiento) {
 
 // ── MODAL ───────────────────────────────────────────────────────────────────
 async function openModal(username) {
+  const requestVersion = ++detailRequestVersion;
   const overlay = document.getElementById('modal-overlay');
   const inner = document.getElementById('modal-body-inner');
   inner.innerHTML = '<div class="loading">Cargando...</div>';
@@ -1945,6 +1902,7 @@ async function openModal(username) {
 
   const r = await fetch(`/api/clientes/${username}`);
   const d = await r.json();
+  if (requestVersion !== detailRequestVersion || !overlay.classList.contains('open')) return;
   if (d.error) { inner.innerHTML = '<div class="loading">Error al cargar</div>'; return; }
 
   const c = d.cliente;
@@ -2266,6 +2224,15 @@ async function openModal(username) {
           <input type="password" id="edit-service-password" value="${service.service_password || ''}" placeholder="Password XUI/IPTV">
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Dispositivos incluidos</label>
+          <select id="edit-service-devices">
+            <option value="3" ${Number(service.devices || 3) === 3 ? 'selected' : ''}>3 dispositivos</option>
+            <option value="6" ${Number(service.devices || 3) === 6 ? 'selected' : ''}>6 dispositivos</option>
+          </select>
+        </div>
+      </div>
       <div style="font-size:12px;color:var(--muted);margin:-4px 0 12px;">El portal del cliente muestra el password XUI como contraseña Fénix y como contraseña de Max Player cuando se usa Migrar + Max Player.</div>
       <button class="btn-primary" onclick="guardarEdicion('${username}')">💾 Guardar cambios</button>
       ${esAdmin && !c.archived_at ? `<button class="btn-danger" style="background:var(--red);color:#fff;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-left:6px;" onclick="eliminarCliente('${username}', '${(c.nombre||username).replace(/'/g,"\\'") }')">Archivar cliente</button>` : ''}
@@ -2282,7 +2249,7 @@ async function openModal(username) {
         </div>
         <div class="form-group">
           <label>Monto (Q)</label>
-          <input type="number" id="pago-monto" placeholder="90" min="1">
+          <input type="number" id="pago-monto" placeholder="90.00" min="0.01" step="0.01" inputmode="decimal">
         </div>
         <div class="form-group">
           <label>Nuevo vencimiento</label>
@@ -2294,8 +2261,8 @@ async function openModal(username) {
         <input type="file" id="pago-comprobante" accept="image/*" style="display:none" onchange="onComprobanteSelected(this)">
         <label for="pago-comprobante" class="file-upload-label" id="comprobante-label">📎 Adjuntar imagen de pago</label>
       </div>
-      <button class="btn-primary" onclick="registrarPago('${username}')">✅ Registrar pago</button>
-      <button class="btn-primary" style="margin-top:8px;background:linear-gradient(135deg,#FF6A00,#FFB000);" onclick="prepararRenovacionDesdeCliente(${JSON.stringify(username)})">🔥 Crear tarea de renovación</button>
+      <button class="btn-primary" id="register-payment-btn" onclick="registrarPago('${username}')">✅ Registrar pago</button>
+      <button class="btn-primary" style="margin-top:8px;background:linear-gradient(135deg,#FF6A00,#FFB000);" onclick='prepararRenovacionDesdeCliente(${JSON.stringify(username)})'>🔥 Crear tarea de renovación</button>
       <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
     </div>
     <div class="section-divider">Historial de pagos</div>
@@ -2873,6 +2840,7 @@ async function migrarClienteDesdeLista(username, hasSavedPassword = false) {
     return;
   }
   const currentService = detail.service || {};
+  const currentDevices = Number(currentService.devices || 3);
   let xuiPassword = currentService.service_password || '';
   if (!xuiPassword) {
     const password = prompt(`Fenix no tiene guardado el password XUI/IPTV de ${username}.\n\nIngresa el password XUI/IPTV para migrar, crear Max Player y enviar el mensaje:`);
@@ -2887,7 +2855,8 @@ async function migrarClienteDesdeLista(username, hasSavedPassword = false) {
       enabled: true,
       service_username: (detail.service && detail.service.service_username) || username,
       service_password: xuiPassword,
-      expires_at: (detail.cliente && detail.cliente.vencimiento) || ''
+      expires_at: (detail.cliente && detail.cliente.vencimiento) || '',
+      devices: currentDevices
     })
   });
   const result = await ejecutarRestauracionMaxPlayer(username, Boolean(currentService.service_password), xuiPassword);
@@ -2917,7 +2886,8 @@ async function migrarUsuarioTecnico(username) {
       enabled: true,
       service_username: service.service_username || username,
       service_password: service.service_password,
-      expires_at: client.vencimiento || ''
+      expires_at: client.vencimiento || '',
+      devices: Number(service.devices || 3)
     })
   });
   const restoreR = await fetch(`/api/clientes/${encodeURIComponent(username)}/maxplayer/restore`, {
@@ -3035,8 +3005,10 @@ async function guardarEdicion(username) {
   const parent_username = document.getElementById('edit-parent-username')?.value.trim() || '';
   const serviceUsernameEl = document.getElementById('edit-service-username');
   const servicePasswordEl = document.getElementById('edit-service-password');
+  const serviceDevicesEl = document.getElementById('edit-service-devices');
   const service_username = serviceUsernameEl ? serviceUsernameEl.value.trim() : '';
   const service_password = servicePasswordEl ? servicePasswordEl.value.trim() : '';
+  const devices = serviceDevicesEl ? Number(serviceDevicesEl.value || 3) : 3;
   const resellerUsernameEl = document.getElementById('edit-reseller-username');
   const resellerStatusEl = document.getElementById('edit-reseller-status');
   const reseller_username = resellerUsernameEl ? resellerUsernameEl.value.trim() : undefined;
@@ -3064,7 +3036,7 @@ async function guardarEdicion(username) {
     if (!confirm(`¿Cambiar el username de "${username}" a "${nuevo_username}"?\n\nEsto actualizará también todo el historial de pagos.`)) return;
   }
 
-  const body = { nombre, contacto, vencimiento, referido, notas, parent_username, service_username, service_password, smartone };
+  const body = { nombre, contacto, vencimiento, referido, notas, parent_username, service_username, service_password, devices, smartone };
   if (reseller_username !== undefined) body.reseller_username = reseller_username;
   if (reseller_status !== undefined) body.reseller_status = reseller_status;
   if (nuevo_username && nuevo_username !== username) body.nuevo_username = nuevo_username;
@@ -3600,8 +3572,7 @@ async function exportarClientesNuevos() {
 }
 
 // ── INIT ────────────────────────────────────────────────────────────────────
-loadDashboard();
-loadConfig();
+loadConfig().catch(() => showToast('❌ No se pudo cargar la configuración. Vuelve a intentarlo.'));
 
 // ── ANALYTICS ──────────────────────────────────────────────────────────────
 let analyticsData = null;
@@ -4127,5 +4098,6 @@ function renderTablaTrimestral(ventas) {
     </table>`;
 }
 </script>
+<script src="/static/control.js?v=20261109"></script>
 </body>
 </html>
