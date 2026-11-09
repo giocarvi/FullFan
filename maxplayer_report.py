@@ -1,0 +1,184 @@
+"""Read-only account review. Candidates are never deletion instructions."""
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta
+import csv
+import io
+import re
+import time
+from urllib.parse import urlparse
+from xui_report import day, GT
+
+
+class MaxReportError(Exception):
+    pass
+
+
+def clean(value):
+    return str(value if value is not None else '').strip()
+
+
+def key(value):
+    return clean(value).casefold()
+
+
+def pick(row, *names):
+    lookup={re.sub(r'[\s_-]+','',str(k)).casefold():v for k,v in row.items()}
+    for name in names:
+        value=lookup.get(re.sub(r'[\s_-]+','',name).casefold())
+        if value is not None and value != '':
+            return value
+    return None
+
+
+def boolean(value):
+    value=key(value)
+    if value in ('1','true','yes','active','enabled','online','activo'):return True
+    if value in ('0','false','no','inactive','disabled','offline','inactivo'):return False
+    return None
+
+
+def connection(value):
+    if value is None or clean(value)=='':return None
+    if key(value) in ('never','nunca','0','null','none'):return 'Nunca'
+    try:
+        timestamp=float(value)
+        if timestamp>10**12:timestamp/=1000
+        if timestamp>0:return datetime.fromtimestamp(timestamp,GT).isoformat()
+    except (ValueError, TypeError, OSError, OverflowError):pass
+    return clean(value)[:100]
+
+
+def normalize_customer(raw):
+    if not isinstance(raw,dict):raise MaxReportError('Max Player devolvió una cuenta con formato desconocido.')
+    customer_id=clean(pick(raw,'id','customer_id','user_id','MaxPlayer ID'))
+    username=clean(pick(raw,'username','user_name','Username Max Player'))
+    aliases=[clean(pick(raw,'iptv_user','iptv_username','list_username','List Username'))]
+    for list_key in ('lists','playlists'):
+        lists=raw.get(list_key,[])
+        if isinstance(lists,list):
+            for item in lists:
+                if isinstance(item,dict):aliases.append(clean(pick(item,'username','iptv_user','list_username')))
+    aliases=list(dict.fromkeys(v for v in aliases if v))
+    if not username and not aliases:
+        raise MaxReportError('Falta el usuario de una cuenta de Max Player. No se puede comparar una lista incompleta.')
+    state=boolean(pick(raw,'is_active','enabled','status'))
+    return {'id':customer_id if customer_id.isdigit() else None,'username':username,'list_usernames':aliases,
+            'state':'activo' if state is True else 'inactivo' if state is False else 'no_confirmado',
+            'online':boolean(pick(raw,'is_online','online')),
+            'last_connection':connection(pick(raw,'last_login','last_connection','connection','Last Login'))}
+
+
+def parse_csv(content):
+    try:decoded=content.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        raise MaxReportError('El CSV debe estar en UTF-8. Vuelve a exportarlo desde Max Player.') from None
+    try:
+        dialect=csv.Sniffer().sniff(decoded[:10000],delimiters=',;\t')
+        reader=csv.DictReader(io.StringIO(decoded),dialect=dialect)
+        headers={re.sub(r'[\s_-]+','',h or '').casefold() for h in reader.fieldnames or []}
+        if not headers.intersection({'username','listusername','iptvuser','iptvusername'}):
+            raise MaxReportError('El archivo no tiene las columnas de usuarios de Max Player.')
+        rows=[]
+        for row in reader:
+            if len(rows)>=50000:raise MaxReportError('El archivo excede el límite de cuentas permitido.')
+            if all(not clean(v) for v in row.values()):continue
+            rows.append(normalize_customer(row))
+        if not rows:raise MaxReportError('El CSV no contiene cuentas para comparar.')
+        return rows
+    except (csv.Error, TypeError):
+        raise MaxReportError('No se pudo interpretar el CSV exportado de Max Player.') from None
+
+
+def fetch_customers(get_users):
+    """Use existing authenticated GET only. Report unconfirmed completeness explicitly."""
+    rows=[];seen=set();page=1;expected=None;deadline=time.monotonic()+150
+    while True:
+        if time.monotonic()>deadline or page>100:
+            raise MaxReportError('La consulta de Max Player tardó demasiado. Puedes usar su exportación CSV.')
+        payload=get_users({'page':page,'per_page':500,'limit':500})
+        container=payload
+        if isinstance(payload,dict) and isinstance(payload.get('data'),dict):container=payload['data']
+        batch=container if isinstance(container,list) else None
+        if isinstance(container,dict):
+            for name in ('users','customers','items','results','data'):
+                if isinstance(container.get(name),list):batch=container[name];break
+        if batch is None:
+            raise MaxReportError('La API no devolvió una lista reconocible. Usa un CSV reciente de Customers.')
+        total=None
+        for meta in (container,payload,payload.get('meta') if isinstance(payload,dict) else None,
+                     payload.get('pagination') if isinstance(payload,dict) else None,
+                     container.get('meta') if isinstance(container,dict) else None):
+            if isinstance(meta,dict):
+                value=pick(meta,'total','total_count','recordsTotal','recordsFiltered')
+                if value is not None:
+                    try:total=int(value)
+                    except (ValueError,TypeError):raise MaxReportError('Max Player devolvió un total no válido.') from None
+                    break
+        if total is not None and (total<0 or total>50000 or expected is not None and total!=expected):
+            raise MaxReportError('El total de Max Player cambió durante la consulta. Vuelve a consultar.')
+        expected=total if total is not None else expected
+        for raw in batch:
+            account=normalize_customer(raw)
+            identity=account['id'] or key(account['username'])
+            if not identity or identity in seen:
+                raise MaxReportError('Max Player repitió cuentas entre páginas. Usa un CSV reciente para evitar un reporte parcial.')
+            seen.add(identity);rows.append(account)
+        if len(rows)>50000 or expected is not None and len(rows)>expected:
+            raise MaxReportError('La cantidad de cuentas no coincide con el total informado.')
+        if expected is None:
+            if not rows:raise MaxReportError('La API no devolvió cuentas de Max Player.')
+            return rows,False
+        if len(rows)==expected:return rows,True
+        if not batch:raise MaxReportError('Max Player no entregó todas las páginas. No se mostrará un resultado parcial.')
+        page+=1
+
+
+def compare_accounts(clients,accounts,today,grace_days=7):
+    index=defaultdict(dict)
+    for raw in clients:
+        client=dict(raw);expiry=day(client.get('vencimiento'))
+        archived=bool(client.get('archived_at'))
+        client={'username':client['username'],'name':client.get('nombre') or client['username'],
+                'expiry':expiry.isoformat() if expiry else None,
+                'state':'archivado' if archived else 'sin_fecha' if not expiry else 'activo' if expiry>=today else 'vencido',
+                'days_expired':(today-expiry).days if expiry and expiry<today else 0,
+                'last_payment':clean(client.get('last_payment')) or None,
+                'recent_payment':bool(day(client.get('last_payment_recorded')) and day(client['last_payment_recorded'])>=today-timedelta(days=7)),
+                'pending_activation':bool(client.get('pending_activation'))}
+        for alias in (raw['username'],raw.get('service_username')):
+            if key(alias):index[key(alias)][raw['username']]=client
+    names=Counter();ids=Counter(a['id'] for a in accounts if a['id'])
+    for account in accounts:
+        for alias in {key(account['username']),*(key(a) for a in account['list_usernames'])}-{''}:names[alias]+=1
+    rows=[];counts=Counter()
+    for account in accounts:
+        aliases={key(account['username']),*(key(a) for a in account['list_usernames'])}-{''}
+        found={}
+        for alias in aliases:found.update(index.get(alias,{}))
+        matches=list(found.values());flags=[]
+        duplicate=any(names[a]>1 for a in aliases) or bool(account['id'] and ids[account['id']]>1)
+        active=any(f['state']=='activo' for f in matches)
+        pending=any(f['pending_activation'] or f['recent_payment'] for f in matches)
+        ambiguous=len(matches)>1 or duplicate
+        if duplicate:flags.append('duplicados')
+        if len(matches)>1:flags.append('coincidencia_ambigua')
+        if active:flags.append('conservar_activo')
+        if not matches:flags.append('sin_fenix')
+        if matches and all(f['state']=='archivado' for f in matches):flags.append('archivado_fenix')
+        if any(f['state']=='vencido' for f in matches):flags.append('vencido_fenix')
+        if any(f['state']=='sin_fecha' for f in matches):flags.append('sin_fecha')
+        if any(f['pending_activation'] for f in matches):flags.append('activacion_pendiente')
+        if any(f['recent_payment'] for f in matches):flags.append('pago_reciente')
+        if account['last_connection']=='Nunca':flags.append('nunca_conecto')
+        if account['state']=='inactivo':flags.append('ya_inactivo_max')
+        if account['state']=='no_confirmado':flags.append('estado_max_no_confirmado')
+        if account['online'] is True:flags.append('conectado')
+        expired_long=bool(matches) and all(f['state']=='archivado' or f['state']=='vencido' and f['days_expired']>=grace_days for f in matches)
+        candidate=(not matches or expired_long) and not (active or pending or ambiguous or account['online'] is True or account['state']=='inactivo')
+        if candidate:flags.append('candidato_revision')
+        elif any(f['state']=='vencido' and f['days_expired']<grace_days for f in matches):flags.append('vencido_reciente')
+        for flag in flags:counts[flag]+=1
+        rows.append({'maxplayer':account,'fenix':matches,'flags':flags,'candidate':candidate})
+    rows.sort(key=lambda r:(not r['candidate'],key(r['maxplayer']['username'])))
+    return {'rows':rows,'counts':dict(counts),'today':today.isoformat(),'generated_at':datetime.now(GT).isoformat(),
+            'grace_days':grace_days,'total_maxplayer':len(accounts),'total_fenix':len(clients)}

@@ -5,9 +5,13 @@ on:
     paths:
       - app.py
       - xui_report.py
+      - maxplayer_report.py
+      - integration_credentials.py
+      - requirements.txt
       - templates/index.html
       - static/control.*
       - static/xui-report.*
+      - static/maxplayer-report.*
       - scripts/snapshot_payment_history.py
       - tests/**
       - .github/workflows/control-checks.yml

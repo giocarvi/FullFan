@@ -60,6 +60,20 @@ analytics=client.get('/api/analytics')
 assert analytics.status_code==200,analytics.get_data(as_text=True)
 assert analytics.json['ventas_trimestrales'][0]['clientes']==1
 c.execute('SELECT * FROM pagos WHERE id=%s',(old_id,));assert c.fetchone()==historical
+db.commit()
+with patch.object(app,'fetch_xui_report_lines',return_value=[]):
+    saved=client.post('/api/admin/xui-comparacion',json={'username':'PG_PANEL_DEMO','password':'PG_SECRET_DEMO','remember':True})
+    assert saved.status_code==200,saved.get_data(as_text=True)
+    assert saved.json['credential_saved'] is True
+    assert client.get('/api/admin/xui-comparacion').status_code==200
+assert not any(k.startswith('integration_credentials.') for k in client.get('/api/config').json)
+c.execute("SELECT valor FROM configuracion WHERE clave='integration_credentials.xui'")
+assert 'PG_SECRET_DEMO' not in c.fetchone()[0]
+with patch.object(app,'maxplayer_configured',return_value=True),patch.object(app,'maxplayer_request',return_value={'users':[{'id':1,'username':'PG_DEMO'}],'total':1}) as remote:
+    report=client.get('/api/admin/maxplayer-comparacion')
+    assert report.status_code==200,report.get_data(as_text=True)
+    assert remote.call_args.args[0]=='GET'
+c.execute('SELECT * FROM pagos WHERE id=%s',(old_id,));assert c.fetchone()==historical
 db.close()
 print('Postgres history, devices, expiry, reports, ledger and idempotency verified')
 '''

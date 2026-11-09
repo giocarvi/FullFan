@@ -23,7 +23,7 @@ def text(value):
 
 def day(value):
     value = text(value)
-    match = re.search(r'\b(\d{4}-\d{2}-\d{2})\b', value)
+    match = re.search(r'(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)', value)
     try:
         if match:
             return date.fromisoformat(match.group(1))

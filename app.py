@@ -15,6 +15,8 @@ import unicodedata
 import traceback
 import threading
 from xui_report import fetch_lines as fetch_xui_report_lines, compare_clients as compare_xui_clients, XuiReportError
+from integration_credentials import PREFIX as INTEGRATION_PREFIX, CredentialError, seal as seal_access, unseal as unseal_access
+from maxplayer_report import MaxReportError, fetch_customers as fetch_max_report_customers, parse_csv as parse_max_report_csv, compare_accounts as compare_max_accounts
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -4041,6 +4043,48 @@ def api_delete_activation_task(task_id):
 _xui_report_lock = threading.Lock()
 
 
+def saved_integration_access(integration):
+    db = get_db()
+    try:
+        cursor = db.cursor()
+        cursor.execute(qmark('SELECT valor FROM configuracion WHERE clave=?'), (INTEGRATION_PREFIX + integration,))
+        row = fetchone(cursor)
+        return unseal_access(app.secret_key, integration, row['valor']) if row else {}
+    finally:
+        db.close()
+
+
+def save_integration_access(integration, values):
+    encrypted = seal_access(app.secret_key, integration, values)
+    db = get_db()
+    try:
+        cursor = db.cursor()
+        cursor.execute(qmark('''INSERT INTO configuracion(clave,valor) VALUES(?,?)
+            ON CONFLICT(clave) DO UPDATE SET valor=excluded.valor'''), (INTEGRATION_PREFIX + integration, encrypted))
+        db.commit()
+    finally:
+        db.close()
+
+
+@app.route('/api/admin/integrations/<integration>', methods=['DELETE'])
+@login_required
+def forget_integration_access(integration):
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    if integration != 'xui':
+        return jsonify({'error': 'Integración no válida'}), 404
+    db = get_db()
+    try:
+        cursor = db.cursor()
+        cursor.execute(qmark('DELETE FROM configuracion WHERE clave=?'), (INTEGRATION_PREFIX + integration,))
+        db.commit()
+    finally:
+        db.close()
+    response = jsonify({'ok': True})
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 @app.route('/api/admin/xui-comparacion', methods=['GET', 'POST'])
 @login_required
 def xui_comparacion():
@@ -4049,8 +4093,12 @@ def xui_comparacion():
     data = request.get_json(silent=True) if request.method == 'POST' else {}
     if not isinstance(data, dict):
         return jsonify({'error': 'Solicitud inválida'}), 400
-    username = data.get('username') if request.method == 'POST' else os.environ.get('XUI_USER')
-    password = data.get('password') if request.method == 'POST' else os.environ.get('XUI_PASS')
+    try:
+        saved = saved_integration_access('xui') if request.method == 'GET' else {}
+    except CredentialError as error:
+        return jsonify({'error': str(error), 'code': 'xui_credentials_required'}), 503
+    username = data.get('username') if request.method == 'POST' else saved.get('username') or os.environ.get('XUI_USER')
+    password = data.get('password') if request.method == 'POST' else saved.get('password') or os.environ.get('XUI_PASS')
     if not username or not password:
         response = jsonify({'error': 'Conecta tu panel XUI para consultar el reporte.', 'code': 'xui_credentials_required'})
         response.headers['Cache-Control'] = 'no-store'
@@ -4072,15 +4120,87 @@ def xui_comparacion():
             clients = fetchall(cursor)
         finally:
             db.close()
-        response = jsonify(compare_xui_clients(clients, lines, today_gt()))
+        report = compare_xui_clients(clients, lines, today_gt())
+        if request.method == 'POST' and data.get('remember') is True:
+            save_integration_access('xui', {'username': username, 'password': password})
+            report['credential_saved'] = True
+        response = jsonify(report)
         response.headers['Cache-Control'] = 'no-store'
         return response
-    except XuiReportError as error:
+    except (XuiReportError, CredentialError) as error:
         response = jsonify({'error': str(error), 'code': 'xui_unavailable'})
         response.headers['Cache-Control'] = 'no-store'
         return response, 502
     finally:
         _xui_report_lock.release()
+
+
+_max_report_lock = threading.Lock()
+
+
+@app.route('/api/admin/maxplayer-comparacion', methods=['GET', 'POST'])
+@login_required
+def maxplayer_comparacion():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    try:
+        grace_days = int(request.values.get('min_dias', '7'))
+        if not 0 <= grace_days <= 3650:raise ValueError()
+    except (TypeError, ValueError):
+        return jsonify({'error': 'El margen debe estar entre 0 y 3650 días.'}), 400
+    if request.method == 'GET' and not maxplayer_configured():
+        return jsonify({'error': 'La API de Max Player no está configurada. Puedes cargar un CSV reciente de Customers.',
+                        'code': 'maxplayer_not_configured'}), 503
+    if not _max_report_lock.acquire(blocking=False):
+        return jsonify({'error': 'Ya hay una consulta de Max Player en proceso.'}), 409
+    try:
+        if request.method == 'POST':
+            if request.content_length and request.content_length > 12_000_000:
+                return jsonify({'error': 'El archivo es demasiado grande. Máximo 10 MB.'}), 413
+            upload = request.files.get('file')
+            if not upload:
+                return jsonify({'error': 'Selecciona el CSV exportado de Max Player.'}), 400
+            content = upload.stream.read(10_000_001)
+            if len(content) > 10_000_000:
+                return jsonify({'error': 'El archivo supera los 10 MB.'}), 413
+            exported_on = request.form.get('exported_on', '')
+            if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', exported_on):
+                return jsonify({'error': 'Indica la fecha de exportación del CSV.'}), 400
+            try:
+                export_date = date.fromisoformat(exported_on)
+                if export_date > today_gt():raise ValueError()
+            except ValueError:
+                return jsonify({'error': 'La fecha de exportación no puede ser futura o inválida.'}), 400
+            accounts = parse_max_report_csv(content)
+            complete = False
+            source = 'CSV de Max Player (fecha declarada por el administrador)'
+        else:
+            accounts, complete = fetch_max_report_customers(lambda params: get_maxplayer_users({**params, 'domain_id': str(MAXPLAYER_DOMAIN_ID)}))
+            exported_on = today_gt().isoformat()
+            source = 'API Max Player'
+        db = get_db()
+        try:
+            cursor = db.cursor()
+            cursor.execute(f'''SELECT c.username, c.nombre, c.vencimiento, c.archived_at, sc.service_username,
+                (SELECT MAX(p.mes) FROM pagos p WHERE p.username=c.username AND {active_payment_where('p')}) AS last_payment,
+                (SELECT MAX(p.fecha_registro) FROM pagos p WHERE p.username=c.username AND {active_payment_where('p')}) AS last_payment_recorded,
+                EXISTS(SELECT 1 FROM activation_tasks t WHERE t.username=c.username AND t.status IN ('open','in_progress','blocked')) AS pending_activation
+                FROM clientes c LEFT JOIN client_service_credentials sc ON sc.username=c.username''')
+            clients = fetchall(cursor)
+        finally:
+            db.close()
+        report = compare_max_accounts(clients, accounts, today_gt(), grace_days)
+        report.update(source=source, source_complete=complete, exported_on=exported_on)
+        response = jsonify(report)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except MaxReportError as error:
+        return jsonify({'error': str(error), 'code': 'maxplayer_report_error'}), 502
+    except MaxPlayerError:
+        return jsonify({'error': 'No se pudo consultar la API de Max Player. Revisa el token configurado o carga un CSV reciente de Customers.',
+                        'code': 'maxplayer_unavailable'}), 502
+    finally:
+        _max_report_lock.release()
 
 
 @app.route('/api/analytics')
@@ -4809,7 +4929,9 @@ def get_config():
     c.execute("SELECT clave, valor FROM configuracion")
     rows = fetchall(c)
     db.close()
-    return jsonify({r['clave']: r['valor'] for r in rows})
+    response = jsonify({r['clave']: r['valor'] for r in rows if not r['clave'].startswith(INTEGRATION_PREFIX)})
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @app.route('/api/config', methods=['POST'])
@@ -4818,6 +4940,8 @@ def save_config():
     if session.get('rol') != 'admin':
         return jsonify({'error': 'Acceso denegado'}), 403
     data = request.get_json()
+    if not isinstance(data, dict) or any(str(key).startswith(INTEGRATION_PREFIX) for key in data):
+        return jsonify({'error': 'Las credenciales de integraciones se administran desde su sección privada.'}), 400
     db = get_db()
     c = db.cursor()
     for clave, valor in data.items():
