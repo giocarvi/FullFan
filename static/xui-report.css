@@ -44,6 +44,8 @@
 .max-delete-ack input { width:auto; margin-top:4px; }
 .max-delete-actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
 .max-delete-actions button { width:auto; margin:0; }
+.max-delete-skip { display:block; background:transparent; color:#fca5a5; border-color:#f87171; }
+.max-delete-risk { margin:14px 0; color:#fca5a5; }
 @media(max-width:900px) { .xui-filters { grid-template-columns:1fr 1fr; } }
 @media(max-width:600px) {
   .xui-summary { grid-template-columns:1fr 1fr; }

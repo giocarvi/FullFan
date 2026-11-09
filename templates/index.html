@@ -640,7 +640,7 @@ body {
 }
 </style>
 <link rel="stylesheet" href="/static/control.css?v=20261109">
-{% if rol == 'admin' %}<link rel="stylesheet" href="/static/xui-report.css?v=20261109d">{% endif %}
+{% if rol == 'admin' %}<link rel="stylesheet" href="/static/xui-report.css?v=20261109f">{% endif %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -881,6 +881,7 @@ body {
     <button class="btn-primary" type="submit">Comparar archivo con Fénix actual</button>
   </form></details>
   <div class="form-group max-grace"><label for="max-grace">Margen antes de marcar un vencido como candidato (días)</label><input id="max-grace" type="number" min="0" max="3650" value="7"><small>Se aplica en la próxima consulta. Por defecto se reservan 7 días para renovaciones tardías.</small></div>
+  <p class="view-note">«Eliminar sin verificar conexión» omite solo esa consulta y podría interrumpir una sesión activa. Mantiene las validaciones de Fénix y exige una aceptación adicional del administrador. No elimina clientes ni pagos en Fénix.</p>
   <div id="max-results" hidden>
     <div id="max-summary" class="xui-summary"></div>
     <form id="max-filters" class="xui-filters max-filters"><div class="form-group"><label for="max-search">Buscar</label><input id="max-search" type="search" placeholder="Usuario Fénix, Max Player o lista"></div><div class="form-group"><label for="max-category">Mostrar</label><select id="max-category"><option value="candidato_revision">Candidatos para revisión</option><option value="">Todas las cuentas recibidas</option></select></div><button id="max-export" class="btn-secondary" type="button">Exportar CSV</button></form>
@@ -4149,6 +4150,6 @@ function renderTablaTrimestral(ventas) {
 }
 </script>
 <script src="/static/control.js?v=20261109"></script>
-{% if rol == 'admin' %}<script src="/static/xui-report.js?v=20261109b"></script><script src="/static/maxplayer-report.js?v=20261109e"></script>{% endif %}
+{% if rol == 'admin' %}<script src="/static/xui-report.js?v=20261109b"></script><script src="/static/maxplayer-report.js?v=20261109f"></script>{% endif %}
 </body>
 </html>

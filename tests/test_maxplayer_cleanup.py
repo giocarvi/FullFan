@@ -300,6 +300,81 @@ class MaxCleanupTests(unittest.TestCase):
         self.assertFalse(result.json['rows'][0]['can_check_connection'])
         self.delete.assert_not_called()
 
+    def test_explicit_connection_override_needs_extra_ack_and_retains_history(self):
+        self.accounts[0]['online']=None
+        db=fixture.module.get_db();before=capture(db);db.close()
+        prepared=self.prepare(skip_connection_check=True)
+        self.assertEqual(prepared.status_code,200,prepared.json)
+        self.assertTrue(prepared.json['skip_connection_check'])
+        self.assertIsNone(prepared.json['account']['online'])
+        self.delete.assert_not_called()
+        self.assertEqual(self.confirm(prepared.json).status_code,400)
+        self.assertEqual(self.confirm(prepared.json,connection_risk_acknowledged=False).status_code,400)
+        self.assertEqual(self.confirm(prepared.json,connection_risk_acknowledged='true').status_code,400)
+        result=self.confirm(prepared.json,connection_risk_acknowledged=True)
+        self.assertEqual(result.json['status'],'deleted')
+        self.assertTrue(self.confirm(prepared.json,connection_risk_acknowledged=True).json['replayed'])
+        self.delete.assert_called_once()
+        self.assertEqual(self.support.call_count,2)
+        self.assertTrue(all(call.args==('GET','/customers/101') for call in self.support.call_args_list))
+        operation=fixture.rows('SELECT * FROM maxplayer_cleanup_operations')[0]
+        self.assertIn('SIN VERIFICAR CONEXIÓN',operation['reason'])
+        event=fixture.rows("SELECT * FROM audit_log WHERE action='deletion_requested'")[0]
+        self.assertTrue(json.loads(event['metadata'])['connection_check_skipped'])
+        db=fixture.module.get_db();after=capture(db,baseline=before);db.close()
+        for table,diff in compare(before,after).items():
+            self.assertEqual(diff['faltantes'],0,table);self.assertEqual(diff['modificados'],0,table)
+            if table not in ('audit_log','maxplayer_cleanup_operations'):self.assertEqual(diff['nuevos'],0,table)
+
+    def test_override_keeps_paid_recent_pending_ambiguous_and_known_online_guards(self):
+        for values in [dict(vencimiento='2099-01-01'),dict(vencimiento=None),dict(vencimiento=(fixture.module.today_gt()-fixture.module.timedelta(days=2)).isoformat())]:
+            fixture.seed()
+            db=fixture.module.get_db();db.execute("INSERT INTO clientes(username,nombre,vencimiento) VALUES('MAX_UNUSED','Reserved',?)",(values['vencimiento'],));db.commit();db.close()
+            self.assertEqual(self.prepare(skip_connection_check=True).status_code,409)
+        fixture.seed()
+        db=fixture.module.get_db();db.execute("INSERT INTO clientes(username,nombre,vencimiento) VALUES('MAX_UNUSED','Pending','2026-01-01')");db.execute("INSERT INTO activation_tasks(username,task_type,status) VALUES('MAX_UNUSED','renewal','open')");db.commit();db.close()
+        self.assertEqual(self.prepare(skip_connection_check=True).status_code,409)
+        fixture.seed();self.complete=False
+        self.assertEqual(self.prepare(skip_connection_check=True).status_code,409)
+        self.complete=True;self.accounts.append({**self.accounts[0],'id':'102'})
+        self.assertEqual(self.prepare(skip_connection_check=True).status_code,409)
+        self.accounts=self.accounts[:1];self.accounts[0]['online']=True
+        self.assertEqual(self.prepare(skip_connection_check=True).status_code,409)
+        for role in ('atencion','reseller'):
+            self.assertEqual(fixture.client(role).post('/api/admin/maxplayer/101/preparar-eliminacion',json={'username':'MAX_UNUSED','skip_connection_check':True},headers=self.headers).status_code,403)
+        self.delete.assert_not_called()
+
+    def test_override_mode_is_signed_and_cannot_be_enabled_on_final_payload(self):
+        plan=self.prepare().json
+        self.accounts[0]['online']=None
+        result=self.confirm(plan,skip_connection_check=True,connection_risk_acknowledged=True)
+        self.assertEqual(result.status_code,409)
+        self.delete.assert_not_called()
+
+    def test_manual_override_still_blocks_a_new_payment_before_final_confirmation(self):
+        self.accounts[0]['online']=None
+        db=fixture.module.get_db();db.execute("INSERT INTO clientes(username,nombre,vencimiento) VALUES('MAX_UNUSED','Expired','2026-01-01')");db.commit();db.close()
+        plan=self.prepare(skip_connection_check=True).json
+        db=fixture.module.get_db();db.execute("INSERT INTO pagos(username,mes,monto,fecha_registro) VALUES('MAX_UNUSED','2026-11-09',90,'2026-11-09T12:00:00')");db.commit();db.close()
+        self.assertEqual(self.confirm(plan,connection_risk_acknowledged=True).status_code,409)
+        self.assertIn('SIN VERIFICAR CONEXIÓN',fixture.rows('SELECT reason FROM maxplayer_cleanup_operations')[0]['reason'])
+        self.delete.assert_not_called()
+
+    def test_override_flag_is_boolean_and_individual_identity_is_still_required(self):
+        for value in ('true',1,None):self.assertEqual(self.prepare(skip_connection_check=value).status_code,400)
+        self.support.side_effect=lambda *a,**kw:{'success':1,'data':{'id':'102','username':'MAX_UNUSED'}}
+        self.assertEqual(self.prepare(skip_connection_check=True).status_code,502)
+        self.delete.assert_not_called()
+
+    def test_override_timeout_is_not_retried_and_remains_labelled(self):
+        self.accounts[0]['online']=None;plan=self.prepare(skip_connection_check=True).json
+        self.timeout_delete=True
+        self.assertEqual(self.confirm(plan,connection_risk_acknowledged=True).json['status'],'uncertain')
+        self.assertEqual(self.confirm(plan,connection_risk_acknowledged=True).status_code,409)
+        self.assertIn('SIN VERIFICAR CONEXIÓN',fixture.rows('SELECT reason FROM maxplayer_cleanup_operations')[0]['reason'])
+        self.assertEqual(self.client.post('/api/admin/maxplayer/101/verificar-eliminacion',json={},headers=self.headers).json['status'],'deleted')
+        self.delete.assert_called_once()
+
 
 class DevicePresenceTests(unittest.TestCase):
     def test_only_fresh_explicit_offline_of_all_registered_devices_is_accepted(self):

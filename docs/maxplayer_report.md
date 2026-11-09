@@ -36,9 +36,19 @@ Las comprobaciones son puntuales: no existe una transacción compartida entre F�
 
 El listado general `GET /users` documentado no incluye conexión actual. No se recorre cada cliente para completar ese dato: se consulta únicamente el candidato elegido, al preparar y al confirmar, dejando al menos 1,05 segundos entre lecturas de esta operación.
 
-La respuesta de dispositivos debe tener `success: 1`, `presence_available: true`, `presence_generated_at_unix` entero y reciente (máximo 120 segundos de antigüedad y 15 de tolerancia futura), y registros identificables sin duplicados, todos con `online: false` booleano. Cualquier `online: true` bloquea; `null`, valores no booleanos, fallo de presencia, formato incompleto o fecha desactualizada no se convierten a desconexión. Un array vacío tampoco basta: la documentación advierte que puede haber registros asíncronos pendientes de persistir. No se añade una excepción de borrado para esos casos.
+En la opción con comprobación, la respuesta de dispositivos debe tener `success: 1`, `presence_available: true`, `presence_generated_at_unix` entero y reciente (máximo 120 segundos de antigüedad y 15 de tolerancia futura), y registros identificables sin duplicados, todos con `online: false` booleano. Cualquier `online: true` bloquea; `null`, valores no booleanos, fallo de presencia, formato incompleto o fecha desactualizada no se convierten a desconexión. Un array vacío tampoco basta: la documentación advierte que puede haber registros asíncronos pendientes de persistir. La opción manual descrita abajo no altera esa interpretación ni presenta una conexión desconocida como desconectada.
 
 Solo se devuelve al navegador un resumen; identificadores de instalación, nombres de dispositivos y metadatos no se exponen. La confirmación incluye una huella de los dispositivos y su estado, pero no el instante del heartbeat, que naturalmente avanza en cada consulta. La fecha se valida de nuevo; cambios de dispositivos invalidan la confirmación. Se reconocen también los alias documentados en `lists[].iptv_info.username`, sin conservar ni devolver contraseñas o servidores de esas listas. No se realizan cambios de límites, dispositivos ni listas.
+
+### Opción manual: eliminar sin verificar conexión
+
+A petición explícita del propietario, se incorpora «Eliminar sin verificar conexión» como acción separada, solo para administrador y por cuenta. Omite únicamente `GET /customers/{id}/devices`, tanto al preparar como al confirmar. No consulta ni supone el tiempo sin conexión; «Sin dato» permanece desconocido. Si el propio listado ya informa que está conectado, se mantiene el bloqueo.
+
+Se conservan el recorrido completo y la relectura de identidad de Max Player, la consulta individual de identidad y la comparación actual con Fénix. No permite eliminar una coincidencia vigente, con pago reciente, activación pendiente, fecha desconocida, margen insuficiente, duplicidad o ambigüedad. No funciona desde CSV ni con errores de identidad/API. No elimina el cliente ni sus pagos o credenciales en Fénix.
+
+La confirmación muestra expresamente que NO se verificará la conexión y que podría interrumpir una sesión activa. Exige usuario exacto, motivo, la confirmación habitual y otra casilla inicialmente vacía aceptando ese riesgo. `skip_connection_check` solo admite un booleano durante la preparación; queda firmado en el plan y no puede cambiarse con el cuerpo de la confirmación final. Omitir la aceptación adicional no envía ningún DELETE ni crea un recibo de envío.
+
+La decisión se añade a la auditoría con `connection_check_skipped: true` y el recibo/motivo queda marcado `SIN VERIFICAR CONEXIÓN`, también ante bloqueo o incertidumbre. Conserva la reserva única, la prohibición de reenvíos inciertos y la verificación posterior de ausencia. No añade automatización, borrado masivo ni migración de datos.
 
 ## Registro y resultados inciertos
 

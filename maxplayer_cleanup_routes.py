@@ -78,7 +78,7 @@ def register_routes(app,api):
         secret=app.secret_key.encode() if isinstance(app.secret_key,str) else app.secret_key
         return hmac.new(secret,('maxplayer-cleanup:'+api.MAXPLAYER_API_TOKEN).encode(),hashlib.sha256).hexdigest()
 
-    def read_live(grace,account_id=None):
+    def read_live(grace,account_id=None,*,skip_connection_check=False):
         target_page={}
         def observe(params,accounts):
             if any(a['id']==str(account_id) for a in accounts):target_page.update(params)
@@ -106,10 +106,11 @@ def register_routes(app,api):
             identity=details['data']
             if identity.get('id')!=str(account_id) or identity.get('username')!=row['maxplayer']['username']:
                 raise api.MaxReportError('La identidad individual ya no coincide con el reporte. Actualiza la consulta; no se permite borrar.')
-            api.time.sleep(1.05)
-            presence=device_presence(api.maxplayer_request('GET',f'/customers/{account_id}/devices'),api.time.time())
-            for account in accounts:
-                if account['id']==str(account_id):account.update(presence)
+            if not skip_connection_check:
+                api.time.sleep(1.05)
+                presence=device_presence(api.maxplayer_request('GET',f'/customers/{account_id}/devices'),api.time.time())
+                for account in accounts:
+                    if account['id']==str(account_id):account.update(presence)
             # Reload Fénix AFTER the latest provider heartbeat.
             report=api.compare_max_accounts(api.load_max_comparison_clients(),accounts,api.today_gt(),grace)
             report.update(source='API Max Player',source_complete=complete,exported_on=api.today_gt().isoformat())
@@ -125,6 +126,9 @@ def register_routes(app,api):
             c=db.cursor();c.execute(api.qmark('SELECT * FROM maxplayer_cleanup_operations WHERE maxplayer_id=?'),(str(account_id),))
             return api.fetchone(c)
         finally:db.close()
+
+    def recorded_reason(plan,reason):
+        return ('SIN VERIFICAR CONEXIÓN · ' if plan.get('skip_connection_check') is True else '')+reason
 
     def set_status(account_id,request_id,status,reason,action):
         db=api.get_db()
@@ -155,7 +159,8 @@ def register_routes(app,api):
                 if c.rowcount!=1:
                     db.rollback();return old
             api.audit_event(c,'maxplayer',account_id,'deletion_requested',reason=reason,
-                metadata={'request_id':plan['request_id'],'maxplayer_username':plan['username']})
+                metadata={'request_id':plan['request_id'],'maxplayer_username':plan['username'],
+                          'connection_check_skipped':plan.get('skip_connection_check') is True})
             db.commit();return None
         finally:db.close()
 
@@ -173,6 +178,8 @@ def register_routes(app,api):
         if denied:return denied
         data=request.get_json(silent=True)
         if not isinstance(data,dict):return response({'error':'Solicitud inválida.'},400)
+        skip_connection_check=data.get('skip_connection_check',False)
+        if type(skip_connection_check) is not bool:return response({'error':'La opción de omitir conexión debe ser explícita.'},400)
         try:grace=max(7,min(3650,int(data.get('min_dias',7))))
         except (ValueError,TypeError):return response({'error':'Margen inválido.'},400)
         old=get_operation(account_id)
@@ -180,15 +187,17 @@ def register_routes(app,api):
             return response({'error':'Ya hay una operación registrada. Revisa o verifica su estado; no se enviará otra orden.','status':old['status']},409)
         if not api._max_report_lock.acquire(blocking=False):return response({'error':'Hay otra consulta en proceso. Espera a que termine.'},409)
         try:
-            report=read_live(grace,account_id);row=target(report,account_id)
-            block=deletion_block(row,report['source_complete'])
+            report=read_live(grace,account_id,skip_connection_check=skip_connection_check);row=target(report,account_id)
+            block=deletion_block(row,report['source_complete'],skip_connection_check=skip_connection_check)
             if block:return response({'error':block},409)
             if data.get('username')!=row['maxplayer']['username']:
                 return response({'error':'El usuario ya no coincide con la cuenta seleccionada. Actualiza el reporte.'},409)
             plan={'actor':session['user'],'id':str(account_id),'username':row['maxplayer']['username'],
-                  'fingerprint':fingerprint(row),'grace':grace,'request_id':secrets.token_urlsafe(24),'provider_scope':provider_scope()}
+                  'fingerprint':fingerprint(row),'grace':grace,'request_id':secrets.token_urlsafe(24),'provider_scope':provider_scope(),
+                  'skip_connection_check':skip_connection_check}
             return response({'confirmation':signer().dumps(plan),'account':row['maxplayer'],'fenix':row['fenix'],
-                             'flags':row['flags'],'expires_in':TTL,'checked_at':report['generated_at']})
+                             'flags':row['flags'],'expires_in':TTL,'checked_at':report['generated_at'],
+                             'skip_connection_check':skip_connection_check})
         except api.MaxReportError as error:return response({'error':str(error)},502)
         except api.MaxPlayerError as error:return response(api.maxplayer_report_failure(error),502)
         finally:api._max_report_lock.release()
@@ -209,41 +218,45 @@ def register_routes(app,api):
         reason=data.get('reason')
         if data.get('typed_username')!=plan['username'] or data.get('acknowledged') is not True or not isinstance(reason,str) or not 3<=len(reason.strip())<=500:
             return response({'error':'Escribe exactamente el usuario, indica el motivo y confirma la advertencia.'},400)
+        skip_connection_check=plan.get('skip_connection_check') is True
+        if skip_connection_check and data.get('connection_risk_acknowledged') is not True:
+            return response({'error':'Debes aceptar expresamente que se eliminará sin verificar conexión y podría interrumpir una sesión activa.'},400)
+        operation_reason=recorded_reason(plan,reason.strip())
         if not api._max_report_lock.acquire(blocking=False):return response({'error':'Hay otra consulta en proceso. Espera a que termine.'},409)
         claimed=False;sent=False;delete_returned=False
         try:
-            old=claim(account_id,plan,reason.strip())
+            old=claim(account_id,plan,operation_reason)
             if old:
                 if old['status']=='deleted' and old['username']==plan['username']:
                     return response({'ok':True,'status':'deleted','replayed':True,'message':'La eliminación ya estaba confirmada. No se envió otra orden.'})
                 return response({'error':'La operación ya fue recibida. Revisa el historial; no se reenvía el borrado.','status':old['status']},409)
             claimed=True
-            report=read_live(plan['grace'],account_id);row=target(report,account_id)
-            block=deletion_block(row,report['source_complete'])
+            report=read_live(plan['grace'],account_id,skip_connection_check=skip_connection_check);row=target(report,account_id)
+            block=deletion_block(row,report['source_complete'],skip_connection_check=skip_connection_check)
             if not block and (fingerprint(row)!=plan['fingerprint'] or row['maxplayer']['username']!=plan['username']):
                 block='Los datos cambiaron desde la preparación. Debes revisar una nueva confirmación.'
             try:signer().loads(data['confirmation'],max_age=TTL)
             except (BadSignature,SignatureExpired):block='La confirmación venció durante la comprobación. Prepara otra.'
             if block:
-                set_status(account_id,plan['request_id'],'blocked',block,'deletion_blocked')
+                set_status(account_id,plan['request_id'],'blocked',recorded_reason(plan,block),'deletion_blocked')
                 return response({'error':block,'status':'blocked'},409)
             # Make an intended send durable before the one and only external DELETE.
-            set_status(account_id,plan['request_id'],'sending',reason.strip(),'deletion_sending')
+            set_status(account_id,plan['request_id'],'sending',operation_reason,'deletion_sending')
             sent=True
             api.delete_maxplayer_user(str(account_id))
             delete_returned=True
-            set_status(account_id,plan['request_id'],'verifying',reason.strip(),'deletion_submitted')
+            set_status(account_id,plan['request_id'],'verifying',operation_reason,'deletion_submitted')
             after=read_live(plan['grace'])
             absent=after['source_complete'] and target(after,account_id) is None
             state='deleted' if absent else 'uncertain'
             message='Cuenta eliminada de Max Player y ausencia confirmada. Cliente y pagos de Fénix conservados.' if absent else 'La orden fue enviada, pero no se confirmó la ausencia. No se reenviará; usa Verificar estado.'
-            set_status(account_id,plan['request_id'],state,reason.strip(),'deletion_confirmed' if absent else 'deletion_uncertain')
+            set_status(account_id,plan['request_id'],state,operation_reason,'deletion_confirmed' if absent else 'deletion_uncertain')
             return response({'ok':absent,'status':state,'message':message,'request_id':plan['request_id']},200 if absent else 202)
         except (api.MaxPlayerError,api.MaxReportError) as error:
             safe=api.maxplayer_report_failure(error) if isinstance(error,api.MaxPlayerError) else {'error':str(error)}
             rejected=sent and not delete_returned and isinstance(error,api.MaxPlayerError) and error.http_status in (400,401,403,404,405,409,422,429)
             state='rejected' if rejected else 'uncertain' if sent else 'not_sent'
-            if claimed:set_status(account_id,plan['request_id'],state,safe['error'],'deletion_'+state)
+            if claimed:set_status(account_id,plan['request_id'],state,recorded_reason(plan,safe['error']),'deletion_'+state)
             suffix=' Max Player rechazó la orden. No se reintenta automáticamente; corrige la causa y prepara otra revisión.' if rejected else ' La orden pudo haberse recibido. No la repitas; verifica el estado.' if sent else ' No se envió una orden de borrado.'
             return response({**safe,'status':state,'error':safe['error']+suffix},502)
         except Exception:

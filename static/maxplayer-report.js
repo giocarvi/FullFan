@@ -15,27 +15,36 @@
     const data=await r.json();return {response:r,data};
   }
   function closeButton(){dialog.querySelector('[data-cleanup-close]').onclick=()=>{if(!cleanupBusy)dialog.close();};}
-  async function prepareDeletion(account){
+  async function prepareDeletion(account,skipConnectionCheck=false){
     if(busy||cleanupBusy||!cleanupCsrf)return;
     const sequence=++cleanupSequence;cleanupPlan=null;
-    dialog.innerHTML='<h2 id="max-cleanup-title">Comprobar conexión y revisar</h2><p role="status">Consultando la identidad, la conexión de sus dispositivos y Fénix actual. No se está borrando nada…</p><button class="btn-secondary" type="button" data-cleanup-close>Cancelar</button>';
+    dialog.innerHTML=`<h2 id="max-cleanup-title">${skipConnectionCheck?'Eliminar sin verificar conexión':'Comprobar conexión y revisar'}</h2><p role="status">${skipConnectionCheck?'Revisando identidad y Fénix actual. No se consultará la conexión. Todavía no se está borrando nada…':'Consultando la identidad, la conexión de sus dispositivos y Fénix actual. No se está borrando nada…'}</p><button class="btn-secondary" type="button" data-cleanup-close>Cancelar</button>`;
     if(!dialog.open)dialog.showModal();closeButton();
     try{
-      const {response,data}=await cleanupRequest(`/api/admin/maxplayer/${encodeURIComponent(account.id)}/preparar-eliminacion`,{username:account.username,min_dias:report.grace_days});
+      const {response,data}=await cleanupRequest(`/api/admin/maxplayer/${encodeURIComponent(account.id)}/preparar-eliminacion`,{username:account.username,min_dias:report.grace_days,skip_connection_check:skipConnectionCheck});
       if(sequence!==cleanupSequence||!dialog.open)return;
       if(!response.ok)throw new Error(data.error||'No se pudo verificar la cuenta.');
+      if((data.skip_connection_check===true)!==skipConnectionCheck)throw new Error('El modo de revisión no coincide. Actualiza la página y prepara otra confirmación.');
       cleanupPlan=data;
       dialog.innerHTML=`<h2 id="max-cleanup-title">Eliminar solo de Max Player</h2><p><strong>${safe(data.account.username)}</strong> · ID <strong>${safe(data.account.id)}</strong></p><p class="max-delete-warning">Esta acción elimina la cuenta en Max Player y puede perder sus accesos y configuración allí. No elimina el cliente, sus pagos ni su historial en Fénix. No se puede deshacer desde este botón.</p><p class="view-note">La conexión fue informada como desconectada. Se volverá a comprobar todo al confirmar. Esta revisión vence en ${Math.round(data.expires_in/60)} minutos.</p><form id="max-delete-form"><div class="form-group"><label for="max-delete-reason">Motivo</label><select id="max-delete-reason" required><option value="">Selecciona un motivo</option><option>No renovó el servicio</option><option>Sin coincidencia en Fénix, revisado por administrador</option><option>Cliente archivado, revisado por administrador</option></select></div><div class="form-group"><label for="max-delete-typed">Escribe exactamente: ${safe(data.account.username)}</label><input id="max-delete-typed" autocomplete="off" required></div><label class="max-delete-ack"><input id="max-delete-ack" type="checkbox" required> Confirmo que revisé este usuario e ID y quiero eliminar únicamente su cuenta de Max Player.</label><p id="max-delete-state" role="status" aria-live="polite"></p><div class="max-delete-actions"><button class="btn-secondary" type="button" data-cleanup-close>Cancelar</button><button id="max-delete-submit" class="max-delete-btn" type="submit" disabled>Eliminar definitivamente de Max Player</button></div></form>`;
+      if(skipConnectionCheck){
+        $('max-cleanup-title').textContent='Eliminar sin verificar conexión';
+        dialog.querySelector('.view-note').textContent=`No se comprobará la conexión. Se volverán a revisar identidad y Fénix. Esta confirmación vence en ${Math.round(data.expires_in/60)} minutos.`;
+        $('max-delete-form').insertAdjacentHTML('afterbegin','<p class="max-delete-warning"><strong>SIN VERIFICAR CONEXIÓN.</strong> No sabemos si está conectado. Esta eliminación podría interrumpir una sesión activa.</p>');
+        dialog.querySelector('.max-delete-ack').insertAdjacentHTML('afterend','<label class="max-delete-ack max-delete-risk"><input id="max-delete-risk" type="checkbox" required> Acepto eliminar sin verificar la conexión, aunque pueda interrumpir una sesión activa.</label>');
+        $('max-delete-submit').textContent='Eliminar sin verificar conexión';
+      }
       closeButton();
-      const typed=$('max-delete-typed'),ack=$('max-delete-ack'),reason=$('max-delete-reason'),button=$('max-delete-submit');
-      const valid=()=>{button.disabled=typed.value!==data.account.username||!ack.checked||!reason.value||cleanupBusy;};
+      const typed=$('max-delete-typed'),ack=$('max-delete-ack'),risk=$('max-delete-risk'),reason=$('max-delete-reason'),button=$('max-delete-submit');
+      const valid=()=>{button.disabled=typed.value!==data.account.username||!ack.checked||!reason.value||(skipConnectionCheck&&!risk?.checked)||cleanupBusy;};
       typed.oninput=valid;ack.onchange=valid;reason.onchange=valid;typed.focus();
+      if(risk)risk.onchange=valid;
       $('max-delete-form').onsubmit=async e=>{
         e.preventDefault();if(button.disabled||cleanupBusy||!e.currentTarget.reportValidity())return;
         cleanupBusy=true;valid();dialog.querySelector('[data-cleanup-close]').disabled=true;
         $('max-delete-state').textContent='Revalidando antes de enviar una única orden y verificando el resultado. No cierres esta ventana ni repitas la acción…';
         try{
-          const result=await cleanupRequest(`/api/admin/maxplayer/${encodeURIComponent(data.account.id)}/eliminar`,{confirmation:data.confirmation,typed_username:typed.value,reason:reason.value,acknowledged:ack.checked});
+          const result=await cleanupRequest(`/api/admin/maxplayer/${encodeURIComponent(data.account.id)}/eliminar`,{confirmation:data.confirmation,typed_username:typed.value,reason:reason.value,acknowledged:ack.checked,connection_risk_acknowledged:skipConnectionCheck&&risk.checked});
           const state=result.data.status||'uncertain';
           if(state==='deleted'&&result.response.ok){
             report.rows=report.rows.filter(row=>row.maxplayer.id!==data.account.id);report.total_maxplayer=report.rows.length;report.counts={};report.rows.forEach(row=>row.flags.forEach(flag=>report.counts[flag]=(report.counts[flag]||0)+1));summary();draw();
@@ -66,9 +75,10 @@
       <td data-label="Fénix">${r.fenix.map(f=>`<div class="xui-account"><button class="text-action" type="button" data-max-client="${safe(f.username)}">${safe(f.name)}</button><small>${safe(f.username)} · ${safe(states[f.state]||f.state)}</small></div>`).join('')||'Sin coincidencia exacta'}</td>
       <td data-label="Vence Fénix">${r.fenix.map(f=>`<div>${safe(f.expiry||'Sin fecha')}${f.days_expired?`<small>${Number(f.days_expired)} días vencido</small>`:''}</div>`).join('')||'—'}</td>
       <td data-label="Último pago">${r.fenix.map(f=>`<div>${safe(f.last_payment||'Sin pagos')}${f.recent_payment?'<small>Registro de pago reciente</small>':''}${f.pending_activation?'<small>Activación pendiente</small>':''}</div>`).join('')||'—'}</td>
-      <td data-label="Hallazgos / acción"><div class="xui-flags">${r.flags.map(f=>`<span>${safe(labels[f]||f)}</span>`).join('')}</div>${r.candidate?`<button class="max-delete-btn" type="button" data-max-delete="${safe(r.maxplayer.id||'')}" ${r.can_check_connection&&report.source_complete&&report.source==='API Max Player'?'':'disabled'}>Comprobar conexión y revisar</button><small>${safe(r.can_check_connection&&report.source_complete&&report.source==='API Max Player'?'Consulta los dispositivos de esta cuenta. Este paso no borra nada.':r.deletion_block||'Actualiza la consulta antes de revisar.')}</small>`:''}</td></tr>`).join('')}</tbody></table>`:'<div class="empty-state">No hay cuentas con estos filtros. Puedes cambiar «Mostrar» para revisar las demás.</div>';
+      <td data-label="Hallazgos / acción"><div class="xui-flags">${r.flags.map(f=>`<span>${safe(labels[f]||f)}</span>`).join('')}</div>${r.candidate?`<button class="max-delete-btn" type="button" data-max-delete="${safe(r.maxplayer.id||'')}" ${r.can_check_connection&&report.source_complete&&report.source==='API Max Player'?'':'disabled'}>Comprobar conexión y revisar</button><button class="max-delete-btn max-delete-skip" type="button" data-max-skip="${safe(r.maxplayer.id||'')}" ${r.can_check_connection&&report.source_complete&&report.source==='API Max Player'?'':'disabled'}>Eliminar sin verificar conexión</button><small>${safe(r.can_check_connection&&report.source_complete&&report.source==='API Max Player'?'Omitir conexión puede interrumpir una sesión activa. Ambas opciones requieren confirmación.':r.deletion_block||'Actualiza la consulta antes de revisar.')}</small>`:''}</td></tr>`).join('')}</tbody></table>`:'<div class="empty-state">No hay cuentas con estos filtros. Puedes cambiar «Mostrar» para revisar las demás.</div>';
     $('max-list').querySelectorAll('[data-max-client]').forEach(b=>b.onclick=()=>openModal(b.dataset.maxClient));
     $('max-list').querySelectorAll('[data-max-delete]').forEach(b=>b.onclick=()=>{const row=report.rows.find(r=>r.maxplayer.id===b.dataset.maxDelete);if(row)prepareDeletion(row.maxplayer);});
+    $('max-list').querySelectorAll('[data-max-skip]').forEach(b=>b.onclick=()=>{const row=report.rows.find(r=>r.maxplayer.id===b.dataset.maxSkip);if(row)prepareDeletion(row.maxplayer,true);});
   }
   function summary(){const cards=[['','Cuentas recibidas'],['candidato_revision','Candidatos para revisión'],['conservar_activo','Conservar: activos en Fénix'],['sin_fenix','Sin coincidencia en Fénix'],['vencido_fenix','Vencidos en Fénix'],['duplicados','Duplicados en Max Player']];$('max-summary').innerHTML=cards.map(([k,v])=>`<button class="xui-kpi" type="button" data-max-filter="${k}"><strong>${Number(k?report.counts[k]||0:report.total_maxplayer).toLocaleString()}</strong><span>${safe(v)}</span></button>`).join('');$('max-summary').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('max-category').value=b.dataset.maxFilter;page=1;draw();});}
   async function consult(file){
