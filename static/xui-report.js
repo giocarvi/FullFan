@@ -40,7 +40,7 @@
   }
   async function consult(credentials){
     if(busy)return;busy=true;
-    $('xui-refresh').disabled=true;$('xui-connect').querySelector('button').disabled=true;
+    $('xui-refresh').disabled=true;$('xui-connect').querySelectorAll('button').forEach(b=>b.disabled=true);
     $('xui-message').textContent='Consultando todas las páginas de XUI y comparando con Fénix. Puede tardar un momento…';
     // Never leave a previous successful snapshot visible as if a failed refresh were current.
     $('xui-results').hidden=true;
@@ -49,17 +49,23 @@
       if(!response.headers.get('content-type')?.includes('application/json'))throw new Error('La sesión terminó. Vuelve a ingresar en Fénix.');
       const data=await response.json();
       if(!response.ok){
-        if(data.code==='xui_credentials_required'||credentials)$('xui-connect').hidden=false;
+        if(data.code==='xui_credentials_required'||data.code==='xui_unavailable'||credentials)$('xui-connect').hidden=false;
         throw new Error(data.error||'No se pudo consultar XUI.');
       }
       report=data;page=1;$('xui-connect').hidden=true;$('xui-results').hidden=false;
-      $('xui-message').textContent='Consulta completa. No se modificó ningún usuario ni pago.';
+      $('xui-message').textContent='Consulta completa. No se modificó ningún usuario ni pago.'+(data.credential_saved?' Acceso guardado cifrado en Fénix.':'');
       summarize();draw();
     }catch(error){$('xui-message').textContent=error.message||'No se pudo consultar XUI.';}
-    finally{busy=false;$('xui-password').value='';$('xui-refresh').disabled=false;$('xui-connect').querySelector('button').disabled=false;}
+    finally{busy=false;$('xui-password').value='';$('xui-refresh').disabled=false;$('xui-connect').querySelectorAll('button').forEach(b=>b.disabled=false);}
   }
   $('xui-refresh').onclick=()=>consult();
-  $('xui-connect').onsubmit=e=>{e.preventDefault();if(e.currentTarget.reportValidity())consult({username:$('xui-username').value.trim(),password:$('xui-password').value});};
+  $('xui-connect').onsubmit=e=>{e.preventDefault();if(e.currentTarget.reportValidity())consult({username:$('xui-username').value.trim(),password:$('xui-password').value,remember:$('xui-remember').checked});};
+  $('xui-change-access').onclick=()=>{if(!busy){$('xui-connect').hidden=false;$('xui-password').focus();}};
+  $('xui-forget').onclick=async()=>{
+    if(busy||!confirm('¿Olvidar el acceso XUI guardado en Fénix? No se borrará ningún cliente.'))return;
+    try{const r=await fetch('/api/admin/integrations/xui',{method:'DELETE'});if(!r.ok)throw new Error('No se pudo olvidar el acceso.');$('xui-message').textContent='Acceso guardado eliminado. Las variables configuradas en Railway, si existen, no se modifican.';$('xui-password').value='';}
+    catch(e){$('xui-message').textContent=e.message;}
+  };
   Object.entries(labels).forEach(([value,label])=>{$('xui-category').add(new Option(label,value));});
   $('xui-filters').onsubmit=e=>e.preventDefault();
   ['xui-search','xui-category','xui-archived'].forEach(id=>$(id).addEventListener(id==='xui-search'?'input':'change',()=>{page=1;draw();}));

@@ -61,12 +61,13 @@ fs.mkdirSync(out,{recursive:true});
       if(xuiRequests===1)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'xui_credentials_required',error:'Conecta tu panel XUI para consultar el reporte.'})});
       assert.equal(route.request().method(),'POST');
       assert.equal(route.request().postDataJSON().password,'SYNTHETIC_PANEL_ONLY');
+      assert.equal(route.request().postDataJSON().remember,true);
       return route.fulfill({contentType:'application/json',body:JSON.stringify({rows:reportRows,counts:{falta_tiempo_xui:1,dispositivos_distintos:61},total_groups:61,total_fenix:61,total_xui:61,owner:'giocarvi',generated_at:'2026-11-09T10:00:00-06:00',today:'2026-11-09'})});
     });
     await page.evaluate(()=>switchView('xui'));await page.locator('#xui-refresh').click();
     await page.locator('#xui-connect').waitFor({state:'visible'});
     await page.locator('#xui-password').fill('SYNTHETIC_PANEL_ONLY');
-    await page.locator('#xui-connect button').click();await page.locator('#xui-list tbody tr').first().waitFor();
+    await page.locator('#xui-connect button[type=submit]').click();await page.locator('#xui-list tbody tr').first().waitFor();
     assert.equal(await page.locator('#xui-list tbody tr').count(),50);
     assert.equal(await page.locator('#xui-password').inputValue(),'');
     await page.locator('#xui-next').click();assert.equal(await page.locator('#xui-list tbody tr').count(),11);
@@ -80,6 +81,31 @@ fs.mkdirSync(out,{recursive:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await page.locator('[data-xui-client="DEMO_FAMILIAR"]').click();await page.locator('#client-tab-summary').waitFor();await page.keyboard.press('Escape');
     assert.equal(xuiRequests,2);
+    // Max Player review is read-only; test both API and CSV sources with synthetic responses.
+    const maxRows=[
+      {maxplayer:{id:'1',username:'DEMO_OLD',list_usernames:['DEMO_OLD'],state:'no_confirmado',online:null,last_connection:'Nunca'},fenix:[],flags:['sin_fenix','candidato_revision','nunca_conecto'],candidate:true},
+      {maxplayer:{id:'2',username:'DEMO_FAMILIAR',list_usernames:['DEMO_FAMILIAR'],state:'activo',online:false,last_connection:null},fenix:[{username:'DEMO_FAMILIAR',name:'Familia de ejemplo',expiry:'2026-12-01',state:'activo',days_expired:0,last_payment:'2026-11-09',recent_payment:true,pending_activation:false}],flags:['conservar_activo','pago_reciente'],candidate:false}
+    ];
+    let maxRequests=0;
+    await page.route('**/api/admin/maxplayer-comparacion*',route=>{
+      maxRequests++;assert.ok(['GET','POST'].includes(route.request().method()));
+      return route.fulfill({contentType:'application/json',body:JSON.stringify({rows:maxRows,counts:{sin_fenix:1,candidato_revision:1,conservar_activo:1},total_maxplayer:2,total_fenix:48,grace_days:7,source:route.request().method()==='POST'?'CSV de Max Player':'API Max Player',source_complete:false,exported_on:'2026-11-09',generated_at:'2026-11-09T10:00:00-06:00',today:'2026-11-09'})});
+    });
+    await page.evaluate(()=>switchView('maxplayer'));await page.locator('#max-refresh').click();await page.locator('#max-list tbody tr').first().waitFor();
+    assert.equal(await page.locator('#max-list tbody tr').count(),1);
+    assert.ok((await page.locator('#max-list').textContent()).includes('No confirmado'));
+    await page.evaluate(()=>document.querySelectorAll('.success-toast').forEach(n=>n.remove()));
+    await page.screenshot({path:path.join(out,'admin_maxplayer_reporte.png')});
+    const maxDownloadPromise=page.waitForEvent('download');await page.locator('#max-export').click();
+    assert.equal((await maxDownloadPromise).suggestedFilename(),'fenix_vs_maxplayer_2026-11-09.csv');
+    await page.locator('#max-category').selectOption('conservar_activo');assert.equal(await page.locator('#max-list tbody tr').count(),1);
+    await page.locator('[data-max-client="DEMO_FAMILIAR"]').click();await page.locator('#client-tab-summary').waitFor();await page.keyboard.press('Escape');
+    await page.locator('.max-upload summary').click();
+    await page.locator('#max-csv').setInputFiles({name:'synthetic.csv',mimeType:'text/csv',buffer:Buffer.from('MaxPlayer ID,Username\n1,DEMO_OLD\n')});
+    await page.locator('#max-exported-on').fill('2026-11-09');await page.locator('#max-upload-form button').click();
+    await page.waitForFunction(()=>document.querySelector('#max-updated').textContent.startsWith('CSV'));
+    assert.equal(maxRequests,2);
+    await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.setViewportSize({width,height});
     await page.locator('.nav-btn[data-view=pagos]').click();await page.waitForSelector('#payments-list .ledger-table');
     await page.screenshot({path:path.join(out,'admin_pagos.png')});
     await page.evaluate(()=>switchView('analytics'));await page.waitForSelector('#day-chart-inner .day-bar-col');
@@ -95,6 +121,8 @@ fs.mkdirSync(out,{recursive:true});
     await page.evaluate(()=>openModal('DEMO_FAMILIAR'));await page.waitForSelector('#client-tab-payments');await page.locator('#client-tab-payments').click();await page.locator('#pago-monto').fill('10.50');await page.evaluate(()=>registrarPago('DEMO_FAMILIAR'));
     await page.waitForFunction(value=>document.querySelector('#kpi-historico').textContent.includes(Math.round(value).toLocaleString()),initial+10.5);
   } else {
+    assert.equal(await page.locator('[data-view=maxplayer],#view-maxplayer').count(),0);
+    assert.equal((await context.request.get(url+'/api/admin/maxplayer-comparacion')).status(),403);
     assert.equal(await page.locator('[data-view=xui],#view-xui').count(),0);
     assert.equal((await context.request.get(url+'/api/admin/xui-comparacion')).status(),403);
     assert.equal(await page.locator('.nav-btn[data-view=pagos]').count(),0);

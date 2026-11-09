@@ -4,3 +4,4 @@ psycopg2-binary
 werkzeug
 openpyxl
 gunicorn
+cryptography>=44,<48
