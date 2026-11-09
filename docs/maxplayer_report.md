@@ -5,6 +5,7 @@ Solo administrador, tanto en la vista como en `/api/admin/maxplayer-comparacion`
 ## Fuentes
 
 - API existente mediante `MAXPLAYER_API_TOKEN` y `MAXPLAYER_DOMAIN_ID` del servidor; solo usa GET Users. Nunca expone el token al navegador. Los errores de la integración se sustituyen por un mensaje que no contiene el cuerpo original del proveedor.
+- El reporte distingue autenticación, acceso denegado, bloqueo de protección del proveedor, ruta, parámetros, dominio, límite de consultas, fallo temporal, red y tiempo de espera. Incluye únicamente categoría y código HTTP si existe; no devuelve cuerpos de respuesta, direcciones con credenciales ni secretos. Un error genérico o un 403 no se trata por sí solo como prueba de token inválido. La clasificación no sustituye una consulta autenticada real. Se recortan espacios exteriores del token y dominio al leer las variables del servidor.
 - CSV UTF-8 reciente exportado de Customers, cargado por administrador (máximo 10 MB). Se analiza en memoria, no se guarda como archivo ni se importa a las tablas. La fecha de exportación es declarada por el administrador y se muestra en el reporte; no se interpreta como una verificación independiente de actualidad.
 - Se recorren páginas si la API informa un total y se aborta si repite cuentas, faltan páginas o cambia el total. Si no informa un total, se comparan explícitamente solo las cuentas recibidas sin afirmar cobertura completa. Lo mismo se indica para el CSV. Nunca se concluye que un cliente falte en Max Player por no aparecer en una fuente de cobertura incierta.
 

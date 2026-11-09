@@ -151,8 +151,8 @@ PASSWORD_HASH_PREFIXES = ('scrypt:', 'pbkdf2:', 'argon2:')
 CREDIT_COST_USD = float(os.environ.get('CREDIT_COST_USD', '1.25'))
 USD_GTQ_RATE = float(os.environ.get('USD_GTQ_RATE', '7.80'))
 MAXPLAYER_API_BASE = os.environ.get('MAXPLAYER_API_BASE', 'https://api.maxplayer.tv/v3/api/public').rstrip('/')
-MAXPLAYER_API_TOKEN = os.environ.get('MAXPLAYER_API_TOKEN', '')
-MAXPLAYER_DOMAIN_ID = os.environ.get('MAXPLAYER_DOMAIN_ID', '')
+MAXPLAYER_API_TOKEN = os.environ.get('MAXPLAYER_API_TOKEN', '').strip()
+MAXPLAYER_DOMAIN_ID = os.environ.get('MAXPLAYER_DOMAIN_ID', '').strip()
 PAYPAL_CLIENT_ID = os.environ.get(
     'PAYPAL_CLIENT_ID',
     'BAAysVQngxEwR-B24HNggrsLWDm0VZjMaXvQkcVhBrU2vRG5_2nU9mRJNJYNIzmxZeQT5qok6JuVWHI0NE'
@@ -270,14 +270,56 @@ def estimate_credits_from_amount(amount):
 
 
 class MaxPlayerError(Exception):
-    pass
+    def __init__(self, message, *, kind='unknown', http_status=None):
+        super().__init__(message)
+        self.kind = kind
+        self.http_status = http_status
+
+
+def maxplayer_error_kind(status, detail=''):
+    detail = str(detail).casefold()
+    if status == 401:return 'authentication'
+    if status == 403:
+        return 'edge_block' if any(word in detail for word in ('cloudflare','cf-ray','challenge-platform')) else 'forbidden'
+    if status == 404:return 'endpoint'
+    if status in (400,422):return 'parameters'
+    if status == 429:return 'rate_limit'
+    if status and status >= 500:return 'provider_unavailable'
+    if 'token' in detail and any(word in detail for word in ('invalid','expired','not valid','incorrect','unauthorized')):
+        return 'authentication'
+    if 'domain' in detail and any(word in detail for word in ('invalid','not found','not exist','required','missing','incorrect')):
+        return 'domain'
+    return 'provider_rejected'
+
+
+def maxplayer_report_failure(error):
+    # Fixed messages only: provider bodies may contain tokens or customer secrets.
+    messages = {
+        'authentication': 'Max Player rechazó la autenticación. Verifica que MAXPLAYER_API_TOKEN sea el token de API del proveedor, vigente y sin comillas.',
+        'forbidden': 'Max Player denegó el acceso. Puede ser un permiso del token o una restricción de acceso; este resultado no confirma que el token sea inválido.',
+        'edge_block': 'La protección de Max Player bloqueó la solicitud desde el servidor de Fénix. Consulta con Max Player si permite acceso de API desde Railway; no significa necesariamente que el token sea inválido.',
+        'endpoint': 'Max Player no encontró la ruta de API configurada. Revisa MAXPLAYER_API_BASE con la documentación del proveedor.',
+        'parameters': 'Max Player rechazó los parámetros de la consulta. No se puede concluir que el token sea inválido; hay que verificar el formato de Get Users y MAXPLAYER_DOMAIN_ID.',
+        'domain': 'Max Player rechazó el dominio configurado. Revisa MAXPLAYER_DOMAIN_ID: debe ser el dominio del proveedor, no el ID de un cliente.',
+        'rate_limit': 'Max Player limitó la cantidad de consultas. Espera antes de volver a intentarlo.',
+        'provider_unavailable': 'El servidor de Max Player respondió con un error temporal. Puedes reintentar más tarde o usar el CSV.',
+        'network': 'El servidor de Fénix no pudo establecer conexión con Max Player. Puede ser un problema de red, DNS o certificado; no confirma un token inválido.',
+        'timeout': 'Max Player no respondió a tiempo. Reintenta más tarde o utiliza un CSV reciente.',
+        'not_configured': 'Falta configurar MAXPLAYER_API_TOKEN o MAXPLAYER_DOMAIN_ID en el servicio web de Fénix.',
+        'provider_rejected': 'Max Player rechazó la consulta, sin una causa que Fénix pueda identificar de forma segura. No se ha confirmado un token inválido.',
+        'unknown': 'No se pudo consultar Max Player y no se ha identificado la causa. Puedes usar un CSV reciente mientras se revisa la conexión.'
+    }
+    kind = error.kind if error.kind in messages else 'unknown'
+    status = error.http_status if type(error.http_status) is int and 100 <= error.http_status <= 599 else None
+    message = messages[kind] + (f' Respuesta HTTP {status}.' if status else '')
+    return {'error': message, 'code': 'maxplayer_unavailable', 'diagnostic': {'kind': kind, 'http_status': status}}
 
 def maxplayer_configured():
     return bool(MAXPLAYER_API_TOKEN and MAXPLAYER_DOMAIN_ID)
 
 def maxplayer_request(method, path, payload=None):
     if not maxplayer_configured():
-        raise MaxPlayerError('Max Player no está configurado. Agrega MAXPLAYER_API_TOKEN y MAXPLAYER_DOMAIN_ID en Railway.')
+        raise MaxPlayerError('Max Player no está configurado. Agrega MAXPLAYER_API_TOKEN y MAXPLAYER_DOMAIN_ID en Railway.', kind='not_configured')
     url = f"{MAXPLAYER_API_BASE}{path}"
     body = None
     headers = {
@@ -306,7 +348,8 @@ def maxplayer_request(method, path, payload=None):
             except json.JSONDecodeError:
                 return {'raw': raw}
             if isinstance(parsed, dict) and parsed.get('success') == 0 and parsed.get('error'):
-                raise MaxPlayerError(f"Max Player respondió error: {parsed.get('error')}")
+                raise MaxPlayerError(f"Max Player respondió error: {parsed.get('error')}",
+                                     kind=maxplayer_error_kind(200, parsed.get('error')), http_status=200)
             return parsed
     except HTTPError as exc:
         raw = exc.read().decode('utf-8', errors='replace')
@@ -314,11 +357,13 @@ def maxplayer_request(method, path, payload=None):
             detail = json.loads(raw)
         except json.JSONDecodeError:
             detail = raw
-        raise MaxPlayerError(f"Max Player respondió HTTP {exc.code}: {detail}") from exc
+        raise MaxPlayerError(f"Max Player respondió HTTP {exc.code}: {detail}",
+                             kind=maxplayer_error_kind(exc.code, raw), http_status=exc.code) from exc
     except URLError as exc:
-        raise MaxPlayerError(f"No se pudo conectar con Max Player: {exc.reason}") from exc
+        raise MaxPlayerError(f"No se pudo conectar con Max Player: {exc.reason}",
+                             kind='timeout' if isinstance(exc.reason, TimeoutError) else 'network') from exc
     except TimeoutError as exc:
-        raise MaxPlayerError('Max Player tardó demasiado en responder.') from exc
+        raise MaxPlayerError('Max Player tardó demasiado en responder.', kind='timeout') from exc
 
 def extract_maxplayer_user_id(response):
     """Intenta encontrar el id del usuario sin depender de una forma exacta de respuesta."""
@@ -4196,9 +4241,10 @@ def maxplayer_comparacion():
         return response
     except MaxReportError as error:
         return jsonify({'error': str(error), 'code': 'maxplayer_report_error'}), 502
-    except MaxPlayerError:
-        return jsonify({'error': 'No se pudo consultar la API de Max Player. Revisa el token configurado o carga un CSV reciente de Customers.',
-                        'code': 'maxplayer_unavailable'}), 502
+    except MaxPlayerError as error:
+        response = jsonify(maxplayer_report_failure(error))
+        response.headers['Cache-Control'] = 'no-store'
+        return response, 502
     finally:
         _max_report_lock.release()
 
