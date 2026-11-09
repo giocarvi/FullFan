@@ -1,6 +1,9 @@
 ﻿from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
 import os
 import hmac
+import hashlib
+import math
+from decimal import Decimal, InvalidOperation
 import json
 import time
 import re
@@ -79,6 +82,14 @@ def normalize_date_input(value):
         except ValueError:
             pass
     return text
+
+def normalize_devices(value, default=3):
+    """Normaliza conexiones/dispositivos para mostrar el plan correcto en el portal."""
+    try:
+        devices = int(float(str(value or '').strip()))
+    except (TypeError, ValueError):
+        devices = default
+    return max(1, min(devices, 10))
 
 def normalize_smartone_status(expiration_text, status=''):
     raw = f"{status or ''} {expiration_text or ''}".lower()
@@ -477,7 +488,7 @@ if DATABASE_URL:
 else:
     import sqlite3
     PG = False
-    DB_PATH = os.path.join(os.path.dirname(__file__), 'database.db')
+    DB_PATH = os.environ.get('SQLITE_DB_PATH') or os.path.join(os.path.dirname(__file__), 'database.db')
 
     def get_db():
         conn = sqlite3.connect(DB_PATH)
@@ -664,6 +675,16 @@ def init_db():
                 c.execute(ddl)
             except Exception:
                 pass
+
+    # Additive only: historical payments are never rewritten for request deduplication.
+    c.execute('''CREATE TABLE IF NOT EXISTS payment_submissions (
+        request_key TEXT PRIMARY KEY,
+        username TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        payment_id INTEGER,
+        created_at TEXT NOT NULL
+    )''')
 
     if PG:
         c.execute('''CREATE TABLE IF NOT EXISTS audit_log (
@@ -861,14 +882,15 @@ def init_db():
             ('fundador-3m', 'Fundador 3 meses', 3, 3, 3, 225, None),
             ('fundador-6m', 'Fundador 6 meses', 6, 6, 3, 400, None),
             ('fundador-12m', 'Fundador 12 meses', 12, 12, 3, 700, None),
-            ('familiar-1m', 'Familiar 1 mes', 1, 1, 3, None, 13.99),
-            ('familiar-3m', 'Familiar 3 meses', 3, 3, 3, None, 38.99),
-            ('familiar-6m', 'Familiar 6 meses', 6, 6, 3, None, 73.99),
-            ('familiar-12m', 'Familiar 12 meses', 12, 12, 3, None, 137.99),
+            ('familiar-1m', 'Familiar 1 mes', 1, 1, 6, None, 13.99),
+            ('familiar-3m', 'Familiar 3 meses', 3, 3, 6, None, 38.99),
+            ('familiar-6m', 'Familiar 6 meses', 6, 6, 6, None, 73.99),
+            ('familiar-12m', 'Familiar 12 meses', 12, 12, 6, None, 137.99),
         ]
         for p in plan_defaults:
             c.execute("""INSERT INTO plans (slug,name,months,credits_required,connections,price_gtq,price_usd)
                          VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (slug) DO NOTHING""", p)
+        c.execute("UPDATE plans SET connections=6 WHERE slug LIKE 'familiar-%'")
         device_defaults = [
             ('Android', 'Max Player', 'android'),
             ('iOS', 'Max Player', 'ios'),
@@ -1002,15 +1024,16 @@ def init_db():
             ('fundador-3m', 'Fundador 3 meses', 3, 3, 3, 225, None),
             ('fundador-6m', 'Fundador 6 meses', 6, 6, 3, 400, None),
             ('fundador-12m', 'Fundador 12 meses', 12, 12, 3, 700, None),
-            ('familiar-1m', 'Familiar 1 mes', 1, 1, 3, None, 13.99),
-            ('familiar-3m', 'Familiar 3 meses', 3, 3, 3, None, 38.99),
-            ('familiar-6m', 'Familiar 6 meses', 6, 6, 3, None, 73.99),
-            ('familiar-12m', 'Familiar 12 meses', 12, 12, 3, None, 137.99),
+            ('familiar-1m', 'Familiar 1 mes', 1, 1, 6, None, 13.99),
+            ('familiar-3m', 'Familiar 3 meses', 3, 3, 6, None, 38.99),
+            ('familiar-6m', 'Familiar 6 meses', 6, 6, 6, None, 73.99),
+            ('familiar-12m', 'Familiar 12 meses', 12, 12, 6, None, 137.99),
         ]
         for p in plan_defaults:
             c.execute("""INSERT OR IGNORE INTO plans
                          (slug,name,months,credits_required,connections,price_gtq,price_usd)
                          VALUES (?,?,?,?,?,?,?)""", p)
+        c.execute("UPDATE plans SET connections=6 WHERE slug LIKE 'familiar-%'")
         device_defaults = [
             ('Android', 'Max Player', 'android'),
             ('iOS', 'Max Player', 'ios'),
@@ -2211,7 +2234,7 @@ def dashboard():
     db = get_db()
     c = db.cursor()
     today = today_gt().isoformat()
-    in_30 = today_gt().replace(day=min(today_gt().day + 30, 28)).isoformat()
+    in_30 = (today_gt() + timedelta(days=30)).isoformat()
     mes_actual = today_gt().strftime('%Y-%m')
 
     c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes WHERE vencimiento >= ? AND {active_client_where()}"), (today,))
@@ -2225,6 +2248,15 @@ def dashboard():
 
     c.execute(qmark(f"SELECT COALESCE(SUM(monto),0) as t FROM pagos WHERE mes LIKE ? AND {active_payment_where()}"), (f'{mes_actual}%',))
     ingresos = fetchone(c)['t']
+
+    c.execute(qmark(f'''SELECT
+        SUM(CASE WHEN vencimiento=? THEN 1 ELSE 0 END) AS hoy,
+        SUM(CASE WHEN vencimiento>=? AND vencimiento<=? THEN 1 ELSE 0 END) AS semana
+        FROM clientes WHERE {active_client_where()}'''),
+        (today, today, (today_gt()+timedelta(days=7)).isoformat()))
+    upcoming = fetchone(c)
+    c.execute(qmark(f'SELECT COALESCE(SUM(monto),0) AS total FROM pagos WHERE mes=? AND {active_payment_where()}'), (today,))
+    ingresos_hoy = fetchone(c)['total']
 
     t = today_gt()
     m6 = t.month - 6
@@ -2262,6 +2294,8 @@ def dashboard():
     return jsonify({
         'activos': activos, 'vencidos': vencidos, 'por_vencer': por_vencer,
         'ingresos_mes': round(float(ingresos), 2),
+        'ingresos_hoy': round(float(ingresos_hoy), 2) if session.get('rol') == 'admin' else None,
+        'vencen_hoy': int(upcoming['hoy'] or 0), 'vencen_semana': int(upcoming['semana'] or 0),
         'ultimos_meses': ultimos_meses,
         'por_vencer_lista': pronto
     })
@@ -2287,7 +2321,10 @@ def clientes():
     estado = request.args.get('estado', '')
     fecha = request.args.get('fecha', '').strip()
     archivados = request.args.get('archivados', '').strip().lower()
-    page = int(request.args.get('page', 1))
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Página inválida'}), 400
     per_page = 20
     offset = (page - 1) * per_page
     today = today_gt().isoformat()
@@ -2308,17 +2345,25 @@ def clientes():
     elif estado == 'vencido':
         where.append("(vencimiento < ? OR vencimiento IS NULL)"); params.append(today)
     elif estado == 'por_vencer':
-        in_30 = today_gt().replace(day=min(today_gt().day + 30, 28)).isoformat()
+        in_30 = (today_gt() + timedelta(days=30)).isoformat()
         where.append("vencimiento >= ? AND vencimiento <= ?"); params += [today, in_30]
+    elif estado in ('hoy', 'semana'):
+        end = today if estado == 'hoy' else (today_gt()+timedelta(days=7)).isoformat()
+        where.append('vencimiento >= ? AND vencimiento <= ?'); params += [today, end]
 
     where_sql = "WHERE " + " AND ".join(where) if where else ""
     db = get_db()
     c = db.cursor()
     c.execute(qmark(f"SELECT COUNT(*) as c FROM clientes {where_sql}"), params)
     total = fetchone(c)['c']
+    sort = {'vence_asc': f"CASE WHEN vencimiento>='{today}' THEN 0 ELSE 1 END, CASE WHEN vencimiento>='{today}' THEN vencimiento END ASC, vencimiento DESC, username ASC",
+            'vence_desc': 'vencimiento DESC, username ASC',
+            'nombre': 'nombre ASC, username ASC'}.get(request.args.get('sort'), 'vencimiento DESC, username ASC')
     c.execute(qmark(f"""
-        SELECT username, nombre, contacto, vencimiento, referido, parent_username, reseller_username, reseller_status, total_pagado, notas, archived_at, archived_by, archive_reason
-        FROM clientes {where_sql} ORDER BY vencimiento DESC, username ASC LIMIT ? OFFSET ?
+        SELECT username, nombre, contacto, vencimiento, referido, parent_username, reseller_username, reseller_status, total_pagado, notas, archived_at, archived_by, archive_reason,
+               (SELECT devices FROM client_service_credentials sc WHERE sc.username=clientes.username) AS devices,
+               (SELECT MAX(p.mes) FROM pagos p WHERE p.username=clientes.username AND {active_payment_where('p')}) AS ultimo_pago
+        FROM clientes {where_sql} ORDER BY {sort} LIMIT ? OFFSET ?
     """), params + [per_page, offset])
     rows = fetchall(c)
     db.close()
@@ -2391,7 +2436,7 @@ def cliente_detalle(username):
     """), (username,))
     pagos = fetchall(c)
     c.execute(qmark("""
-        SELECT service_username, service_password, expires_at,
+        SELECT service_username, service_password, expires_at, devices,
                maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status
         FROM client_service_credentials WHERE username=?
     """), (username,))
@@ -2751,7 +2796,7 @@ def actualizar_portal_cliente(username):
     service_password = (data.get('service_password') or '').strip()
     app_name = (data.get('app_name') or 'Max Player').strip()
     expires_at = (data.get('expires_at') or '').strip()
-    devices = int(data.get('devices') or 3)
+    devices_input = data.get('devices')
     now = now_gt().isoformat(timespec='seconds')
 
     db = get_db()
@@ -2760,6 +2805,10 @@ def actualizar_portal_cliente(username):
     if not fetchone(c):
         db.close()
         return jsonify({'error': 'Cliente no encontrado'}), 404
+
+    c.execute(qmark("SELECT devices FROM client_service_credentials WHERE username=?"), (username,))
+    current_service = fetchone(c) or {}
+    devices = normalize_devices(devices_input, normalize_devices(current_service.get('devices'), 3))
 
     if portal_password:
         if PG:
@@ -2862,7 +2911,7 @@ def restaurar_maxplayer_cliente(username):
         db.close()
         return jsonify({'error': 'Cliente no encontrado'}), 404
     c.execute(qmark("""
-        SELECT service_username, service_password, expires_at, maxplayer_user_id
+        SELECT service_username, service_password, expires_at, devices, maxplayer_user_id
         FROM client_service_credentials WHERE username=?
     """), (username,))
     service = fetchone(c)
@@ -2871,6 +2920,7 @@ def restaurar_maxplayer_cliente(username):
             'service_username': username,
             'service_password': '',
             'expires_at': cliente.get('vencimiento'),
+            'devices': 3,
             'maxplayer_user_id': None,
         }
     if not service.get('service_username'):
@@ -2883,6 +2933,7 @@ def restaurar_maxplayer_cliente(username):
 
     service_username = service['service_username']
     service_password = service['service_password']
+    service_devices = normalize_devices(service.get('devices'), 3)
     try:
         existing_user_id = service.get('maxplayer_user_id') or find_maxplayer_user_id(service_username)
         if existing_user_id:
@@ -2904,36 +2955,38 @@ def restaurar_maxplayer_cliente(username):
     if PG:
         c.execute("""
             INSERT INTO client_service_credentials
-                (username, app_name, service_username, service_password, expires_at,
+                (username, app_name, service_username, service_password, expires_at, devices,
                  maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status, updated_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT (username) DO UPDATE SET
                 app_name=EXCLUDED.app_name,
                 service_username=EXCLUDED.service_username,
                 service_password=EXCLUDED.service_password,
                 expires_at=COALESCE(EXCLUDED.expires_at, client_service_credentials.expires_at),
+                devices=EXCLUDED.devices,
                 maxplayer_user_id=EXCLUDED.maxplayer_user_id,
                 maxplayer_synced_at=EXCLUDED.maxplayer_synced_at,
                 maxplayer_sync_status=EXCLUDED.maxplayer_sync_status,
                 updated_at=EXCLUDED.updated_at
-        """, (username, 'Max Player', service_username, service_password, service.get('expires_at'),
+        """, (username, 'Max Player', service_username, service_password, service.get('expires_at'), service_devices,
               maxplayer_user_id, now, sync_status, now))
     else:
         c.execute("""
             INSERT INTO client_service_credentials
-                (username, app_name, service_username, service_password, expires_at,
+                (username, app_name, service_username, service_password, expires_at, devices,
                  maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(username) DO UPDATE SET
                 app_name=excluded.app_name,
                 service_username=excluded.service_username,
                 service_password=excluded.service_password,
                 expires_at=COALESCE(excluded.expires_at, client_service_credentials.expires_at),
+                devices=excluded.devices,
                 maxplayer_user_id=excluded.maxplayer_user_id,
                 maxplayer_synced_at=excluded.maxplayer_synced_at,
                 maxplayer_sync_status=excluded.maxplayer_sync_status,
                 updated_at=excluded.updated_at
-        """, (username, 'Max Player', service_username, service_password, service.get('expires_at'),
+        """, (username, 'Max Player', service_username, service_password, service.get('expires_at'), service_devices,
               maxplayer_user_id, now, sync_status, now))
     db.commit()
     db.close()
@@ -3028,9 +3081,12 @@ def actualizar_cliente(username):
 
     service_username = (data.get('service_username') or '').strip()
     service_password = (data.get('service_password') or '').strip()
-    if service_username or service_password or data.get('vencimiento'):
+    if service_username or service_password or data.get('vencimiento') or 'devices' in data:
         now = now_gt().isoformat(timespec='seconds')
         expires_at = data.get('vencimiento') or ''
+        c.execute(qmark("SELECT devices FROM client_service_credentials WHERE username=?"), (username,))
+        current_service = fetchone(c) or {}
+        devices = normalize_devices(data.get('devices'), normalize_devices(current_service.get('devices'), 3))
         if PG:
             c.execute("""
                 INSERT INTO client_service_credentials
@@ -3055,7 +3111,7 @@ def actualizar_cliente(username):
                         ELSE client_service_credentials.maxplayer_sync_status
                     END,
                     updated_at=EXCLUDED.updated_at
-            """, (username, 'Max Player', service_username, service_password, expires_at, 3, now))
+            """, (username, 'Max Player', service_username, service_password, expires_at, devices, now))
         else:
             c.execute("""
                 INSERT INTO client_service_credentials
@@ -3080,7 +3136,7 @@ def actualizar_cliente(username):
                         ELSE client_service_credentials.maxplayer_sync_status
                     END,
                     updated_at=excluded.updated_at
-            """, (username, 'Max Player', service_username, service_password, expires_at, 3, now))
+            """, (username, 'Max Player', service_username, service_password, expires_at, devices, now))
 
     if 'smartone' in data:
         smartone_data = data.get('smartone') or {}
@@ -3403,42 +3459,139 @@ def registrar_pago():
     data = request.json or {}
     username = (data.get('username') or '').strip()
     try:
-        monto = float(data.get('monto', 0))
-    except (TypeError, ValueError):
-        monto = 0
-    vencimiento_nuevo = data.get('vencimiento')
-    mes = data.get('mes', today_gt().strftime('%Y-%m-01'))
-    comprobante = data.get('comprobante')  # base64 data URL, optional
-    if not username or monto <= 0:
+        amount = Decimal(str(data.get('monto', 0)))
+        if not amount.is_finite() or amount <= 0 or amount.as_tuple().exponent < -2:
+            raise ValueError('Importe inválido')
+        monto = float(amount)
+        if not math.isfinite(monto):
+            raise ValueError('Importe inválido')
+        mes = date.fromisoformat(data.get('mes') or today_gt().isoformat()).isoformat()
+        vencimiento_nuevo = data.get('vencimiento') or None
+        if vencimiento_nuevo:
+            vencimiento_nuevo = date.fromisoformat(vencimiento_nuevo).isoformat()
+    except (InvalidOperation, TypeError, ValueError):
+        return jsonify({'error': 'Revisa el monto (máximo dos decimales) y las fechas.'}), 400
+    comprobante = data.get('comprobante')
+    request_key = request.headers.get('Idempotency-Key') or data.get('request_key') or ''
+    if request_key and not re.fullmatch(r'[A-Za-z0-9_-]{16,128}', str(request_key)):
+        return jsonify({'error': 'Identificador de pago inválido.'}), 400
+    if not username:
         return jsonify({'error': 'Datos inválidos'}), 400
     db = get_db()
-    c = db.cursor()
-    c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
-    if not fetchone(c):
+    try:
+        c = db.cursor()
+        c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
+        if not fetchone(c):
+            return jsonify({'error': f'Cliente no encontrado: {username}'}), 404
+        if request_key:
+            fingerprint = hashlib.sha256(json.dumps(
+                [username, format(amount, '.2f'), mes, vencimiento_nuevo, comprobante],
+                ensure_ascii=False, separators=(',', ':')
+            ).encode()).hexdigest()
+            actor = session.get('user') or ''
+            c.execute(qmark('''INSERT INTO payment_submissions
+                (request_key, username, actor, fingerprint, created_at)
+                VALUES (?,?,?,?,?) ON CONFLICT (request_key) DO NOTHING'''),
+                (request_key, username, actor, fingerprint, now_gt().isoformat(timespec='seconds')))
+            if c.rowcount == 0:
+                c.execute(qmark('SELECT actor, fingerprint, payment_id FROM payment_submissions WHERE request_key=?'), (request_key,))
+                previous = fetchone(c)
+                if previous['actor'] != actor or previous['fingerprint'] != fingerprint:
+                    return jsonify({'error': 'Esta operación ya se utilizó con otros datos. Abre un nuevo registro de pago.'}), 409
+                db.commit()
+                return jsonify({'ok': True, 'payment_id': previous['payment_id'], 'replayed': True})
+        insert_sql = '''INSERT INTO pagos (username, mes, monto, comprobante, created_by)
+                        VALUES (?,?,?,?,?)'''
+        c.execute(qmark(insert_sql + (' RETURNING id' if PG else '')),
+                  (username, mes, monto, comprobante, session.get('user')))
+        payment_id = c.fetchone()[0] if PG else c.lastrowid
+        if vencimiento_nuevo:
+            c.execute(qmark('UPDATE clientes SET total_pagado=total_pagado+?, vencimiento=? WHERE username=?'),
+                      (monto, vencimiento_nuevo, username))
+        else:
+            c.execute(qmark('UPDATE clientes SET total_pagado=total_pagado+? WHERE username=?'), (monto, username))
+        if request_key:
+            c.execute(qmark('UPDATE payment_submissions SET payment_id=? WHERE request_key=?'), (payment_id, request_key))
+        db.commit()
+        return jsonify({'ok': True, 'payment_id': payment_id})
+    except Exception:
+        db.rollback()
+        raise
+    finally:
         db.close()
-        return jsonify({'error': f'Cliente no encontrado: {username}'}), 404
-    if PG:
-        c.execute("""
-            INSERT INTO pagos (username, mes, monto, comprobante, created_by)
-            VALUES (%s,%s,%s,%s,%s)
-            RETURNING id
-        """, (username, mes, monto, comprobante, session.get('user')))
-        payment_id = c.fetchone()[0]
-    else:
-        c.execute("""
-            INSERT INTO pagos (username, mes, monto, comprobante, created_by)
-            VALUES (?,?,?,?,?)
-        """, (username, mes, monto, comprobante, session.get('user')))
-        payment_id = c.lastrowid
-    if vencimiento_nuevo:
-        c.execute(qmark("UPDATE clientes SET total_pagado = total_pagado + ?, vencimiento=? WHERE username=?"),
-                  (monto, vencimiento_nuevo, username))
-    else:
-        c.execute(qmark("UPDATE clientes SET total_pagado = total_pagado + ? WHERE username=?"),
-                  (monto, username))
-    db.commit()
-    db.close()
-    return jsonify({'ok': True, 'payment_id': payment_id})
+
+
+@app.route('/api/pagos', methods=['GET'])
+@app.route('/api/clientes/<username>/pagos', methods=['GET'])
+@login_required
+def consultar_pagos(username=None):
+    # Staff retain per-client history access; global financial reports stay admin-only.
+    if username is None and session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    try:
+        page = max(1, int(request.args.get('page', 1)))
+        desde = request.args.get('desde', '')
+        hasta = request.args.get('hasta', '')
+        for value in (desde, hasta):
+            if value:
+                date.fromisoformat(value)
+        if desde and hasta and desde > hasta:
+            raise ValueError('Rango inválido')
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Revisa las fechas y la página.'}), 400
+    where, params = [], []
+    if username:
+        where.append('p.username=?')
+        params.append(username)
+    if desde:
+        where.append('p.mes>=?')
+        params.append(desde)
+    if hasta:
+        where.append('p.mes<=?')
+        params.append(hasta)
+    estado = request.args.get('estado', 'todos' if username else 'validos')
+    if estado == 'validos':
+        where.append(active_payment_where('p'))
+    elif estado == 'anulados':
+        where.append('COALESCE(p.is_void, FALSE)=TRUE' if PG else 'COALESCE(p.is_void,0)=1')
+    elif estado != 'todos':
+        return jsonify({'error': 'Estado de pago inválido'}), 400
+    search = request.args.get('q', '').strip()
+    if search:
+        op = 'ILIKE' if PG else 'LIKE'
+        where.append(f'(p.username {op} ? OR cl.nombre {op} ? OR p.created_by {op} ?)')
+        params.extend([f'%{search}%'] * 3)
+    sql_from = ' FROM pagos p LEFT JOIN clientes cl ON cl.username=p.username'
+    sql_where = ' WHERE ' + ' AND '.join(where) if where else ''
+    db = get_db()
+    try:
+        c = db.cursor()
+        c.execute(qmark('''SELECT COUNT(*) AS total,
+            COALESCE(SUM(CASE WHEN ''' + active_payment_where('p') + ''' THEN p.monto ELSE 0 END),0) AS cobrado,
+            COUNT(DISTINCT p.username) AS clientes''' + sql_from + sql_where), params)
+        summary = fetchone(c)
+        export = request.args.get('export') == 'csv' and session.get('rol') == 'admin'
+        paging = '' if export else ' LIMIT ? OFFSET ?'
+        c.execute(qmark('''SELECT p.id, p.username, COALESCE(cl.nombre,p.username) AS nombre,
+            p.mes, p.monto, p.fecha_registro, p.created_by, p.is_void, p.void_reason,
+            p.voided_at, p.voided_by, (p.comprobante IS NOT NULL) AS has_comprobante'''
+            + sql_from + sql_where + ' ORDER BY p.mes DESC,p.id DESC' + paging),
+            params if export else params + [25, (page-1)*25])
+        rows = fetchall(c)
+    finally:
+        db.close()
+    if export:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['ID','Usuario','Cliente','Fecha pago','Monto Q','Fecha registro','Registró','Estado','Motivo anulación'])
+        for row in rows:
+            values = [row['id'],row['username'],row['nombre'],row['mes'],row['monto'],row['fecha_registro'],
+                      row['created_by'], 'Anulado' if row['is_void'] else 'Válido',row['void_reason']]
+            writer.writerow(["'"+v if isinstance(v,str) and v.lstrip().startswith(('=','+','-','@')) else v for v in values])
+        return Response('\ufeff'+output.getvalue(), mimetype='text/csv',
+                        headers={'Content-Disposition':'attachment; filename=pagos_fenix.csv'})
+    return jsonify({'pagos': rows, 'total': summary['total'], 'cobrado': round(float(summary['cobrado']),2),
+                    'clientes': summary['clientes'], 'page': page, 'per_page': 25})
 
 @app.route('/api/admin/corregir-mes', methods=['POST'])
 @login_required
@@ -3734,11 +3887,18 @@ def api_update_activation_task(task_id):
     if status == 'done' and xui_expires_at:
         payment_registered = False
         order = None
+        c.execute(qmark('SELECT devices FROM client_service_credentials WHERE username=?'), (task['username'],))
+        current_service = fetchone(c) or {}
+        service_devices = normalize_devices(current_service.get('devices'), 3)
         if task.get('order_id'):
             c.execute(qmark("SELECT * FROM orders WHERE id=?"), (task['order_id'],))
             order = fetchone(c)
+            if order and order.get('plan_id'):
+                c.execute(qmark("SELECT connections FROM plans WHERE id=?"), (order['plan_id'],))
+                plan = fetchone(c) or {}
+                service_devices = normalize_devices(plan.get('connections'), 3)
         if register_payment and order and not order.get('payment_registered_at') and float(order.get('amount') or 0) > 0:
-            payment_month = today_gt().strftime('%Y-%m-01')
+            payment_month = today_gt().isoformat()
             amount = float(order.get('amount') or 0)
             comprobante = order.get('payment_proof')
             if PG:
@@ -3782,7 +3942,7 @@ def api_update_activation_task(task_id):
                     maxplayer_synced_at=COALESCE(EXCLUDED.maxplayer_synced_at, client_service_credentials.maxplayer_synced_at),
                     maxplayer_sync_status=COALESCE(EXCLUDED.maxplayer_sync_status, client_service_credentials.maxplayer_sync_status),
                     updated_at=EXCLUDED.updated_at
-            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, 3,
+            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, service_devices,
                   maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status, completed_at))
             if portal_password:
                 c.execute("""
@@ -3813,7 +3973,7 @@ def api_update_activation_task(task_id):
                     maxplayer_synced_at=COALESCE(excluded.maxplayer_synced_at, client_service_credentials.maxplayer_synced_at),
                     maxplayer_sync_status=COALESCE(excluded.maxplayer_sync_status, client_service_credentials.maxplayer_sync_status),
                     updated_at=excluded.updated_at
-            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, 3,
+            """, (task['username'], 'Max Player', xui_username, xui_password, xui_expires_at, service_devices,
                   maxplayer_user_id, maxplayer_synced_at, maxplayer_sync_status, completed_at))
             if portal_password:
                 c.execute("""
@@ -3866,9 +4026,11 @@ def api_delete_activation_task(task_id):
                             {'task_id': task_id, 'username': pago['username'], 'monto': pago.get('monto')})
                 pago_revertido = True
 
-    c.execute(qmark("DELETE FROM activation_tasks WHERE id=?"), (task_id,))
+    c.execute(qmark("UPDATE activation_tasks SET status='cancelled' WHERE id=?"), (task_id,))
     if task.get('order_id'):
-        c.execute(qmark("DELETE FROM orders WHERE id=?"), (task['order_id'],))
+        c.execute(qmark("UPDATE orders SET status='cancelled' WHERE id=?"), (task['order_id'],))
+    audit_event(c, 'activation_task', task_id, 'cancelled', session.get('user'), '',
+                {'order_id': task.get('order_id'), 'payment_voided': pago_revertido})
     db.commit()
     db.close()
     return jsonify({'ok': True, 'pago_revertido': pago_revertido})
@@ -3918,6 +4080,13 @@ def analytics():
         """)
     ventas_anuales = fetchall(c)
 
+    quarter_key = ("TO_CHAR(mes::date,'YYYY') || ' Q' || EXTRACT(QUARTER FROM mes::date)::int::text"
+                   if PG else "strftime('%Y',mes) || ' Q' || CAST((CAST(strftime('%m',mes) AS INTEGER)+2)/3 AS INTEGER)")
+    c.execute(f'''SELECT {quarter_key} AS trimestre, SUM(monto) AS total,
+                  COUNT(*) AS pagos, COUNT(DISTINCT username) AS clientes
+                  FROM pagos WHERE {active_payment_where()} GROUP BY trimestre ORDER BY trimestre''')
+    ventas_trimestrales = fetchall(c)
+
     # Distribución por tipo de plan (según monto del pago)
     if PG:
         c.execute("""
@@ -3953,7 +4122,7 @@ def analytics():
             SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as nuevos
             FROM pagos p
             WHERE COALESCE(p.is_void, FALSE) = FALSE
-              AND p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, FALSE) = FALSE)
+              AND p.id = (SELECT p2.id FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, FALSE) = FALSE ORDER BY p2.mes,p2.id LIMIT 1)
             GROUP BY m ORDER BY m
         """)
     else:
@@ -3961,7 +4130,7 @@ def analytics():
             SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as nuevos
             FROM pagos p
             WHERE COALESCE(p.is_void, 0) = 0
-              AND p.mes = (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, 0) = 0)
+              AND p.id = (SELECT p2.id FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, 0) = 0 ORDER BY p2.mes,p2.id LIMIT 1)
             GROUP BY m ORDER BY m
         """)
     nuevos_por_mes = fetchall(c)
@@ -3972,7 +4141,7 @@ def analytics():
             SELECT TO_CHAR(p.mes::date, 'YYYY-MM') as m, COUNT(*) as renovaciones
             FROM pagos p
             WHERE COALESCE(p.is_void, FALSE) = FALSE
-              AND p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, FALSE) = FALSE)
+              AND p.id != (SELECT p2.id FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, FALSE) = FALSE ORDER BY p2.mes,p2.id LIMIT 1)
             GROUP BY m ORDER BY m
         """)
     else:
@@ -3980,7 +4149,7 @@ def analytics():
             SELECT strftime('%Y-%m', p.mes) as m, COUNT(*) as renovaciones
             FROM pagos p
             WHERE COALESCE(p.is_void, 0) = 0
-              AND p.mes != (SELECT MIN(p2.mes) FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, 0) = 0)
+              AND p.id != (SELECT p2.id FROM pagos p2 WHERE p2.username = p.username AND COALESCE(p2.is_void, 0) = 0 ORDER BY p2.mes,p2.id LIMIT 1)
             GROUP BY m ORDER BY m
         """)
     renovaciones_por_mes = fetchall(c)
@@ -4178,6 +4347,7 @@ def analytics():
     return jsonify({
         'ventas_mensuales': ventas_mensuales,
         'ventas_anuales': ventas_anuales,
+        'ventas_trimestrales': ventas_trimestrales,
         'planes': planes,
         'nuevos_por_mes': nuevos_por_mes,
         'renovaciones_por_mes': renovaciones_por_mes,
@@ -4231,7 +4401,7 @@ def clientes_nuevos():
                    COUNT(p.id) as num_pagos,
                    MAX(p.mes) as ultimo_pago
             FROM clientes cl
-            LEFT JOIN pagos p ON p.username = cl.username
+            LEFT JOIN pagos p ON p.username = cl.username AND COALESCE(p.is_void, FALSE)=FALSE
             WHERE SUBSTRING(cl.created_at, 1, 10) >= %s
               AND SUBSTRING(cl.created_at, 1, 10) <= %s
             GROUP BY cl.username, cl.nombre, cl.contacto,
@@ -4245,7 +4415,7 @@ def clientes_nuevos():
                    COUNT(p.id) as num_pagos,
                    MAX(p.mes) as ultimo_pago
             FROM clientes cl
-            LEFT JOIN pagos p ON p.username = cl.username
+            LEFT JOIN pagos p ON p.username = cl.username AND COALESCE(p.is_void, 0)=0
             WHERE substr(cl.created_at, 1, 10) >= ?
               AND substr(cl.created_at, 1, 10) <= ?
             GROUP BY cl.username, cl.nombre, cl.contacto,
@@ -4703,6 +4873,7 @@ def importar_xui_credenciales():
         user_col = col('username', 'usuario', 'user')
         pass_col = col('password', 'contraseña', 'contrasena', 'pass')
         exp_col = col('vencimiento', 'expires', 'expiration', 'fecha vencimiento')
+        devices_col = col('devices', 'dispositivos', 'conexiones', 'connections', 'max connections', 'max_connections')
         if user_col is None or pass_col is None:
             return jsonify({'ok': False, 'error': 'No encontré columnas Username y Password.'}), 400
 
@@ -4714,6 +4885,9 @@ def importar_xui_credenciales():
             password = str(row[pass_col] or '').strip() if len(row) > pass_col else ''
             if not username or not password:
                 continue
+            devices = None
+            if devices_col is not None and len(row) > devices_col and row[devices_col] not in (None, ''):
+                devices = normalize_devices(row[devices_col], 3)
             processed += 1
             expires_at = None
             if exp_col is not None and len(row) > exp_col and row[exp_col]:
@@ -4724,6 +4898,10 @@ def importar_xui_credenciales():
                     expires_at = str(value).strip()
             c.execute(qmark("SELECT username FROM clientes WHERE username=?"), (username,))
             client_exists = bool(fetchone(c))
+            if devices is None:
+                c.execute(qmark('SELECT devices FROM client_service_credentials WHERE username=?'), (username,))
+                previous_service = fetchone(c) or {}
+                devices = normalize_devices(previous_service.get('devices'), 3)
             if not client_exists:
                 if PG:
                     c.execute("""
@@ -4754,7 +4932,7 @@ def importar_xui_credenciales():
                         expires_at=COALESCE(EXCLUDED.expires_at, client_service_credentials.expires_at),
                         devices=EXCLUDED.devices,
                         updated_at=EXCLUDED.updated_at
-                """, (username, 'Max Player', username, password, expires_at, 3, now))
+                """, (username, 'Max Player', username, password, expires_at, devices, now))
                 c.execute("""
                     INSERT INTO client_portal_accounts (username, password, is_enabled, updated_at)
                     VALUES (%s,%s,TRUE,%s)
@@ -4772,7 +4950,7 @@ def importar_xui_credenciales():
                         expires_at=COALESCE(excluded.expires_at, client_service_credentials.expires_at),
                         devices=excluded.devices,
                         updated_at=excluded.updated_at
-                """, (username, 'Max Player', username, password, expires_at, 3, now))
+                """, (username, 'Max Player', username, password, expires_at, devices, now))
                 c.execute("""
                     INSERT OR IGNORE INTO client_portal_accounts (username, password, is_enabled, updated_at)
                     VALUES (?,?,1,?)
