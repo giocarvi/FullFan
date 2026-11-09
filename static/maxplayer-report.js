@@ -30,7 +30,7 @@
       if(!response.ok){if(data.code?.startsWith('maxplayer_'))document.querySelector('.max-upload').open=true;throw new Error(data.error||'No se pudo comparar Max Player.');}
       report=data;page=1;$('max-results').hidden=false;
       $('max-message').textContent='Reporte listo. No se eliminó, desactivó ni modificó ninguna cuenta.';
-      $('max-updated').textContent=`${data.source}. Fecha de la fuente: ${data.exported_on}. Comparado con Fénix el ${new Date(data.generated_at).toLocaleString('es-GT',{timeZone:'America/Guatemala'})}. Margen: ${data.grace_days} días. ${data.source_complete?'Total de la API verificado.':'Se comparan solo las cuentas recibidas; no se confirma que sean toda la cartera.'}`;
+      $('max-updated').textContent=`${data.source}. Fecha de la fuente: ${data.exported_on}. Comparado con Fénix el ${new Date(data.generated_at).toLocaleString('es-GT',{timeZone:'America/Guatemala'})}. Margen: ${data.grace_days} días. ${data.source_complete?'Recorrido completo de la API confirmado.':'Se comparan solo las cuentas recibidas; no se confirma que sean toda la cartera.'}`;
       summary();draw();
     }catch(e){$('max-message').textContent=e.message||'No se pudo generar el reporte.';}
     finally{busy=false;$('max-refresh').disabled=false;$('max-upload-form').querySelector('button').disabled=false;$('max-csv').value='';}
