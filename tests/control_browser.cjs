@@ -50,6 +50,36 @@ fs.mkdirSync(out,{recursive:true});
   await page.waitForFunction(()=>document.querySelector('#act-username').value==='DEMO_FAMILIAR');
   assert.equal(await page.locator('#act-username').inputValue(),'DEMO_FAMILIAR');
   if(role==='admin'){
+    // Never contact real XUI from UI tests; exercise the credential fallback and report with synthetic data.
+    let xuiRequests=0;
+    const reportRows=Array.from({length:61},(_,i)=>({key:'demo_'+i,
+      fenix:[{username:i===0?'DEMO_FAMILIAR':'DEMO_XUI_'+i,name:i===0?'Familia de ejemplo':'Cliente de ejemplo '+i,service_username:'demo_'+i,expiry:'2026-12-01',devices:6,state:'activo',archived:false}],
+      xui:[{id:String(i+1),username:'demo_'+i,owner:'giocarvi',expiry:'2026-11-20',devices:3,state:'activo',unlimited:false}],
+      flags:i===0?['falta_tiempo_xui','dispositivos_distintos']:['dispositivos_distintos'],difference_days:-11}));
+    await page.route('**/api/admin/xui-comparacion',async route=>{
+      xuiRequests++;
+      if(xuiRequests===1)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({code:'xui_credentials_required',error:'Conecta tu panel XUI para consultar el reporte.'})});
+      assert.equal(route.request().method(),'POST');
+      assert.equal(route.request().postDataJSON().password,'SYNTHETIC_PANEL_ONLY');
+      return route.fulfill({contentType:'application/json',body:JSON.stringify({rows:reportRows,counts:{falta_tiempo_xui:1,dispositivos_distintos:61},total_groups:61,total_fenix:61,total_xui:61,owner:'giocarvi',generated_at:'2026-11-09T10:00:00-06:00',today:'2026-11-09'})});
+    });
+    await page.evaluate(()=>switchView('xui'));await page.locator('#xui-refresh').click();
+    await page.locator('#xui-connect').waitFor({state:'visible'});
+    await page.locator('#xui-password').fill('SYNTHETIC_PANEL_ONLY');
+    await page.locator('#xui-connect button').click();await page.locator('#xui-list tbody tr').first().waitFor();
+    assert.equal(await page.locator('#xui-list tbody tr').count(),50);
+    assert.equal(await page.locator('#xui-password').inputValue(),'');
+    await page.locator('#xui-next').click();assert.equal(await page.locator('#xui-list tbody tr').count(),11);
+    await page.locator('#xui-category').selectOption('falta_tiempo_xui');assert.equal(await page.locator('#xui-list tbody tr').count(),1);
+    await page.evaluate(()=>document.querySelectorAll('.success-toast').forEach(n=>n.remove()));
+    await page.screenshot({path:path.join(out,'admin_xui_reporte.png')});
+    const downloadPromise=page.waitForEvent('download');await page.locator('#xui-export').click();
+    const download=await downloadPromise;assert.equal(download.suggestedFilename(),'fenix_vs_xui_giocarvi_2026-11-09.csv');
+    await page.locator('#xui-category').selectOption('');await page.locator('#xui-search').fill('DEMO_FAMILIAR');
+    assert.equal(await page.locator('#xui-list tbody tr').count(),1);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.locator('[data-xui-client="DEMO_FAMILIAR"]').click();await page.locator('#client-tab-summary').waitFor();await page.keyboard.press('Escape');
+    assert.equal(xuiRequests,2);
     await page.locator('.nav-btn[data-view=pagos]').click();await page.waitForSelector('#payments-list .ledger-table');
     await page.screenshot({path:path.join(out,'admin_pagos.png')});
     await page.evaluate(()=>switchView('analytics'));await page.waitForSelector('#day-chart-inner .day-bar-col');
@@ -65,6 +95,8 @@ fs.mkdirSync(out,{recursive:true});
     await page.evaluate(()=>openModal('DEMO_FAMILIAR'));await page.waitForSelector('#client-tab-payments');await page.locator('#client-tab-payments').click();await page.locator('#pago-monto').fill('10.50');await page.evaluate(()=>registrarPago('DEMO_FAMILIAR'));
     await page.waitForFunction(value=>document.querySelector('#kpi-historico').textContent.includes(Math.round(value).toLocaleString()),initial+10.5);
   } else {
+    assert.equal(await page.locator('[data-view=xui],#view-xui').count(),0);
+    assert.equal((await context.request.get(url+'/api/admin/xui-comparacion')).status(),403);
     assert.equal(await page.locator('.nav-btn[data-view=pagos]').count(),0);
     assert.equal((await context.request.get(url+'/api/pagos')).status(),403);
     await page.locator('.nav-more').click();assert.equal(await page.locator('#nav-overflow').isVisible(),true);

@@ -1,0 +1,31 @@
+.xui-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:20px 0; }
+#view-xui .page-heading > div { flex:1; }
+#xui-refresh { width:auto; flex-shrink:0; padding:12px 20px; }
+.xui-kpi { text-align:left; background:var(--card); border:1px solid var(--border); border-radius:13px; padding:17px; color:var(--text); cursor:pointer; }
+.xui-kpi strong { display:block; font-size:27px; color:var(--accent2); }
+.xui-kpi span { display:block; font-size:12px; color:var(--muted); margin-top:7px; }
+.xui-filters { display:grid; grid-template-columns:minmax(150px,1fr) minmax(180px,1fr) auto auto; gap:14px; align-items:end; margin-top:20px; }
+.xui-filters .form-group { margin:0; }
+.xui-archive-filter { display:flex; align-items:center; gap:7px; font-size:12px; padding:12px 0; }
+.xui-archive-filter input { width:auto; }
+.xui-filters .btn-secondary { width:auto; margin:0; }
+.xui-connect { max-width:600px; margin:18px 0; }
+.xui-connect .form-group { margin:16px 0; }
+#xui-message { margin:16px 0; color:var(--accent2); font-size:13px; line-height:1.6; }
+.xui-table-wrap { margin-top:15px; }
+.xui-table { min-width:1050px; font-size:12px; }
+.xui-account + .xui-account { margin-top:12px; border-top:1px solid var(--border); padding-top:9px; }
+.xui-account strong { display:block; overflow-wrap:anywhere; }
+.xui-account .badge { display:inline-block; margin-top:6px; }
+.xui-flags { display:flex; flex-direction:column; gap:5px; color:var(--accent2); }
+.xui-explanation { margin-top:24px; font-size:13px; line-height:1.7; color:var(--muted); }
+.xui-explanation summary { color:var(--text); cursor:pointer; font-weight:700; }
+.xui-explanation p { margin-top:12px; }
+@media(max-width:900px) { .xui-filters { grid-template-columns:1fr 1fr; } }
+@media(max-width:600px) {
+  .xui-summary { grid-template-columns:1fr 1fr; }
+  .xui-filters { grid-template-columns:1fr; }
+  #view-xui .page-heading { align-items:stretch; flex-direction:column; }
+  #xui-refresh { width:100%; }
+  .xui-table { min-width:0; }
+}

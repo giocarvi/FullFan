@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - app.py
+      - xui_report.py
       - templates/index.html
       - static/control.*
+      - static/xui-report.*
       - scripts/snapshot_payment_history.py
       - tests/**
       - .github/workflows/control-checks.yml
