@@ -31,6 +31,7 @@ c.execute("INSERT INTO pagos(username,mes,monto,comprobante) VALUES('PG_DEMO','2
 old_id=c.fetchone()[0]
 db.commit()
 c.execute('SELECT * FROM pagos WHERE id=%s',(old_id,));historical=c.fetchone()
+db.commit()
 with patch.object(app,'_migrate_from_excel'):
     app.init_db()
 c.execute('SELECT * FROM pagos WHERE id=%s',(old_id,));assert c.fetchone()==historical
