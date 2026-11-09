@@ -1,4 +1,4 @@
-﻿from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, Response
 import os
 import hmac
 import hashlib
@@ -13,6 +13,8 @@ import base64
 import secrets
 import unicodedata
 import traceback
+import threading
+from xui_report import fetch_lines as fetch_xui_report_lines, compare_clients as compare_xui_clients, XuiReportError
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -4034,6 +4036,51 @@ def api_delete_activation_task(task_id):
     db.commit()
     db.close()
     return jsonify({'ok': True, 'pago_revertido': pago_revertido})
+
+
+_xui_report_lock = threading.Lock()
+
+
+@app.route('/api/admin/xui-comparacion', methods=['GET', 'POST'])
+@login_required
+def xui_comparacion():
+    if session.get('rol') != 'admin':
+        return jsonify({'error': 'Acceso denegado'}), 403
+    data = request.get_json(silent=True) if request.method == 'POST' else {}
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Solicitud inválida'}), 400
+    username = data.get('username') if request.method == 'POST' else os.environ.get('XUI_USER')
+    password = data.get('password') if request.method == 'POST' else os.environ.get('XUI_PASS')
+    if not username or not password:
+        response = jsonify({'error': 'Conecta tu panel XUI para consultar el reporte.', 'code': 'xui_credentials_required'})
+        response.headers['Cache-Control'] = 'no-store'
+        return response, 503
+    if not isinstance(username, str) or not isinstance(password, str) or len(username) > 256 or len(password) > 2048:
+        return jsonify({'error': 'Credenciales inválidas'}), 400
+    if not _xui_report_lock.acquire(blocking=False):
+        return jsonify({'error': 'Ya hay una consulta XUI en proceso. Espera a que termine.'}), 409
+    try:
+        lines = fetch_xui_report_lines(username, password,
+            base_url=os.environ.get('XUI_BASE_URL', 'http://xdplustv.online/99access99'),
+            reseller=os.environ.get('XUI_RESELLER_ID', '3652'))
+        db = get_db()
+        try:
+            cursor = db.cursor()
+            cursor.execute('''SELECT c.username, c.nombre, c.vencimiento, c.archived_at,
+                                     sc.service_username, sc.devices
+                              FROM clientes c LEFT JOIN client_service_credentials sc ON sc.username=c.username''')
+            clients = fetchall(cursor)
+        finally:
+            db.close()
+        response = jsonify(compare_xui_clients(clients, lines, today_gt()))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except XuiReportError as error:
+        response = jsonify({'error': str(error), 'code': 'xui_unavailable'})
+        response.headers['Cache-Control'] = 'no-store'
+        return response, 502
+    finally:
+        _xui_report_lock.release()
 
 
 @app.route('/api/analytics')

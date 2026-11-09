@@ -640,6 +640,7 @@ body {
 }
 </style>
 <link rel="stylesheet" href="/static/control.css?v=20261109">
+{% if rol == 'admin' %}<link rel="stylesheet" href="/static/xui-report.css?v=20261109a">{% endif %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -843,6 +844,30 @@ body {
 </div>
 
 {% if rol == 'admin' %}
+<div id="view-xui" class="view">
+  <div class="page-heading"><div><h1>Fénix vs XUI</h1><p>Comparación de clientes · únicamente owner giocarvi · solo lectura</p></div><button id="xui-refresh" class="btn-primary" type="button">Consultar XUI</button></div>
+  <p class="view-note">No renueva, elimina ni modifica usuarios, dispositivos o pagos. El reporte es una fotografía de la consulta, no una sincronización automática.</p>
+  <div id="xui-message" role="status" aria-live="polite"></div>
+  <form id="xui-connect" class="ops-card xui-connect" hidden>
+    <h3>Conectar el panel XUI</h3><p class="view-note">Usa tu acceso de administrador de XUI, no el de un cliente. La contraseña se usa solo para esta consulta y no se guarda. El panel XUI indicado usa HTTP, una conexión sin cifrado.</p>
+    <div class="form-group"><label for="xui-username">Usuario del panel XUI</label><input id="xui-username" autocomplete="off" value="giocarvi" required maxlength="256"></div>
+    <div class="form-group"><label for="xui-password">Contraseña del panel XUI</label><input id="xui-password" type="password" autocomplete="off" required maxlength="2048"></div>
+    <button class="btn-primary" type="submit">Consultar sin guardar contraseña</button>
+  </form>
+  <div id="xui-results" hidden>
+    <div id="xui-summary" class="xui-summary"></div>
+    <form id="xui-filters" class="xui-filters">
+      <div class="form-group"><label for="xui-search">Buscar usuario o nombre</label><input id="xui-search" type="search" placeholder="Usuario de Fénix o XUI"></div>
+      <div class="form-group"><label for="xui-category">Mostrar</label><select id="xui-category"><option value="">Todos</option></select></div>
+      <label class="xui-archive-filter"><input id="xui-archived" type="checkbox"> Incluir archivados de Fénix</label>
+      <button id="xui-export" class="btn-secondary" type="button">Exportar CSV</button>
+    </form>
+    <p class="view-note" id="xui-updated"></p>
+    <div class="ledger-results xui-table-wrap" id="xui-list"></div>
+    <div class="ledger-pagination"><button id="xui-prev" class="btn-secondary" type="button">Anterior</button><span id="xui-page" aria-live="polite"></span><button id="xui-next" class="btn-secondary" type="button">Siguiente</button></div>
+    <details class="ops-card xui-explanation"><summary>Cómo se compara</summary><p>Se utiliza el usuario del servicio guardado en Fénix; si está vacío, el usuario de Fénix. Se ignoran mayúsculas y espacios en los extremos, no se hacen coincidencias aproximadas. Los duplicados se agrupan para revisión, sin elegir uno automáticamente.</p><p>La fecha de referencia es el vencimiento del cliente en Fénix. Diferencia positiva: XUI tiene más días; negativa: menos días. Las conexiones simultáneas de XUI se comparan con los dispositivos registrados en Fénix. Los valores desconocidos no se suponen de 3 dispositivos. «Activo» en XUI no significa que esté conectado en este momento.</p><p>Fénix considera vigente el día completo del vencimiento en horario de Guatemala. XUI también puede marcar un usuario como bloqueado o vencido antes de terminar ese día. Los archivados no se consideran clientes activos.</p></details>
+  </div>
+</div>
 <div id="view-resellers" class="view">
   <div class="config-form">
     <div class="config-section">
@@ -1071,6 +1096,7 @@ body {
   <button class="nav-btn" data-view="analytics">
     <span class="icon">📈</span>Análisis
   </button>
+  <button class="nav-btn" data-view="xui"><span class="icon">🔎</span>Fénix vs XUI</button>
   <button class="nav-btn" data-view="config">
     <span class="icon">⚙️</span>Config
   </button>
@@ -4099,5 +4125,6 @@ function renderTablaTrimestral(ventas) {
 }
 </script>
 <script src="/static/control.js?v=20261109"></script>
+{% if rol == 'admin' %}<script src="/static/xui-report.js?v=20261109a"></script>{% endif %}
 </body>
 </html>
