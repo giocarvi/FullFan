@@ -88,13 +88,13 @@ def fake_fetch(callback,**kwargs):
     if kwargs.get('page_observer'):kwargs['page_observer']({'limit':100},accounts)
     return list(accounts),True
 def fake_page(*args,**kwargs):
-    return {'payload':[{'id':999,'username':'PG_UNUSED','is_online':False,'last_login':0}] if accounts else [],'has_more':'false','next_cursor':None}
+    return {'payload':[{'id':a['id'],'username':a['username'],'is_online':a['online'],'last_login':0} for a in accounts],'has_more':'false','next_cursor':None}
 def fake_delete(user_id):
-    assert user_id=='999'
+    assert user_id==accounts[0]['id']
     accounts.clear()
 def fake_support(method,path,**kwargs):
     assert method=='GET'
-    if path=='/customers/999':return {'success':1,'data':{'id':'999','username':'PG_UNUSED'}}
+    if path=='/customers/'+accounts[0]['id']:return {'success':1,'data':{'id':accounts[0]['id'],'username':accounts[0]['username']}}
     assert path=='/customers/999/devices'
     return {'success':1,'data':[{'id':'1','identifier':'SYNTHETIC_DEVICE','online':False}], 'presence_available':True,'presence_generated_at_unix':int(app.time.time())}
 with patch.object(app,'fetch_max_report_customers',side_effect=fake_fetch),patch.object(app,'get_maxplayer_users',side_effect=fake_page),patch.object(app,'maxplayer_request',side_effect=fake_support),patch.object(app,'delete_maxplayer_user',side_effect=fake_delete) as deletion,patch.object(app.time,'sleep',return_value=None):
@@ -107,9 +107,21 @@ with patch.object(app,'fetch_max_report_customers',side_effect=fake_fetch),patch
     assert result.json['status']=='deleted'
     assert client.post('/api/admin/maxplayer/999/eliminar',json=body,headers=headers).json['replayed'] is True
     deletion.assert_called_once_with('999')
+    accounts.append(normalize_customer({'id':'1000','username':'PG_MANUAL_UNUSED','last_login':0}))
+    prepare=client.post('/api/admin/maxplayer/1000/preparar-eliminacion',json={'username':'PG_MANUAL_UNUSED','skip_connection_check':True},headers=headers)
+    assert prepare.status_code==200,prepare.get_data(as_text=True)
+    body={'confirmation':prepare.json['confirmation'],'typed_username':'PG_MANUAL_UNUSED','reason':'Eliminación manual solicitada','acknowledged':True}
+    assert client.post('/api/admin/maxplayer/1000/eliminar',json=body,headers=headers).status_code==400
+    body['connection_risk_acknowledged']=True
+    result=client.post('/api/admin/maxplayer/1000/eliminar',json=body,headers=headers)
+    assert result.status_code==200,result.get_data(as_text=True)
+    assert result.json['status']=='deleted'
+    assert client.post('/api/admin/maxplayer/1000/eliminar',json=body,headers=headers).json['replayed'] is True
+    assert deletion.call_count==2
 db=app.get_db();c=db.cursor()
 c.execute('SELECT * FROM pagos WHERE id=%s',(old_id,));assert c.fetchone()==historical
 c.execute("SELECT status FROM maxplayer_cleanup_operations WHERE maxplayer_id='999'");assert c.fetchone()[0]=='deleted'
+c.execute("SELECT status,reason FROM maxplayer_cleanup_operations WHERE maxplayer_id='1000'");manual=c.fetchone();assert manual[0]=='deleted' and 'SIN VERIFICAR CONEXIÓN' in manual[1]
 db.close()
 print('Postgres history, devices, expiry, reports, ledger and idempotency verified')
 '''

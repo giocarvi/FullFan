@@ -43,12 +43,12 @@ def review_block(row, complete):
     return None
 
 
-def deletion_block(row, complete):
+def deletion_block(row, complete, *, skip_connection_check=False):
     if complete and row and row['maxplayer'].get('online') is True:
         return 'La cuenta está conectada. No se eliminará para evitar cortar el servicio.'
     blocked=review_block(row,complete)
     if blocked:return blocked
-    if row['maxplayer'].get('online') is not False:
+    if not skip_connection_check and row['maxplayer'].get('online') is not False:
         return row['maxplayer'].get('presence_reason') or 'Max Player no confirmó si está conectada. No se permite eliminarla con conexión desconocida.'
     return None
 
