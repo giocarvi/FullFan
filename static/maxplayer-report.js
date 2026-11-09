@@ -18,7 +18,7 @@
   async function prepareDeletion(account){
     if(busy||cleanupBusy||!cleanupCsrf)return;
     const sequence=++cleanupSequence;cleanupPlan=null;
-    dialog.innerHTML='<h2 id="max-cleanup-title">Revisar eliminación de Max Player</h2><p role="status">Comprobando la cuenta y Fénix en tiempo real. No se está borrando nada…</p><button class="btn-secondary" type="button" data-cleanup-close>Cancelar</button>';
+    dialog.innerHTML='<h2 id="max-cleanup-title">Comprobar conexión y revisar</h2><p role="status">Consultando la identidad, la conexión de sus dispositivos y Fénix actual. No se está borrando nada…</p><button class="btn-secondary" type="button" data-cleanup-close>Cancelar</button>';
     if(!dialog.open)dialog.showModal();closeButton();
     try{
       const {response,data}=await cleanupRequest(`/api/admin/maxplayer/${encodeURIComponent(account.id)}/preparar-eliminacion`,{username:account.username,min_dias:report.grace_days});
@@ -39,7 +39,7 @@
           const state=result.data.status||'uncertain';
           if(state==='deleted'&&result.response.ok){
             report.rows=report.rows.filter(row=>row.maxplayer.id!==data.account.id);report.total_maxplayer=report.rows.length;report.counts={};report.rows.forEach(row=>row.flags.forEach(flag=>report.counts[flag]=(report.counts[flag]||0)+1));summary();draw();
-          }else{const row=report.rows.find(row=>row.maxplayer.id===data.account.id);if(row){row.can_prepare_deletion=false;row.cleanup_status=state;row.deletion_block='Revisa el historial antes de intentar otra eliminación.';}draw();}
+          }else{const row=report.rows.find(row=>row.maxplayer.id===data.account.id);if(row){row.can_prepare_deletion=false;row.can_check_connection=false;row.cleanup_status=state;row.deletion_block='Revisa el historial antes de intentar otra eliminación.';}draw();}
           dialog.innerHTML=`<h2 id="max-cleanup-title">${state==='deleted'?'Eliminación confirmada':'Resultado de la revisión'}</h2><p role="status">${safe(result.data.message||result.data.error||'No se pudo confirmar el resultado. Revisa el historial antes de repetir.')}</p><button class="btn-secondary" type="button" data-cleanup-close>Cerrar</button>`;
           $('max-message').textContent=result.data.message||result.data.error||'Revisa el historial de eliminaciones.';
         }catch(error){dialog.innerHTML=`<h2 id="max-cleanup-title">Resultado no confirmado</h2><p role="alert">${safe(error.message)} No reenvíes el borrado; revisa el historial o utiliza Verificar estado.</p><button class="btn-secondary" type="button" data-cleanup-close>Cerrar</button>`;}
@@ -66,7 +66,7 @@
       <td data-label="Fénix">${r.fenix.map(f=>`<div class="xui-account"><button class="text-action" type="button" data-max-client="${safe(f.username)}">${safe(f.name)}</button><small>${safe(f.username)} · ${safe(states[f.state]||f.state)}</small></div>`).join('')||'Sin coincidencia exacta'}</td>
       <td data-label="Vence Fénix">${r.fenix.map(f=>`<div>${safe(f.expiry||'Sin fecha')}${f.days_expired?`<small>${Number(f.days_expired)} días vencido</small>`:''}</div>`).join('')||'—'}</td>
       <td data-label="Último pago">${r.fenix.map(f=>`<div>${safe(f.last_payment||'Sin pagos')}${f.recent_payment?'<small>Registro de pago reciente</small>':''}${f.pending_activation?'<small>Activación pendiente</small>':''}</div>`).join('')||'—'}</td>
-      <td data-label="Hallazgos / acción"><div class="xui-flags">${r.flags.map(f=>`<span>${safe(labels[f]||f)}</span>`).join('')}</div>${r.candidate?`<button class="max-delete-btn" type="button" data-max-delete="${safe(r.maxplayer.id||'')}" ${r.can_prepare_deletion&&report.source_complete&&report.source==='API Max Player'?'':'disabled'}>Revisar eliminación</button><small>${safe(r.deletion_block||'Se comprobará todo otra vez antes de confirmar.')}</small>`:''}</td></tr>`).join('')}</tbody></table>`:'<div class="empty-state">No hay cuentas con estos filtros. Puedes cambiar «Mostrar» para revisar las demás.</div>';
+      <td data-label="Hallazgos / acción"><div class="xui-flags">${r.flags.map(f=>`<span>${safe(labels[f]||f)}</span>`).join('')}</div>${r.candidate?`<button class="max-delete-btn" type="button" data-max-delete="${safe(r.maxplayer.id||'')}" ${r.can_check_connection&&report.source_complete&&report.source==='API Max Player'?'':'disabled'}>Comprobar conexión y revisar</button><small>${safe(r.can_check_connection&&report.source_complete&&report.source==='API Max Player'?'Consulta los dispositivos de esta cuenta. Este paso no borra nada.':r.deletion_block||'Actualiza la consulta antes de revisar.')}</small>`:''}</td></tr>`).join('')}</tbody></table>`:'<div class="empty-state">No hay cuentas con estos filtros. Puedes cambiar «Mostrar» para revisar las demás.</div>';
     $('max-list').querySelectorAll('[data-max-client]').forEach(b=>b.onclick=()=>openModal(b.dataset.maxClient));
     $('max-list').querySelectorAll('[data-max-delete]').forEach(b=>b.onclick=()=>{const row=report.rows.find(r=>r.maxplayer.id===b.dataset.maxDelete);if(row)prepareDeletion(row.maxplayer);});
   }

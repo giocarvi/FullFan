@@ -92,7 +92,12 @@ def fake_page(*args,**kwargs):
 def fake_delete(user_id):
     assert user_id=='999'
     accounts.clear()
-with patch.object(app,'fetch_max_report_customers',side_effect=fake_fetch),patch.object(app,'get_maxplayer_users',side_effect=fake_page),patch.object(app,'delete_maxplayer_user',side_effect=fake_delete) as deletion,patch.object(app.time,'sleep',return_value=None):
+def fake_support(method,path,**kwargs):
+    assert method=='GET'
+    if path=='/customers/999':return {'success':1,'data':{'id':'999','username':'PG_UNUSED'}}
+    assert path=='/customers/999/devices'
+    return {'success':1,'data':[{'id':'1','identifier':'SYNTHETIC_DEVICE','online':False}], 'presence_available':True,'presence_generated_at_unix':int(app.time.time())}
+with patch.object(app,'fetch_max_report_customers',side_effect=fake_fetch),patch.object(app,'get_maxplayer_users',side_effect=fake_page),patch.object(app,'maxplayer_request',side_effect=fake_support),patch.object(app,'delete_maxplayer_user',side_effect=fake_delete) as deletion,patch.object(app.time,'sleep',return_value=None):
     csrf=client.get('/api/admin/maxplayer-eliminaciones').json['csrf'];headers={'X-CSRF-Token':csrf}
     prepare=client.post('/api/admin/maxplayer/999/preparar-eliminacion',json={'username':'PG_UNUSED'},headers=headers)
     assert prepare.status_code==200,prepare.get_data(as_text=True)

@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 import test_control as fixture
 from maxplayer_report import normalize_customer
+from maxplayer_cleanup import device_presence
 from scripts.snapshot_payment_history import capture,compare
 
 
@@ -16,8 +17,10 @@ class MaxCleanupTests(unittest.TestCase):
         fixture.seed();self.client=fixture.client()
         self.accounts=[normalize_customer({'id':101,'username':'MAX_UNUSED','is_online':False,'last_login':0})]
         self.complete=True;self.keep_after_delete=False;self.timeout_delete=False
+        self.device_payload=None;self.presence_stamp=None
         self.fetch=self.mock('fetch_max_report_customers',side_effect=self.fake_fetch)
         self.get=self.mock('get_maxplayer_users',side_effect=self.fake_get)
+        self.support=self.mock('maxplayer_request',side_effect=self.fake_support)
         self.delete=self.mock('delete_maxplayer_user',side_effect=self.fake_delete)
         sleeper=patch.object(fixture.module.time,'sleep',return_value=None);sleeper.start();self.addCleanup(sleeper.stop)
         self.csrf=self.client.get('/api/admin/maxplayer-eliminaciones').json['csrf']
@@ -45,6 +48,15 @@ class MaxCleanupTests(unittest.TestCase):
         if not self.keep_after_delete:self.accounts=[]
         if self.timeout_delete:raise fixture.module.MaxPlayerError('PROVIDER_SECRET',kind='timeout')
         return {'success':1}
+
+    def fake_support(self,method,path,**kwargs):
+        self.assertEqual(method,'GET')
+        self.assertTrue(self.accounts)
+        if path=='/customers/101':return {'success':1,'data':{'id':'101','username':self.accounts[0]['username']}}
+        self.assertEqual(path,'/customers/101/devices')
+        if self.device_payload is not None:return self.device_payload
+        return {'success':1,'data':[{'id':'501','identifier':'SYNTHETIC_DEVICE','online':self.accounts[0]['online']}],
+                'presence_available':True,'presence_generated_at_unix':self.presence_stamp or int(fixture.module.time.time())}
 
     def prepare(self,**data):
         body={'username':'MAX_UNUSED','min_dias':7};body.update(data)
@@ -129,6 +141,51 @@ class MaxCleanupTests(unittest.TestCase):
         response=self.prepare();self.assertEqual(response.status_code,409);self.assertIn('conectada',response.json['error'])
         self.get.assert_called_once_with({'limit':100},include_pagination=True)
         self.delete.assert_not_called()
+
+    def test_unknown_listing_can_check_devices_but_cannot_skip_confirmation(self):
+        self.accounts[0]['online']=None
+        self.device_payload={'success':1,'data':[{'id':'501','identifier':'SYNTHETIC_DEVICE','online':False}],
+                             'presence_available':True,'presence_generated_at_unix':int(fixture.module.time.time())}
+        with patch.object(fixture.module,'maxplayer_configured',return_value=True):
+            report=self.client.get('/api/admin/maxplayer-comparacion')
+        self.assertTrue(report.json['rows'][0]['can_check_connection'])
+        self.assertFalse(report.json['rows'][0]['can_prepare_deletion'])
+        self.support.assert_not_called()  # No per-customer sweep in the general report.
+        prepared=self.prepare();self.assertEqual(prepared.status_code,200,prepared.json)
+        self.assertIs(prepared.json['account']['online'],False)
+        self.assertNotIn('SYNTHETIC_DEVICE',json.dumps(prepared.json))
+        self.delete.assert_not_called()
+        self.assertEqual(self.confirm(prepared.json).json['status'],'deleted')
+        self.delete.assert_called_once()
+
+    def test_device_reconnection_and_outage_block_even_if_listing_says_offline(self):
+        for devices,available in [([True],True),([None],False),([False,None],True),([],True)]:
+            self.device_payload={'success':1,'data':[{'id':str(i+1),'identifier':str(i),'online':value} for i,value in enumerate(devices)],
+                                 'presence_available':available,'presence_generated_at_unix':int(fixture.module.time.time())}
+            self.assertEqual(self.prepare().status_code,409)
+        self.device_payload=None;plan=self.prepare().json
+        self.device_payload={'success':1,'data':[{'id':'501','identifier':'SYNTHETIC_DEVICE','online':True}],
+                             'presence_available':True,'presence_generated_at_unix':int(fixture.module.time.time())}
+        self.assertEqual(self.confirm(plan).status_code,409)
+        self.delete.assert_not_called()
+
+    def test_changed_individual_identity_and_support_errors_fail_closed(self):
+        self.support.side_effect=lambda *a,**kw:{'success':1,'data':{'id':'102','username':'MAX_UNUSED'}}
+        self.assertEqual(self.prepare().status_code,502)
+        self.support.side_effect=fixture.module.MaxPlayerError('PROVIDER_SECRET',kind='forbidden',http_status=403)
+        response=self.prepare();self.assertEqual(response.status_code,502)
+        self.assertNotIn('PROVIDER_SECRET',json.dumps(response.json));self.delete.assert_not_called()
+
+    def test_fresh_heartbeat_timestamp_can_advance_but_device_change_invalidates_plan(self):
+        self.presence_stamp=int(fixture.module.time.time())
+        plan=self.prepare().json;self.presence_stamp+=1
+        self.assertEqual(self.confirm(plan).json['status'],'deleted')
+        fixture.seed();self.accounts=[normalize_customer({'id':101,'username':'MAX_UNUSED','is_online':False,'last_login':0})]
+        plan=self.prepare().json
+        self.device_payload={'success':1,'data':[{'id':'502','identifier':'NEW_DEVICE','online':False}],
+                             'presence_available':True,'presence_generated_at_unix':int(fixture.module.time.time())}
+        self.assertEqual(self.confirm(plan).status_code,409)
+        self.delete.assert_called_once()
 
     def test_new_active_client_new_payment_pending_task_and_new_connection_block_after_preparation(self):
         plan=self.prepare().json
@@ -240,7 +297,22 @@ class MaxCleanupTests(unittest.TestCase):
         result=self.client.post('/api/admin/maxplayer-comparacion',data={'file':(io.BytesIO(b'MaxPlayer ID,Username\n101,MAX_UNUSED\n'),'test.csv'),'exported_on':'2026-11-09'})
         self.assertEqual(result.status_code,200)
         self.assertFalse(result.json['rows'][0]['can_prepare_deletion'])
+        self.assertFalse(result.json['rows'][0]['can_check_connection'])
         self.delete.assert_not_called()
+
+
+class DevicePresenceTests(unittest.TestCase):
+    def test_only_fresh_explicit_offline_of_all_registered_devices_is_accepted(self):
+        payload={'success':1,'data':[{'id':'1','identifier':'DEVICE','online':False}],
+                 'presence_available':True,'presence_generated_at_unix':1000}
+        self.assertIs(device_presence(payload,1001)['online'],False)
+        for changes in [{'success':False},{'success':0},{'presence_available':False},
+                        {'presence_generated_at_unix':800},{'presence_generated_at_unix':1100},
+                        {'presence_generated_at_unix':None},{'data':[]},{'data':[{}]},
+                        {'data':payload['data']*2},{'data':[{'id':'1','identifier':'DEVICE','online':'false'}]}]:
+            with self.subTest(changes=changes):self.assertIsNone(device_presence({**payload,**changes},1001)['online'])
+        connected={**payload,'data':[{'online':True}],'presence_available':False}
+        self.assertIs(device_presence(connected,1001)['online'],True)
 
 
 if __name__=='__main__':unittest.main()

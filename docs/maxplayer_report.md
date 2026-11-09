@@ -25,12 +25,20 @@ El reporte permite filtros, buscador, paginación, CSV sin contraseñas y enlace
 La documentación compartida el 9/11/2026 confirma `DELETE https://api.maxplayer.tv/v3/api/public/users/[user_id]`, sin cuerpo y con `Api-Token`, para cuentas propias. Solo se permite esta dirección HTTPS oficial. No se ejecutan borrados masivos ni automáticos.
 
 1. El administrador consulta la API y elige «Revisar eliminación». El servidor comprueba de nuevo su rol actual en la base, la sesión y la protección contra solicitudes cruzadas.
-2. Se recorre toda la API, se vuelve a leer la página documentada que contiene el ID y después se compara con Fénix actual. No se supone una ruta de consulta individual no documentada. Si falta cobertura completa, identidad, fecha, o confirmación explícita de desconexión, se bloquea. Un CSV nunca habilita borrados. «Nunca conectó» no demuestra que esté desconectado ahora.
+2. Se recorre toda la API y se vuelve a leer la página documentada que contiene el ID. Para un candidato, «Comprobar conexión y revisar» valida su identidad con `GET /customers/{id}` y sus dispositivos con `GET /customers/{id}/devices`, documentados en el OpenAPI 1.5.0 compartido el 9/11/2026. `GET /users/{id}` es una lista de clientes de un reseller, no la ficha de un cliente. Después de los dispositivos se vuelve a leer Fénix. Si falta cobertura completa, identidad, fecha, o confirmación de desconexión, se bloquea. Un CSV nunca habilita esta revisión. «Nunca conectó» no demuestra que esté desconectado ahora.
 3. Si hay coincidencia en Fénix, se exigen al menos 7 días vencido, incluso en archivados; si el administrador elige más margen, también se respeta. Se reservan servicios vigentes, pagos recientes, tareas pendientes, duplicados y casos ambiguos. Los datos ocultos de identidad tampoco permiten borrar.
 4. La confirmación identifica usuario e ID, advierte de la pérdida de acceso/configuración en Max Player y exige un motivo, escribir exactamente el usuario y marcar una casilla inicialmente vacía. Vence a los 180 segundos y está vinculada a administrador, cuenta, datos revisados y credencial del proveedor.
 5. Al confirmar se repiten todas las lecturas y protecciones. Cualquier cambio invalida la revisión. Antes de enviar una única orden externa se guarda un recibo duradero; luego se exige un recorrido completo que confirme la ausencia del ID. Una respuesta exitosa por sí sola no basta.
 
 Las comprobaciones son puntuales: no existe una transacción compartida entre Fénix y Max Player. Una conexión o pago puede cambiar después de la última comprobación. No se presenta esta protección como una garantía atómica entre sistemas.
+
+### Presencia por dispositivos
+
+El listado general `GET /users` documentado no incluye conexión actual. No se recorre cada cliente para completar ese dato: se consulta únicamente el candidato elegido, al preparar y al confirmar, dejando al menos 1,05 segundos entre lecturas de esta operación.
+
+La respuesta de dispositivos debe tener `success: 1`, `presence_available: true`, `presence_generated_at_unix` entero y reciente (máximo 120 segundos de antigüedad y 15 de tolerancia futura), y registros identificables sin duplicados, todos con `online: false` booleano. Cualquier `online: true` bloquea; `null`, valores no booleanos, fallo de presencia, formato incompleto o fecha desactualizada no se convierten a desconexión. Un array vacío tampoco basta: la documentación advierte que puede haber registros asíncronos pendientes de persistir. No se añade una excepción de borrado para esos casos.
+
+Solo se devuelve al navegador un resumen; identificadores de instalación, nombres de dispositivos y metadatos no se exponen. La confirmación incluye una huella de los dispositivos y su estado, pero no el instante del heartbeat, que naturalmente avanza en cada consulta. La fecha se valida de nuevo; cambios de dispositivos invalidan la confirmación. Se reconocen también los alias documentados en `lists[].iptv_info.username`, sin conservar ni devolver contraseñas o servidores de esas listas. No se realizan cambios de límites, dispositivos ni listas.
 
 ## Registro y resultados inciertos
 
