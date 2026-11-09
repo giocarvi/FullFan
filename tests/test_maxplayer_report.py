@@ -2,7 +2,7 @@ from datetime import date
 import io
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from urllib.error import HTTPError, URLError
 import test_control as fixture
 from maxplayer_report import MaxReportError, normalize_customer, parse_csv, fetch_customers, compare_accounts
@@ -59,12 +59,38 @@ class MaxReportTests(unittest.TestCase):
         calls=[]
         def get(params):
             calls.append(params)
-            return {'data':{'data':[{'id':params['page'],'username':'DEMO_'+str(params['page'])}],'total':2}}
-        rows,complete=fetch_customers(get)
-        self.assertTrue(complete);self.assertEqual(len(rows),2);self.assertEqual([c['page'] for c in calls],[1,2])
+            if len(calls)==1:return {'payload':[{'id':1,'username':'DEMO_1'}],'has_more':'true','next_cursor':'1'}
+            return {'payload':[{'id':2,'username':'DEMO_2'}],'has_more':'false','next_cursor':None}
+        rows,complete=fetch_customers(get,pause=lambda delay:None)
+        self.assertTrue(complete);self.assertEqual(len(rows),2)
+        self.assertEqual(calls,[{'limit':100},{'limit':100,'after_id':'1'}])
         rows,complete=fetch_customers(lambda p:[{'id':1,'username':'ONLY_RETURNED_ACCOUNT'}])
         self.assertFalse(complete);self.assertEqual(len(rows),1)
-        with self.assertRaises(MaxReportError):fetch_customers(lambda p:{'data':[{'id':1,'username':'SAME'}],'total':2})
+        with self.assertRaises(MaxReportError):
+            fetch_customers(lambda p:{'payload':[{'id':1,'username':'SAME'}],'has_more':'true','next_cursor':'1'},pause=lambda delay:None)
+
+    def test_cursor_headers_are_required_to_claim_complete_and_bad_cursors_abort(self):
+        for page in [
+            {'payload':[{'id':1,'username':'DEMO'}],'has_more':'true','next_cursor':''},
+            {'payload':[],'has_more':'true','next_cursor':'1'},
+            {'payload':[{'id':1,'username':'DEMO'}],'has_more':'unexpected','next_cursor':'1'}
+        ]:
+            with self.subTest(page=page),self.assertRaises(MaxReportError):fetch_customers(lambda p:page)
+        rows,complete=fetch_customers(lambda p:{'payload':[],'has_more':'false','next_cursor':None})
+        self.assertEqual(rows,[]);self.assertTrue(complete)
+        rows,complete=fetch_customers(lambda p:{'payload':[{'id':1,'username':'DEMO'}],'has_more':None,'next_cursor':None})
+        self.assertEqual(len(rows),1);self.assertFalse(complete)
+
+    def test_cursor_read_is_paced_and_never_follows_arbitrary_urls(self):
+        pages=iter([
+            {'payload':[{'id':1,'username':'DEMO_1'}],'has_more':'true','next_cursor':'opaque:next/value'},
+            {'payload':[{'id':2,'username':'DEMO_2'}],'has_more':'false','next_cursor':None}])
+        calls=[];pauses=[]
+        def get(params):calls.append(params);return next(pages)
+        rows,complete=fetch_customers(get,pause=pauses.append)
+        self.assertTrue(complete);self.assertEqual(len(rows),2)
+        self.assertEqual(calls[1],{'limit':100,'after_id':'opaque:next/value'})
+        self.assertTrue(pauses);self.assertLessEqual(pauses[0],1.05)
 
 
 class MaxReportRouteTests(unittest.TestCase):
@@ -88,10 +114,29 @@ class MaxReportRouteTests(unittest.TestCase):
              patch.object(fixture.module,'maxplayer_request',return_value={'users':[{'id':1,'username':'DEMO_FAMILIAR'}],'total':1}) as remote:
             response=self.client.get('/api/admin/maxplayer-comparacion')
         self.assertEqual(response.status_code,200);self.assertEqual(response.headers['Cache-Control'],'no-store')
-        self.assertEqual(remote.call_args.args[0],'GET');self.assertTrue(remote.call_args.args[1].startswith('/users?'))
+        self.assertEqual(remote.call_args.args,('GET','/users?limit=100'))
+        self.assertEqual(remote.call_args.kwargs,{'include_pagination':True})
         self.assertIn('conservar_activo',response.json['rows'][0]['flags'])
         db=fixture.module.get_db();after=capture(db,baseline=before);db.close()
         self.assertEqual(before['tables'],after['tables'])
+
+    def test_documented_transport_captures_only_pagination_headers_and_read_needs_no_domain(self):
+        response=MagicMock()
+        response.read.return_value=b'[{"id":1,"username":"DEMO"}]'
+        response.headers={'X-Has-More':'false','X-Next-Cursor':'1','Api-Token':'PROVIDER_SECRET','Set-Cookie':'COOKIE_SECRET'}
+        context=MagicMock();context.__enter__.return_value=response
+        with patch.object(fixture.module,'MAXPLAYER_API_TOKEN','SYNTHETIC_TOKEN'),patch.object(fixture.module,'MAXPLAYER_DOMAIN_ID',''),\
+             patch.object(fixture.module.urlrequest,'urlopen',return_value=context) as network:
+            self.assertTrue(fixture.module.maxplayer_configured(require_domain=False))
+            self.assertFalse(fixture.module.maxplayer_configured())
+            page=fixture.module.get_maxplayer_users({'limit':100},include_pagination=True)
+            self.assertEqual(network.call_args.args[0].get_method(),'GET')
+            self.assertTrue(network.call_args.args[0].full_url.endswith('/users?limit=100'))
+            self.assertEqual(page['has_more'],'false');self.assertEqual(page['next_cursor'],'1')
+            self.assertNotIn('PROVIDER_SECRET',json.dumps(page));self.assertNotIn('COOKIE_SECRET',json.dumps(page))
+            with patch.object(fixture.module,'maxplayer_request',return_value=page):
+                result=self.client.get('/api/admin/maxplayer-comparacion')
+            self.assertEqual(result.status_code,200);self.assertTrue(result.json['source_complete'])
 
     def test_csv_is_not_saved_and_api_error_cannot_leak_token(self):
         content=b'MaxPlayer ID,Username,List Username,Password\n1,DEMO_FAMILIAR,DEMO_FAMILIAR,SECRET\n'

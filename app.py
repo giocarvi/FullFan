@@ -299,7 +299,7 @@ def maxplayer_report_failure(error):
         'forbidden': 'Max Player denegó el acceso. Puede ser un permiso del token o una restricción de acceso; este resultado no confirma que el token sea inválido.',
         'edge_block': 'La protección de Max Player bloqueó la solicitud desde el servidor de Fénix. Consulta con Max Player si permite acceso de API desde Railway; no significa necesariamente que el token sea inválido.',
         'endpoint': 'Max Player no encontró la ruta de API configurada. Revisa MAXPLAYER_API_BASE con la documentación del proveedor.',
-        'parameters': 'Max Player rechazó los parámetros de la consulta. No se puede concluir que el token sea inválido; hay que verificar el formato de Get Users y MAXPLAYER_DOMAIN_ID.',
+        'parameters': 'Max Player rechazó la petición Get Users. No se puede concluir que el token sea inválido; hay que verificar el formato que indica la documentación de su API.',
         'domain': 'Max Player rechazó el dominio configurado. Revisa MAXPLAYER_DOMAIN_ID: debe ser el dominio del proveedor, no el ID de un cliente.',
         'rate_limit': 'Max Player limitó la cantidad de consultas. Espera antes de volver a intentarlo.',
         'provider_unavailable': 'El servidor de Max Player respondió con un error temporal. Puedes reintentar más tarde o usar el CSV.',
@@ -314,11 +314,12 @@ def maxplayer_report_failure(error):
     message = messages[kind] + (f' Respuesta HTTP {status}.' if status else '')
     return {'error': message, 'code': 'maxplayer_unavailable', 'diagnostic': {'kind': kind, 'http_status': status}}
 
-def maxplayer_configured():
-    return bool(MAXPLAYER_API_TOKEN and MAXPLAYER_DOMAIN_ID)
+def maxplayer_configured(require_domain=True):
+    return bool(MAXPLAYER_API_TOKEN and (MAXPLAYER_DOMAIN_ID or not require_domain))
 
-def maxplayer_request(method, path, payload=None):
-    if not maxplayer_configured():
+def maxplayer_request(method, path, payload=None, *, include_pagination=False):
+    users_read = method.upper() == 'GET' and path.split('?', 1)[0] == '/users'
+    if not maxplayer_configured(require_domain=not users_read):
         raise MaxPlayerError('Max Player no está configurado. Agrega MAXPLAYER_API_TOKEN y MAXPLAYER_DOMAIN_ID en Railway.', kind='not_configured')
     url = f"{MAXPLAYER_API_BASE}{path}"
     body = None
@@ -346,10 +347,13 @@ def maxplayer_request(method, path, payload=None):
             try:
                 parsed = json.loads(raw)
             except json.JSONDecodeError:
-                return {'raw': raw}
+                parsed = {'raw': raw}
             if isinstance(parsed, dict) and parsed.get('success') == 0 and parsed.get('error'):
                 raise MaxPlayerError(f"Max Player respondió error: {parsed.get('error')}",
                                      kind=maxplayer_error_kind(200, parsed.get('error')), http_status=200)
+            if include_pagination and users_read:
+                return {'payload': parsed, 'has_more': response.headers.get('X-Has-More'),
+                        'next_cursor': response.headers.get('X-Next-Cursor')}
             return parsed
     except HTTPError as exc:
         raw = exc.read().decode('utf-8', errors='replace')
@@ -414,10 +418,12 @@ def iter_maxplayer_users(payload):
         if item is not payload and extract_maxplayer_user_id(item):
             yield item
 
-def get_maxplayer_users(params=None):
+def get_maxplayer_users(params=None, *, include_pagination=False):
     path = '/users'
     if params:
         path = f"{path}?{urlencode(params)}"
+    if include_pagination:
+        return maxplayer_request('GET', path, include_pagination=True)
     return maxplayer_request('GET', path)
 
 def find_maxplayer_user_id(username):
@@ -4193,8 +4199,8 @@ def maxplayer_comparacion():
         if not 0 <= grace_days <= 3650:raise ValueError()
     except (TypeError, ValueError):
         return jsonify({'error': 'El margen debe estar entre 0 y 3650 días.'}), 400
-    if request.method == 'GET' and not maxplayer_configured():
-        return jsonify({'error': 'La API de Max Player no está configurada. Puedes cargar un CSV reciente de Customers.',
+    if request.method == 'GET' and not maxplayer_configured(require_domain=False):
+        return jsonify({'error': 'Falta MAXPLAYER_API_TOKEN en el servicio web de Fénix. Puedes cargar un CSV reciente de Customers.',
                         'code': 'maxplayer_not_configured'}), 503
     if not _max_report_lock.acquire(blocking=False):
         return jsonify({'error': 'Ya hay una consulta de Max Player en proceso.'}), 409
@@ -4220,7 +4226,7 @@ def maxplayer_comparacion():
             complete = False
             source = 'CSV de Max Player (fecha declarada por el administrador)'
         else:
-            accounts, complete = fetch_max_report_customers(lambda params: get_maxplayer_users({**params, 'domain_id': str(MAXPLAYER_DOMAIN_ID)}))
+            accounts, complete = fetch_max_report_customers(lambda params: get_maxplayer_users(params, include_pagination=True))
             exported_on = today_gt().isoformat()
             source = 'API Max Player'
         db = get_db()

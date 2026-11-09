@@ -5,7 +5,6 @@ import csv
 import io
 import re
 import time
-from urllib.parse import urlparse
 from xui_report import day, GT
 
 
@@ -89,13 +88,21 @@ def parse_csv(content):
         raise MaxReportError('No se pudo interpretar el CSV exportado de Max Player.') from None
 
 
-def fetch_customers(get_users):
-    """Use existing authenticated GET only. Report unconfirmed completeness explicitly."""
-    rows=[];seen=set();page=1;expected=None;deadline=time.monotonic()+150
+def fetch_customers(get_users, *, pause=time.sleep):
+    """Documented cursor API: limit=100, X-Next-Cursor -> after_id until no more."""
+    rows=[];seen=set();cursors=set();cursor=None;deadline=time.monotonic()+150;last_request=None
     while True:
-        if time.monotonic()>deadline or page>100:
-            raise MaxReportError('La consulta de Max Player tardó demasiado. Puedes usar su exportación CSV.')
-        payload=get_users({'page':page,'per_page':500,'limit':500})
+        if time.monotonic()>deadline or len(cursors)>500:
+            raise MaxReportError('La consulta de Max Player tardó demasiado. No se mostrará un reporte parcial; puedes usar su CSV.')
+        if last_request is not None:
+            remaining=1.05-(time.monotonic()-last_request)
+            if remaining>0:pause(remaining)
+        params={'limit':100}
+        if cursor is not None:params['after_id']=cursor
+        last_request=time.monotonic()
+        page=get_users(params)
+        wrapped=isinstance(page,dict) and 'payload' in page and 'has_more' in page
+        payload=page['payload'] if wrapped else page
         container=payload
         if isinstance(payload,dict) and isinstance(payload.get('data'),dict):container=payload['data']
         batch=container if isinstance(container,list) else None
@@ -104,33 +111,25 @@ def fetch_customers(get_users):
                 if isinstance(container.get(name),list):batch=container[name];break
         if batch is None:
             raise MaxReportError('La API no devolvió una lista reconocible. Usa un CSV reciente de Customers.')
-        total=None
-        for meta in (container,payload,payload.get('meta') if isinstance(payload,dict) else None,
-                     payload.get('pagination') if isinstance(payload,dict) else None,
-                     container.get('meta') if isinstance(container,dict) else None):
-            if isinstance(meta,dict):
-                value=pick(meta,'total','total_count','recordsTotal','recordsFiltered')
-                if value is not None:
-                    try:total=int(value)
-                    except (ValueError,TypeError):raise MaxReportError('Max Player devolvió un total no válido.') from None
-                    break
-        if total is not None and (total<0 or total>50000 or expected is not None and total!=expected):
-            raise MaxReportError('El total de Max Player cambió durante la consulta. Vuelve a consultar.')
-        expected=total if total is not None else expected
         for raw in batch:
             account=normalize_customer(raw)
             identity=account['id'] or key(account['username'])
             if not identity or identity in seen:
                 raise MaxReportError('Max Player repitió cuentas entre páginas. Usa un CSV reciente para evitar un reporte parcial.')
             seen.add(identity);rows.append(account)
-        if len(rows)>50000 or expected is not None and len(rows)>expected:
-            raise MaxReportError('La cantidad de cuentas no coincide con el total informado.')
-        if expected is None:
+        if len(rows)>50000:raise MaxReportError('Max Player excedió el límite de cuentas permitido.')
+        more=clean(page.get('has_more')).casefold() if wrapped else ''
+        if not more:
             if not rows:raise MaxReportError('La API no devolvió cuentas de Max Player.')
+            # Without the documented final header, do not claim complete coverage.
             return rows,False
-        if len(rows)==expected:return rows,True
-        if not batch:raise MaxReportError('Max Player no entregó todas las páginas. No se mostrará un resultado parcial.')
-        page+=1
+        if more in ('false','0'):return rows,True
+        if more not in ('true','1'):
+            raise MaxReportError('Max Player devolvió una cabecera X-Has-More no válida.')
+        next_cursor=clean(page.get('next_cursor'))
+        if not batch or not next_cursor or len(next_cursor)>2048 or next_cursor in cursors:
+            raise MaxReportError('Max Player indicó más cuentas, pero el cursor falta o se repite. No se mostrará un reporte parcial.')
+        cursors.add(next_cursor);cursor=next_cursor
 
 
 def compare_accounts(clients,accounts,today,grace_days=7):

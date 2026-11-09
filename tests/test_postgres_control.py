@@ -69,10 +69,12 @@ with patch.object(app,'fetch_xui_report_lines',return_value=[]):
 assert not any(k.startswith('integration_credentials.') for k in client.get('/api/config').json)
 c.execute("SELECT valor FROM configuracion WHERE clave='integration_credentials.xui'")
 assert 'PG_SECRET_DEMO' not in c.fetchone()[0]
-with patch.object(app,'maxplayer_configured',return_value=True),patch.object(app,'maxplayer_request',return_value={'users':[{'id':1,'username':'PG_DEMO'}],'total':1}) as remote:
+with patch.object(app,'maxplayer_configured',return_value=True),patch.object(app,'maxplayer_request',return_value={'payload':[{'id':1,'username':'PG_DEMO'}],'has_more':'false','next_cursor':None}) as remote:
     report=client.get('/api/admin/maxplayer-comparacion')
     assert report.status_code==200,report.get_data(as_text=True)
-    assert remote.call_args.args[0]=='GET'
+    assert remote.call_args.args==('GET','/users?limit=100')
+    assert remote.call_args.kwargs=={'include_pagination':True}
+    assert report.json['source_complete'] is True
 c.execute('SELECT * FROM pagos WHERE id=%s',(old_id,));assert c.fetchone()==historical
 db.close()
 print('Postgres history, devices, expiry, reports, ledger and idempotency verified')
