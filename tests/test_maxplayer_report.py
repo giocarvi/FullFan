@@ -44,7 +44,7 @@ class MaxReportTests(unittest.TestCase):
             self.assertTrue(compare_accounts(clients,[account()],TODAY)['rows'][0]['candidate'])
         for client in [customer(expiry='2026-11-08'),customer(last_payment_recorded='2026-11-09T10:00:00'),customer(pending_activation=True),customer(expiry=None)]:
             self.assertFalse(compare_accounts([client],[account()],TODAY)['rows'][0]['candidate'])
-        self.assertFalse(compare_accounts([customer()],[account(enabled=False)],TODAY)['rows'][0]['candidate'])
+        self.assertTrue(compare_accounts([customer()],[account(enabled=False)],TODAY)['rows'][0]['candidate'])
         self.assertTrue(compare_accounts([customer(expiry='2026-11-08')],[account()],TODAY,0)['rows'][0]['candidate'])
 
     def test_csv_no_secrets_and_no_guessing_name_matches(self):

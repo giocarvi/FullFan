@@ -81,15 +81,24 @@ fs.mkdirSync(out,{recursive:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await page.locator('[data-xui-client="DEMO_FAMILIAR"]').click();await page.locator('#client-tab-summary').waitFor();await page.keyboard.press('Escape');
     assert.equal(xuiRequests,2);
-    // Max Player review is read-only; test both API and CSV sources with synthetic responses.
+    // Synthetic sources only; the cleanup routes below never reach a real provider.
     const maxRows=[
-      {maxplayer:{id:'1',username:'DEMO_OLD',list_usernames:['DEMO_OLD'],state:'no_confirmado',online:null,last_connection:'Nunca'},fenix:[],flags:['sin_fenix','candidato_revision','nunca_conecto'],candidate:true},
+      {maxplayer:{id:'1',username:'DEMO_OLD',list_usernames:['DEMO_OLD'],state:'no_confirmado',online:false,last_connection:'Nunca'},fenix:[],flags:['sin_fenix','candidato_revision','nunca_conecto'],candidate:true,can_prepare_deletion:true,deletion_block:null},
       {maxplayer:{id:'2',username:'DEMO_FAMILIAR',list_usernames:['DEMO_FAMILIAR'],state:'activo',online:false,last_connection:null},fenix:[{username:'DEMO_FAMILIAR',name:'Familia de ejemplo',expiry:'2026-12-01',state:'activo',days_expired:0,last_payment:'2026-11-09',recent_payment:true,pending_activation:false}],flags:['conservar_activo','pago_reciente'],candidate:false}
     ];
-    let maxRequests=0;
+    let maxRequests=0,cleanupDeleted=false;const cleanupCalls=[];
+    await page.route('**/api/admin/maxplayer-eliminaciones',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({csrf:'SYNTHETIC_CSRF',operations:cleanupDeleted?[{maxplayer_id:'1',username:'DEMO_OLD',actor:'DEMO_ADMIN',status:'deleted',reason:'No renovó el servicio',updated_at:'2026-11-09T10:00:00-06:00'}]:[]})}));
+    await page.route('**/api/admin/maxplayer/1/**',route=>{
+      cleanupCalls.push(route.request().url());assert.equal(route.request().method(),'POST');
+      assert.equal(route.request().headers()['x-csrf-token'],'SYNTHETIC_CSRF');
+      if(route.request().url().endsWith('/preparar-eliminacion'))return route.fulfill({contentType:'application/json',body:JSON.stringify({confirmation:'SYNTHETIC_CONFIRMATION',account:maxRows[0].maxplayer,fenix:[],flags:['sin_fenix'],expires_in:180,checked_at:'2026-11-09T10:00:00-06:00'})});
+      assert.ok(route.request().url().endsWith('/eliminar'));
+      const body=route.request().postDataJSON();assert.equal(body.confirmation,'SYNTHETIC_CONFIRMATION');assert.equal(body.typed_username,'DEMO_OLD');assert.equal(body.acknowledged,true);assert.ok(body.reason);
+      cleanupDeleted=true;return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,status:'deleted',message:'Cuenta eliminada de Max Player. Cliente y pagos Fénix conservados.'})});
+    });
     await page.route('**/api/admin/maxplayer-comparacion*',route=>{
       maxRequests++;assert.ok(['GET','POST'].includes(route.request().method()));
-      return route.fulfill({contentType:'application/json',body:JSON.stringify({rows:maxRows,counts:{sin_fenix:1,candidato_revision:1,conservar_activo:1},total_maxplayer:2,total_fenix:48,grace_days:7,source:route.request().method()==='POST'?'CSV de Max Player':'API Max Player',source_complete:false,exported_on:'2026-11-09',generated_at:'2026-11-09T10:00:00-06:00',today:'2026-11-09'})});
+      return route.fulfill({contentType:'application/json',body:JSON.stringify({rows:maxRows,counts:{sin_fenix:1,candidato_revision:1,conservar_activo:1},total_maxplayer:2,total_fenix:48,grace_days:7,deletion_csrf:'SYNTHETIC_CSRF',source:route.request().method()==='POST'?'CSV de Max Player':'API Max Player',source_complete:route.request().method()!=='POST',exported_on:'2026-11-09',generated_at:'2026-11-09T10:00:00-06:00',today:'2026-11-09'})});
     });
     await page.evaluate(()=>switchView('maxplayer'));await page.locator('#max-refresh').click();await page.locator('#max-list tbody tr').first().waitFor();
     assert.equal(await page.locator('#max-list tbody tr').count(),1);
@@ -98,12 +107,25 @@ fs.mkdirSync(out,{recursive:true});
     await page.screenshot({path:path.join(out,'admin_maxplayer_reporte.png')});
     const maxDownloadPromise=page.waitForEvent('download');await page.locator('#max-export').click();
     assert.equal((await maxDownloadPromise).suggestedFilename(),'fenix_vs_maxplayer_2026-11-09.csv');
+    await page.locator('[data-max-delete="1"]').click();await page.locator('#max-delete-submit').waitFor();
+    assert.equal(cleanupCalls.length,1);assert.equal(await page.locator('#max-delete-submit').isDisabled(),true);
+    await page.locator('#max-delete-typed').fill('wrong');await page.locator('#max-delete-ack').check();await page.locator('#max-delete-reason').selectOption({label:'No renovó el servicio'});
+    assert.equal(await page.locator('#max-delete-submit').isDisabled(),true);
+    await page.locator('#max-delete-typed').fill('DEMO_OLD');assert.equal(await page.locator('#max-delete-submit').isEnabled(),true);
+    await page.screenshot({path:path.join(out,'admin_maxplayer_confirmacion.png')});
+    await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.setViewportSize({width,height});
+    await page.locator('#max-delete-form').evaluate(form=>{form.requestSubmit();form.requestSubmit();});
+    await page.getByRole('heading',{name:'Eliminación confirmada',exact:true}).waitFor();
+    assert.equal(cleanupCalls.length,2);await page.locator('#max-cleanup-dialog [data-cleanup-close]').click();
+    await page.locator('#max-cleanup-history summary').click();await page.locator('#max-cleanup-history-list tbody tr').waitFor();
+    assert.ok((await page.locator('#max-cleanup-history-list').textContent()).includes('Ausencia confirmada'));
     await page.locator('#max-category').selectOption('conservar_activo');assert.equal(await page.locator('#max-list tbody tr').count(),1);
     await page.locator('[data-max-client="DEMO_FAMILIAR"]').click();await page.locator('#client-tab-summary').waitFor();await page.keyboard.press('Escape');
     await page.locator('.max-upload summary').click();
     await page.locator('#max-csv').setInputFiles({name:'synthetic.csv',mimeType:'text/csv',buffer:Buffer.from('MaxPlayer ID,Username\n1,DEMO_OLD\n')});
     await page.locator('#max-exported-on').fill('2026-11-09');await page.locator('#max-upload-form button').click();
     await page.waitForFunction(()=>document.querySelector('#max-updated').textContent.startsWith('CSV'));
+    await page.locator('#max-category').selectOption('candidato_revision');assert.equal(await page.locator('[data-max-delete="1"]').isDisabled(),true);
     assert.equal(maxRequests,2);
     await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.setViewportSize({width,height});
     await page.locator('.nav-btn[data-view=pagos]').click();await page.waitForSelector('#payments-list .ledger-table');
@@ -123,6 +145,7 @@ fs.mkdirSync(out,{recursive:true});
   } else {
     assert.equal(await page.locator('[data-view=maxplayer],#view-maxplayer').count(),0);
     assert.equal((await context.request.get(url+'/api/admin/maxplayer-comparacion')).status(),403);
+    assert.equal((await context.request.get(url+'/api/admin/maxplayer-eliminaciones')).status(),403);
     assert.equal(await page.locator('[data-view=xui],#view-xui').count(),0);
     assert.equal((await context.request.get(url+'/api/admin/xui-comparacion')).status(),403);
     assert.equal(await page.locator('.nav-btn[data-view=pagos]').count(),0);

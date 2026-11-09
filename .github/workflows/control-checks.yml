@@ -6,6 +6,8 @@ on:
       - app.py
       - xui_report.py
       - maxplayer_report.py
+      - maxplayer_cleanup.py
+      - maxplayer_cleanup_routes.py
       - integration_credentials.py
       - requirements.txt
       - templates/index.html

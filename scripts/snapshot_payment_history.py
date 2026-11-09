@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 TABLES=('clientes','pagos','client_service_credentials','client_portal_accounts',
-        'orders','activation_tasks','smartone_records','smartone_inventory','audit_log')
+        'orders','activation_tasks','smartone_records','smartone_inventory','audit_log','maxplayer_cleanup_operations')
 
 
 def digest(value):

@@ -640,7 +640,7 @@ body {
 }
 </style>
 <link rel="stylesheet" href="/static/control.css?v=20261109">
-{% if rol == 'admin' %}<link rel="stylesheet" href="/static/xui-report.css?v=20261109b">{% endif %}
+{% if rol == 'admin' %}<link rel="stylesheet" href="/static/xui-report.css?v=20261109d">{% endif %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -872,7 +872,7 @@ body {
 </div>
 <div id="view-maxplayer" class="view">
   <div class="page-heading"><div><h1>Fénix vs Max Player</h1><p>Cuentas que conviene conservar y cuentas para revisión · solo administrador</p></div><button id="max-refresh" class="btn-primary" type="button">Consultar API Max Player</button></div>
-  <p class="view-note">Este reporte no elimina, desactiva ni desconecta cuentas. «Candidato» significa revisar, no autorización de borrado. Tener cuenta en Max Player no confirma que su plan esté activo.</p>
+  <p class="view-note">Consultar el reporte no cambia cuentas. La eliminación es individual, solo para administrador y requiere una revisión actualizada y confirmación explícita. Conserva el cliente y todos sus pagos en Fénix.</p>
   <div id="max-message" role="status" aria-live="polite"></div>
   <details class="ops-card max-upload"><summary>Usar un CSV exportado de Customers</summary><form id="max-upload-form">
     <p class="view-note">Alternativa si la API no está disponible. Usa una exportación reciente: el archivo se analiza sin guardarse y no cambia clientes ni pagos.</p>
@@ -887,8 +887,9 @@ body {
     <p id="max-updated" class="view-note"></p>
     <div id="max-list" class="ledger-results xui-table-wrap"></div>
     <div class="ledger-pagination"><button id="max-prev" class="btn-secondary" type="button">Anterior</button><span id="max-page" aria-live="polite"></span><button id="max-next" class="btn-secondary" type="button">Siguiente</button></div>
-    <details class="ops-card xui-explanation"><summary>Criterios y precauciones</summary><p>Se comparan el usuario de Max Player y los usuarios de sus listas con el usuario Fénix y el usuario de servicio guardado. No se utilizan nombres parecidos. Una coincidencia activa en Fénix impide marcar la cuenta como candidata.</p><p>También se reservan los duplicados, coincidencias ambiguas, cuentas conectadas cuando Max Player lo confirma, pagos válidos registrados en los últimos 7 días, activaciones pendientes y vencimientos dentro del margen indicado. «Nunca conectó» no basta por sí solo para recomendar una limpieza.</p><p>El CSV y una API sin total confirmado pueden representar solo parte de la cartera. El reporte no considera que un cliente falte en Max Player por no aparecer en esa lista. La conexión y el estado de Max Player se muestran como «No confirmado» cuando la fuente no aporta ese dato.</p><p>Antes de cualquier eliminación futura se deben volver a verificar el vencimiento, el pago, la coincidencia y la conexión. El historial de Fénix permanece separado y no se borra.</p></details>
+    <details class="ops-card xui-explanation"><summary>Criterios y precauciones</summary><p>Se comparan los usuarios de cuenta/listas con el usuario Fénix, el usuario de servicio y el ID de Max Player guardado en Fénix. Una coincidencia vigente en Fénix bloquea el borrado, incluso si está archivada.</p><p>También se reservan duplicados, coincidencias ambiguas, pagos válidos registrados en los últimos 7 días, tareas pendientes y vencimientos dentro del margen. Para eliminar se exige una fecha verificable con al menos 7 días vencido, incluso en archivados, o ausencia de coincidencia revisada por el administrador. Si eliges un margen mayor, también se respeta. «Nunca conectó» no basta por sí solo.</p><p>Solo se prepara una eliminación desde una consulta completa de la API, nunca desde CSV. Si Max Player no confirma que esté desconectado, el botón queda bloqueado. Las comprobaciones se repiten al preparar y al confirmar; los sistemas externos pueden cambiar entre consultas y no hay una transacción compartida.</p><p>Una orden con resultado incierto no se reenvía automáticamente. Usa «Verificar estado» en el historial: solo consulta. El cliente, sus credenciales y sus pagos en Fénix no se eliminan.</p></details>
   </div>
+  <details id="max-cleanup-history" class="ops-card xui-explanation"><summary>Historial de eliminaciones solicitadas desde Fénix</summary><p>Últimas 100 operaciones. «Verificar estado» no envía una orden de borrado.</p><button id="max-cleanup-history-refresh" class="btn-secondary" type="button">Actualizar historial</button><div id="max-cleanup-history-list" class="ledger-results"></div></details>
 </div>
 <div id="view-resellers" class="view">
   <div class="config-form">
@@ -4148,6 +4149,6 @@ function renderTablaTrimestral(ventas) {
 }
 </script>
 <script src="/static/control.js?v=20261109"></script>
-{% if rol == 'admin' %}<script src="/static/xui-report.js?v=20261109b"></script><script src="/static/maxplayer-report.js?v=20261109c"></script>{% endif %}
+{% if rol == 'admin' %}<script src="/static/xui-report.js?v=20261109b"></script><script src="/static/maxplayer-report.js?v=20261109d"></script>{% endif %}
 </body>
 </html>
