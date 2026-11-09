@@ -92,12 +92,14 @@ class XuiMatchingTests(unittest.TestCase):
     def test_active_fenix_missing_time_devices_and_expired_xui(self):
         rows=self.compare([self.client()],[parse_line(raw_line(expiry='2026-11-08',devices='0 / 3',state='Expired'))])
         self.assertEqual(rows[0]['difference_days'],-23)
-        for flag in ['falta_tiempo_xui','fenix_activo_xui_no','dispositivos_distintos']:
+        for flag in ['falta_tiempo_xui','fenix_activo_xui_no','dispositivos_distintos','vencido_xui']:
             self.assertIn(flag,rows[0]['flags'])
 
     def test_xui_active_fenix_expired_and_today_inclusive(self):
         client=self.client();client['vencimiento']='2026-11-08'
-        self.assertIn('xui_activo_fenix_vencido',self.compare([client],[parse_line(raw_line())])[0]['flags'])
+        flags=self.compare([client],[parse_line(raw_line())])[0]['flags']
+        for flag in ['xui_activo_fenix_vencido','vencido_fenix','tiempo_extra_xui']:
+            self.assertIn(flag,flags)
         client['vencimiento']='2026-11-09'
         self.assertEqual(self.compare([client],[parse_line(raw_line())])[0]['fenix'][0]['state'],'activo')
 

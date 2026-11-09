@@ -185,6 +185,10 @@ def compare_clients(clients, lines, today):
             flags.append('solo_fenix')
         if any(item['archived'] for item in f):
             flags.append('archivados')
+        if any(item['state'] == 'vencido' for item in f):
+            flags.append('vencido_fenix')
+        if any(item['state'] == 'vencido' for item in x):
+            flags.append('vencido_xui')
         if len(f) == len(x) == 1:
             a, b = f[0], x[0]
             if a['expiry'] and b['expiry']:
@@ -193,6 +197,8 @@ def compare_clients(clients, lines, today):
                     flags.append('fechas_distintas')
                 if delta < 0 and a['state'] == 'activo':
                     flags.append('falta_tiempo_xui')
+                if delta > 0:
+                    flags.append('tiempo_extra_xui')
             if a['state'] != b['state']:
                 flags.append('estados_distintos')
             if a['state'] == 'activo' and b['state'] in ('vencido', 'bloqueado', 'inactivo'):

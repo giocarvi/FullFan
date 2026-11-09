@@ -7,7 +7,8 @@
     dispositivos_distintos:'Dispositivos distintos',solo_fenix:'Solo en Fénix',solo_xui:'Solo en XUI (giocarvi)',
     duplicados:'Duplicados / coincidencia ambigua',activos_ambos:'Activos en ambos',vencidos_ambos:'Vencidos en ambos',
     datos_incompletos:'Datos incompletos',archivados:'Archivados de Fénix',coinciden:'Sin diferencias detectadas',
-    estados_distintos:'Estados distintos',sin_vencimiento_xui:'XUI sin vencimiento'};
+    estados_distintos:'Estados distintos',sin_vencimiento_xui:'XUI sin vencimiento',
+    vencido_fenix:'Vencidos en Fénix',vencido_xui:'Vencidos en XUI',tiempo_extra_xui:'Más tiempo en XUI que en Fénix'};
   const states={activo:'Activo',vencido:'Vencido',bloqueado:'Bloqueado',inactivo:'Inactivo',sin_fecha:'Sin fecha',desconocido:'No confirmado',archivado:'Archivado'};
   let report=null,page=1,busy=false;
   const pageSize=50;
