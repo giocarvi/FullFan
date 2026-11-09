@@ -88,7 +88,20 @@ def parse_csv(content):
         raise MaxReportError('No se pudo interpretar el CSV exportado de Max Player.') from None
 
 
-def fetch_customers(get_users, *, pause=time.sleep):
+def normalize_page(page):
+    wrapped=isinstance(page,dict) and 'payload' in page and 'has_more' in page
+    payload=page['payload'] if wrapped else page
+    container=payload
+    if isinstance(payload,dict) and isinstance(payload.get('data'),dict):container=payload['data']
+    batch=container if isinstance(container,list) else None
+    if isinstance(container,dict):
+        for name in ('users','customers','items','results','data'):
+            if isinstance(container.get(name),list):batch=container[name];break
+    if batch is None:raise MaxReportError('La API no devolvió una lista reconocible. Usa un CSV reciente de Customers.')
+    return [normalize_customer(raw) for raw in batch]
+
+
+def fetch_customers(get_users, *, pause=time.sleep, page_observer=None):
     """Documented cursor API: limit=100, X-Next-Cursor -> after_id until no more."""
     rows=[];seen=set();cursors=set();cursor=None;deadline=time.monotonic()+150;last_request=None
     while True:
@@ -102,17 +115,9 @@ def fetch_customers(get_users, *, pause=time.sleep):
         last_request=time.monotonic()
         page=get_users(params)
         wrapped=isinstance(page,dict) and 'payload' in page and 'has_more' in page
-        payload=page['payload'] if wrapped else page
-        container=payload
-        if isinstance(payload,dict) and isinstance(payload.get('data'),dict):container=payload['data']
-        batch=container if isinstance(container,list) else None
-        if isinstance(container,dict):
-            for name in ('users','customers','items','results','data'):
-                if isinstance(container.get(name),list):batch=container[name];break
-        if batch is None:
-            raise MaxReportError('La API no devolvió una lista reconocible. Usa un CSV reciente de Customers.')
-        for raw in batch:
-            account=normalize_customer(raw)
+        batch=normalize_page(page)
+        if page_observer:page_observer(dict(params),batch)
+        for account in batch:
             identity=account['id'] or key(account['username'])
             if not identity or identity in seen:
                 raise MaxReportError('Max Player repitió cuentas entre páginas. Usa un CSV reciente para evitar un reporte parcial.')
@@ -133,19 +138,22 @@ def fetch_customers(get_users, *, pause=time.sleep):
 
 
 def compare_accounts(clients,accounts,today,grace_days=7):
-    index=defaultdict(dict)
+    index=defaultdict(dict);by_max_id=defaultdict(dict)
     for raw in clients:
         client=dict(raw);expiry=day(client.get('vencimiento'))
         archived=bool(client.get('archived_at'))
         client={'username':client['username'],'name':client.get('nombre') or client['username'],
                 'expiry':expiry.isoformat() if expiry else None,
                 'state':'archivado' if archived else 'sin_fecha' if not expiry else 'activo' if expiry>=today else 'vencido',
+                'has_current_service':bool(expiry and expiry>=today),
                 'days_expired':(today-expiry).days if expiry and expiry<today else 0,
                 'last_payment':clean(client.get('last_payment')) or None,
                 'recent_payment':bool(day(client.get('last_payment_recorded')) and day(client['last_payment_recorded'])>=today-timedelta(days=7)),
                 'pending_activation':bool(client.get('pending_activation'))}
         for alias in (raw['username'],raw.get('service_username')):
             if key(alias):index[key(alias)][raw['username']]=client
+        if clean(raw.get('maxplayer_user_id')):
+            by_max_id[clean(raw['maxplayer_user_id'])][raw['username']]=client
     names=Counter();ids=Counter(a['id'] for a in accounts if a['id'])
     for account in accounts:
         for alias in {key(account['username']),*(key(a) for a in account['list_usernames'])}-{''}:names[alias]+=1
@@ -154,9 +162,10 @@ def compare_accounts(clients,accounts,today,grace_days=7):
         aliases={key(account['username']),*(key(a) for a in account['list_usernames'])}-{''}
         found={}
         for alias in aliases:found.update(index.get(alias,{}))
+        found.update(by_max_id.get(account['id'],{}))
         matches=list(found.values());flags=[]
         duplicate=any(names[a]>1 for a in aliases) or bool(account['id'] and ids[account['id']]>1)
-        active=any(f['state']=='activo' for f in matches)
+        active=any(f['state']=='activo' or f.get('has_current_service') for f in matches)
         pending=any(f['pending_activation'] or f['recent_payment'] for f in matches)
         ambiguous=len(matches)>1 or duplicate
         if duplicate:flags.append('duplicados')
@@ -165,15 +174,15 @@ def compare_accounts(clients,accounts,today,grace_days=7):
         if not matches:flags.append('sin_fenix')
         if matches and all(f['state']=='archivado' for f in matches):flags.append('archivado_fenix')
         if any(f['state']=='vencido' for f in matches):flags.append('vencido_fenix')
-        if any(f['state']=='sin_fecha' for f in matches):flags.append('sin_fecha')
+        if any(not f['expiry'] for f in matches):flags.append('sin_fecha')
         if any(f['pending_activation'] for f in matches):flags.append('activacion_pendiente')
         if any(f['recent_payment'] for f in matches):flags.append('pago_reciente')
         if account['last_connection']=='Nunca':flags.append('nunca_conecto')
         if account['state']=='inactivo':flags.append('ya_inactivo_max')
         if account['state']=='no_confirmado':flags.append('estado_max_no_confirmado')
         if account['online'] is True:flags.append('conectado')
-        expired_long=bool(matches) and all(f['state']=='archivado' or f['state']=='vencido' and f['days_expired']>=grace_days for f in matches)
-        candidate=(not matches or expired_long) and not (active or pending or ambiguous or account['online'] is True or account['state']=='inactivo')
+        expired_long=bool(matches) and all(f['expiry'] and f['state'] in ('archivado','vencido') and f['days_expired']>=grace_days for f in matches)
+        candidate=(not matches or expired_long) and not (active or pending or ambiguous or account['online'] is True)
         if candidate:flags.append('candidato_revision')
         elif any(f['state']=='vencido' and f['days_expired']<grace_days for f in matches):flags.append('vencido_reciente')
         for flag in flags:counts[flag]+=1

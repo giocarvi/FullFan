@@ -13,10 +13,13 @@ import base64
 import secrets
 import unicodedata
 import traceback
+import sys
 import threading
 from xui_report import fetch_lines as fetch_xui_report_lines, compare_clients as compare_xui_clients, XuiReportError
 from integration_credentials import PREFIX as INTEGRATION_PREFIX, CredentialError, seal as seal_access, unseal as unseal_access
 from maxplayer_report import MaxReportError, fetch_customers as fetch_max_report_customers, parse_csv as parse_max_report_csv, compare_accounts as compare_max_accounts
+from maxplayer_cleanup import SCHEMA as MAXPLAYER_CLEANUP_SCHEMA
+from maxplayer_cleanup_routes import decorate_report as decorate_max_cleanup_report, register_routes as register_max_cleanup_routes
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -319,7 +322,8 @@ def maxplayer_configured(require_domain=True):
 
 def maxplayer_request(method, path, payload=None, *, include_pagination=False):
     users_read = method.upper() == 'GET' and path.split('?', 1)[0] == '/users'
-    if not maxplayer_configured(require_domain=not users_read):
+    single_user_delete = method.upper() == 'DELETE' and re.fullmatch(r'/users/[1-9]\d*', path) is not None
+    if not maxplayer_configured(require_domain=not (users_read or single_user_delete)):
         raise MaxPlayerError('Max Player no está configurado. Agrega MAXPLAYER_API_TOKEN y MAXPLAYER_DOMAIN_ID en Railway.', kind='not_configured')
     url = f"{MAXPLAYER_API_BASE}{path}"
     body = None
@@ -1175,6 +1179,8 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         )''')
 
+    # Operational deletion receipts are independent of clients and payment history.
+    c.execute(MAXPLAYER_CLEANUP_SCHEMA)
     conn.commit()
 
     # Migrar Excel si DB está vacía
@@ -4189,6 +4195,19 @@ def xui_comparacion():
 _max_report_lock = threading.Lock()
 
 
+def load_max_comparison_clients():
+    db=get_db()
+    try:
+        cursor=db.cursor()
+        cursor.execute(f'''SELECT c.username,c.nombre,c.vencimiento,c.archived_at,sc.service_username,sc.maxplayer_user_id,
+            (SELECT MAX(p.mes) FROM pagos p WHERE p.username=c.username AND {active_payment_where('p')}) AS last_payment,
+            (SELECT MAX(p.fecha_registro) FROM pagos p WHERE p.username=c.username AND {active_payment_where('p')}) AS last_payment_recorded,
+            EXISTS(SELECT 1 FROM activation_tasks t WHERE t.username=c.username AND t.status IN ('open','in_progress','blocked')) AS pending_activation
+            FROM clientes c LEFT JOIN client_service_credentials sc ON sc.username=c.username''')
+        return fetchall(cursor)
+    finally:db.close()
+
+
 @app.route('/api/admin/maxplayer-comparacion', methods=['GET', 'POST'])
 @login_required
 def maxplayer_comparacion():
@@ -4229,19 +4248,10 @@ def maxplayer_comparacion():
             accounts, complete = fetch_max_report_customers(lambda params: get_maxplayer_users(params, include_pagination=True))
             exported_on = today_gt().isoformat()
             source = 'API Max Player'
-        db = get_db()
-        try:
-            cursor = db.cursor()
-            cursor.execute(f'''SELECT c.username, c.nombre, c.vencimiento, c.archived_at, sc.service_username,
-                (SELECT MAX(p.mes) FROM pagos p WHERE p.username=c.username AND {active_payment_where('p')}) AS last_payment,
-                (SELECT MAX(p.fecha_registro) FROM pagos p WHERE p.username=c.username AND {active_payment_where('p')}) AS last_payment_recorded,
-                EXISTS(SELECT 1 FROM activation_tasks t WHERE t.username=c.username AND t.status IN ('open','in_progress','blocked')) AS pending_activation
-                FROM clientes c LEFT JOIN client_service_credentials sc ON sc.username=c.username''')
-            clients = fetchall(cursor)
-        finally:
-            db.close()
+        clients = load_max_comparison_clients()
         report = compare_max_accounts(clients, accounts, today_gt(), grace_days)
         report.update(source=source, source_complete=complete, exported_on=exported_on)
+        decorate_max_cleanup_report(sys.modules[__name__],report,request.method=='GET')
         response = jsonify(report)
         response.headers['Cache-Control'] = 'no-store'
         return response
@@ -5219,6 +5229,9 @@ def diagnostico():
     tablas = [r[0] for r in c.fetchall()]
     db.close()
     return jsonify({'total_pagos': total, 'ultimos_pagos': ultimos, 'tablas': tablas})
+
+
+register_max_cleanup_routes(app,sys.modules[__name__])
 
 
 if __name__ == '__main__':

@@ -25,7 +25,7 @@ def initialize():
 def seed():
     db=module.get_db()
     db.execute("DELETE FROM configuracion WHERE clave LIKE 'integration_credentials.%'")
-    for table in ['payment_submissions','pagos','activation_tasks','orders','client_service_credentials',
+    for table in ['maxplayer_cleanup_operations','payment_submissions','pagos','activation_tasks','orders','client_service_credentials',
                   'client_portal_accounts','smartone_records','smartone_inventory','clientes','usuarios','audit_log']:
         db.execute('DELETE FROM '+table)
     db.executemany('INSERT INTO usuarios(username,password,rol) VALUES(?,?,?)',[

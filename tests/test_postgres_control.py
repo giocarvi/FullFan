@@ -77,6 +77,35 @@ with patch.object(app,'maxplayer_configured',return_value=True),patch.object(app
     assert report.json['source_complete'] is True
 c.execute('SELECT * FROM pagos WHERE id=%s',(old_id,));assert c.fetchone()==historical
 db.close()
+
+# The only DELETE in this test is a mock; Postgres retains all client/payment data.
+db=app.get_db();c=db.cursor()
+c.execute("INSERT INTO usuarios(username,password,rol) VALUES('PG_TEST','synthetic','admin') ON CONFLICT(username) DO UPDATE SET rol='admin'")
+db.commit();db.close()
+from maxplayer_report import normalize_customer
+accounts=[normalize_customer({'id':999,'username':'PG_UNUSED','is_online':False,'last_login':0})]
+def fake_fetch(callback,**kwargs):
+    if kwargs.get('page_observer'):kwargs['page_observer']({'limit':100},accounts)
+    return list(accounts),True
+def fake_page(*args,**kwargs):
+    return {'payload':[{'id':999,'username':'PG_UNUSED','is_online':False,'last_login':0}] if accounts else [],'has_more':'false','next_cursor':None}
+def fake_delete(user_id):
+    assert user_id=='999'
+    accounts.clear()
+with patch.object(app,'fetch_max_report_customers',side_effect=fake_fetch),patch.object(app,'get_maxplayer_users',side_effect=fake_page),patch.object(app,'delete_maxplayer_user',side_effect=fake_delete) as deletion,patch.object(app.time,'sleep',return_value=None):
+    csrf=client.get('/api/admin/maxplayer-eliminaciones').json['csrf'];headers={'X-CSRF-Token':csrf}
+    prepare=client.post('/api/admin/maxplayer/999/preparar-eliminacion',json={'username':'PG_UNUSED'},headers=headers)
+    assert prepare.status_code==200,prepare.get_data(as_text=True)
+    body={'confirmation':prepare.json['confirmation'],'typed_username':'PG_UNUSED','reason':'No renovó, ejemplo','acknowledged':True}
+    result=client.post('/api/admin/maxplayer/999/eliminar',json=body,headers=headers)
+    assert result.status_code==200,result.get_data(as_text=True)
+    assert result.json['status']=='deleted'
+    assert client.post('/api/admin/maxplayer/999/eliminar',json=body,headers=headers).json['replayed'] is True
+    deletion.assert_called_once_with('999')
+db=app.get_db();c=db.cursor()
+c.execute('SELECT * FROM pagos WHERE id=%s',(old_id,));assert c.fetchone()==historical
+c.execute("SELECT status FROM maxplayer_cleanup_operations WHERE maxplayer_id='999'");assert c.fetchone()[0]=='deleted'
+db.close()
 print('Postgres history, devices, expiry, reports, ledger and idempotency verified')
 '''
         result=subprocess.run([sys.executable,'-c',script],cwd=Path(__file__).resolve().parents[1],

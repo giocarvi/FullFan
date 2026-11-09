@@ -32,6 +32,18 @@
 .xui-explanation { margin-top:24px; font-size:13px; line-height:1.7; color:var(--muted); }
 .xui-explanation summary { color:var(--text); cursor:pointer; font-weight:700; }
 .xui-explanation p { margin-top:12px; }
+.max-delete-btn { display:block; margin-top:10px; padding:9px 12px; border:1px solid #f87171; border-radius:8px; background:#9f2525; color:white; cursor:pointer; font-size:12px; }
+.max-delete-btn:disabled { cursor:not-allowed; opacity:.45; }
+.max-cleanup-dialog { width:min(620px,calc(100vw - 28px)); max-height:88vh; overflow:auto; border:1px solid var(--border); border-radius:16px; background:var(--card); color:var(--text); padding:24px; margin:auto; }
+.max-cleanup-dialog::backdrop { background:rgba(0,0,0,.8); }
+.max-cleanup-dialog h2 { margin-bottom:16px; font-size:21px; }
+.max-cleanup-dialog p { font-size:13px; line-height:1.65; margin:12px 0; }
+.max-cleanup-dialog .form-group { margin:18px 0; }
+.max-delete-warning { padding:12px; border:1px solid #f87171; border-radius:8px; background:rgba(239,68,68,.12); }
+.max-delete-ack { display:flex; align-items:flex-start; gap:10px; font-size:13px; line-height:1.6; }
+.max-delete-ack input { width:auto; margin-top:4px; }
+.max-delete-actions { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+.max-delete-actions button { width:auto; margin:0; }
 @media(max-width:900px) { .xui-filters { grid-template-columns:1fr 1fr; } }
 @media(max-width:600px) {
   .xui-summary { grid-template-columns:1fr 1fr; }
