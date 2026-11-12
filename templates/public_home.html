@@ -1,1015 +1,273 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fénix Digital TV | Tu entretenimiento, sin fronteras</title>
-  <meta name="description" content="Fénix Digital TV: deportes, películas, series y entretenimiento en tus dispositivos favoritos. Demo gratis de 3 horas.">
-  <style>
-    :root {
-      --bg:#070B18; --card:#111827; --card2:#171E33; --text:#F8F7F2; --muted:#A8B3CF;
-      --orange:#FF6A00; --gold:#FFC857; --purple:#7C3AED; --green:#10B981; --border:rgba(255,255,255,.12);
-    }
-    * { box-sizing:border-box; }
-    body { margin:0; font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif; background:
-      radial-gradient(circle at top left, rgba(255,106,0,.18), transparent 34%),
-      radial-gradient(circle at 85% 10%, rgba(124,58,237,.22), transparent 32%),
-      var(--bg); color:var(--text); }
-    a { color:inherit; text-decoration:none; }
-    .wrap { width:min(1120px, calc(100% - 32px)); margin:0 auto; }
-    header { position:sticky; top:0; z-index:10; backdrop-filter:blur(16px); background:rgba(7,11,24,.76); border-bottom:1px solid var(--border); }
-    .nav { display:flex; align-items:center; justify-content:space-between; min-height:74px; gap:16px; }
-    .logo { display:flex; align-items:center; gap:12px; }
-    .logo img { width:118px; max-height:52px; object-fit:contain; }
-    .nav-actions { display:flex; gap:10px; align-items:center; }
-    .link { color:var(--muted); font-size:14px; }
-    .nav-links { display:flex; gap:16px; align-items:center; color:var(--muted); font-size:13px; }
-    .nav-links a:hover { color:var(--gold); }
-    .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; border:none; border-radius:999px; padding:12px 18px; font-weight:800; cursor:pointer; transition:.18s; }
-    .btn:hover { transform:translateY(-1px); filter:brightness(1.06); }
-    .btn-primary { background:linear-gradient(135deg,var(--orange),var(--gold)); color:#160B02; box-shadow:0 14px 32px rgba(255,106,0,.25); }
-    .btn-ghost { border:1px solid var(--border); background:rgba(255,255,255,.04); color:var(--text); }
-    .hero { padding:72px 0 42px; display:grid; grid-template-columns:1.12fr .88fr; gap:34px; align-items:center; }
-    .eyebrow { display:inline-flex; border:1px solid rgba(255,200,87,.34); color:var(--gold); background:rgba(255,200,87,.08); padding:7px 12px; border-radius:999px; font-size:13px; font-weight:800; margin-bottom:18px; }
-    h1 { font-size:clamp(38px, 6vw, 72px); line-height:.98; margin:0 0 18px; letter-spacing:-.05em; }
-    .gradient { background:linear-gradient(135deg,#fff,var(--gold),var(--orange)); -webkit-background-clip:text; color:transparent; }
-    .lead { color:var(--muted); font-size:clamp(17px, 2.1vw, 22px); line-height:1.55; margin:0 0 24px; max-width:680px; }
-    .hero-actions { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:22px; }
-    .trust { display:flex; flex-wrap:wrap; gap:10px; color:var(--muted); font-size:13px; }
-    .chip { border:1px solid var(--border); background:rgba(255,255,255,.04); border-radius:999px; padding:8px 11px; }
-    .hero-card { background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03)); border:1px solid var(--border); border-radius:28px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
-    .landing-img { width:100%; display:block; border-radius:24px; border:1px solid var(--border); box-shadow:0 20px 54px rgba(0,0,0,.34); object-fit:cover; }
-    .image-card { position:relative; overflow:hidden; border-radius:28px; border:1px solid var(--border); background:rgba(255,255,255,.04); }
-    .image-card .landing-img { border:0; border-radius:28px; min-height:360px; }
-    .image-overlay { position:absolute; inset:auto 18px 18px 18px; padding:18px; border-radius:20px; background:linear-gradient(180deg,rgba(7,11,24,.2),rgba(7,11,24,.86)); border:1px solid rgba(255,255,255,.14); }
-    .image-overlay h3 { margin:0 0 6px; font-size:24px; }
-    .image-overlay p { margin:0; color:var(--muted); line-height:1.45; }
-    .screen { min-height:360px; border-radius:22px; background:
-      linear-gradient(135deg,rgba(255,106,0,.2),rgba(124,58,237,.18)),
-      linear-gradient(180deg,#111827,#090D1C); border:1px solid rgba(255,255,255,.14); padding:20px; position:relative; overflow:hidden; }
-    .screen:before { content:""; position:absolute; inset:auto -50px -70px auto; width:240px; height:240px; background:radial-gradient(circle,var(--orange),transparent 66%); opacity:.42; }
-    .live { display:inline-flex; gap:8px; align-items:center; background:rgba(239,68,68,.16); color:#FCA5A5; border:1px solid rgba(239,68,68,.35); padding:7px 10px; border-radius:999px; font-size:12px; font-weight:800; }
-    .screen h2 { font-size:34px; margin:58px 0 10px; max-width:360px; }
-    .screen p { color:var(--muted); max-width:360px; line-height:1.5; }
-    .poster-wall { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:22px; transform:rotate(-2deg); }
-    .poster { min-height:112px; border-radius:16px; padding:12px; display:flex; flex-direction:column; justify-content:flex-end; border:1px solid rgba(255,255,255,.16); box-shadow:0 12px 30px rgba(0,0,0,.28); overflow:hidden; position:relative; }
-    .poster:before { content:""; position:absolute; inset:0; background:linear-gradient(180deg,transparent,rgba(0,0,0,.72)); }
-    .poster span { position:relative; z-index:1; font-size:12px; color:#fff; font-weight:900; text-shadow:0 2px 8px rgba(0,0,0,.6); }
-    .poster:nth-child(1) { background:linear-gradient(135deg,#FF6A00,#7C2D12); }
-    .poster:nth-child(2) { background:linear-gradient(135deg,#2563EB,#111827); margin-top:18px; }
-    .poster:nth-child(3) { background:linear-gradient(135deg,#7C3AED,#DB2777); }
-    .poster:nth-child(4) { background:linear-gradient(135deg,#059669,#064E3B); }
-    .poster:nth-child(5) { background:linear-gradient(135deg,#F59E0B,#581C87); margin-top:-16px; }
-    .poster:nth-child(6) { background:linear-gradient(135deg,#DC2626,#020617); }
-    .mini-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:24px; }
-    .mini { background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:16px; padding:12px; min-height:78px; }
-    .mini b { display:block; font-size:22px; color:var(--gold); }
-    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:18px; }
-    .stat { background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:18px; padding:16px; text-align:center; }
-    .stat b { display:block; font-size:28px; color:var(--gold); margin-bottom:4px; }
-    .stat span { color:var(--muted); font-size:13px; }
-    section { padding:42px 0; }
-    .section-title { font-size:clamp(28px,4vw,44px); margin:0 0 10px; letter-spacing:-.035em; }
-    .section-sub { color:var(--muted); margin:0 0 22px; line-height:1.55; max-width:720px; }
-    .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
-    .card { background:rgba(17,24,39,.82); border:1px solid var(--border); border-radius:22px; padding:20px; }
-    .card h3 { margin:0 0 8px; font-size:19px; }
-    .card p { color:var(--muted); line-height:1.5; margin:0; }
-    .feature-list { display:grid; gap:10px; margin-top:14px; }
-    .feature { display:flex; gap:10px; color:var(--muted); line-height:1.45; }
-    .feature strong { color:var(--text); }
-    .feature span:first-child { color:var(--gold); font-weight:900; }
-    .plans { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
-    .plan-modes { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin:0 0 18px; }
-    .plan-mode { border:1px solid var(--border); border-radius:18px; padding:15px; background:rgba(255,255,255,.04); color:var(--muted); }
-    .plan-mode.active { border-color:rgba(255,200,87,.55); background:linear-gradient(135deg,rgba(255,106,0,.12),rgba(255,200,87,.06)); }
-    .plan-mode b { display:block; color:var(--text); margin-bottom:5px; }
-    .plan-mode small { color:var(--gold); font-weight:900; }
-    .plan { position:relative; background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.025)); border:1px solid var(--border); border-radius:22px; padding:20px; }
-    .plan.featured { border-color:rgba(255,200,87,.58); box-shadow:0 18px 50px rgba(255,106,0,.16); }
-    .badge { position:absolute; right:14px; top:14px; font-size:11px; color:#160B02; background:var(--gold); border-radius:999px; padding:5px 8px; font-weight:900; }
-    .price { font-size:34px; font-weight:900; margin:14px 0 4px; }
-    .usd { color:var(--muted); font-size:13px; margin-bottom:16px; }
-    .local-price { color:var(--gold); font-size:14px; font-weight:800; margin-bottom:14px; min-height:20px; }
-    .family-price { margin:10px 0 14px; padding:12px; border:1px solid var(--border); border-radius:16px; background:rgba(255,200,87,.08); }
-    .family-price span { display:block; color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-    .family-price b { display:block; color:var(--text); font-size:22px; margin:3px 0; }
-    .family-price small { display:block; color:var(--orange); font-weight:800; min-height:18px; }
-    .currency-box { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:0 0 18px; padding:12px; border:1px solid var(--border); border-radius:16px; background:rgba(255,255,255,.04); color:var(--muted); }
-    .currency-box select { width:auto; min-width:190px; padding:10px 12px; }
-    .plan ul { padding:0; list-style:none; margin:0 0 18px; color:var(--muted); display:grid; gap:8px; font-size:14px; }
-    .plan li:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
-    .payment-shell { margin-top:22px; border:1px solid var(--border); border-radius:26px; padding:20px; background:linear-gradient(135deg,rgba(255,106,0,.08),rgba(124,58,237,.08)); }
-    .payment-head { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:14px; }
-    .payment-head h3 { margin:0 0 6px; font-size:26px; letter-spacing:-.025em; }
-    .payment-head p { margin:0; color:var(--muted); line-height:1.45; }
-    .payment-table { display:grid; gap:10px; }
-    .payment-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; align-items:center; border:1px solid var(--border); border-radius:18px; padding:12px; background:rgba(255,255,255,.045); }
-    .payment-row b { display:block; }
-    .payment-row small { color:var(--muted); }
-    .payment-buttons { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
-    .payment-buttons .btn { padding:9px 12px; font-size:13px; }
-    .payment-buttons .disabled { opacity:.45; pointer-events:none; }
-    .paypal-plan-buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; grid-column:1/-1; margin-top:4px; }
-    .paypal-plan-buttons > div { min-width:0; }
-    .paypal-public { margin-top:14px; border:1px solid var(--border); border-radius:18px; padding:14px; background:rgba(255,255,255,.045); }
-    .paypal-public h4 { margin:0 0 6px; font-size:18px; }
-    .paypal-public p { margin:0 0 10px; color:var(--muted); line-height:1.45; }
-    .devices-shell { padding:22px; border:1px solid var(--border); border-radius:30px; background:
-      radial-gradient(circle at 8% 0%,rgba(255,106,0,.16),transparent 30%),
-      radial-gradient(circle at 92% 10%,rgba(124,58,237,.18),transparent 34%),
-      rgba(255,255,255,.025); box-shadow:0 24px 70px rgba(0,0,0,.22); }
-    .devices-head { display:flex; align-items:flex-end; justify-content:space-between; gap:18px; margin-bottom:18px; }
-    .devices-head .section-title { margin-bottom:8px; }
-    .app-video-card { display:grid; grid-template-columns:1.05fr .95fr; gap:18px; align-items:center; padding:18px; border:1px solid rgba(255,255,255,.12); border-radius:26px; background:linear-gradient(135deg,rgba(255,106,0,.09),rgba(124,58,237,.11)); margin:0 0 18px; box-shadow:0 18px 48px rgba(0,0,0,.22); }
-    .app-video-copy h3 { margin:0 0 8px; font-size:26px; letter-spacing:-.02em; }
-    .app-video-copy p { margin:0 0 14px; color:var(--muted); line-height:1.5; }
-    .app-video-copy ul { margin:0; padding:0; list-style:none; display:grid; gap:8px; color:#DDE7FF; font-size:14px; }
-    .app-video-copy li:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
-    .app-video { width:100%; aspect-ratio:16/9; display:block; border:1px solid rgba(255,255,255,.14); border-radius:20px; background:#020617; box-shadow:0 16px 40px rgba(0,0,0,.28); }
-    .device-chips { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; min-width:260px; }
-    .device-chip { color:#DDE7FF; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); border-radius:999px; padding:8px 10px; font-size:12px; font-weight:800; }
-    .devices { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
-    .device { background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.028)); border:1px solid rgba(255,255,255,.12); border-radius:22px; padding:14px; color:var(--muted); transition:.18s; display:flex; flex-direction:column; min-height:244px; overflow:hidden; position:relative; box-shadow:0 16px 34px rgba(0,0,0,.18); }
-    .device:before { content:""; position:absolute; inset:0; background:linear-gradient(135deg,rgba(255,200,87,.08),transparent 38%); opacity:0; transition:.18s; pointer-events:none; }
-    .device:hover { transform:translateY(-4px); border-color:rgba(255,200,87,.5); background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.04)); box-shadow:0 20px 48px rgba(0,0,0,.28); }
-    .device:hover:before { opacity:1; }
-    .device b { color:var(--text); display:block; margin-bottom:8px; font-size:16px; line-height:1.2; letter-spacing:-.01em; }
-    .device small { display:inline-flex; width:max-content; max-width:100%; color:#C9D7FF; font-size:12px; font-weight:850; border:1px solid rgba(124,58,237,.34); background:rgba(124,58,237,.14); border-radius:999px; padding:6px 9px; margin-bottom:10px; }
-    .device span { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--gold); margin-top:auto; font-weight:900; }
-    .device span:after { content:""; width:22px; height:1px; background:linear-gradient(90deg,var(--gold),transparent); display:inline-block; }
-    .device-scene { min-height:128px; position:relative; margin:0 0 14px; border-radius:18px; background:
-      radial-gradient(circle at 16% 16%,rgba(255,200,87,.2),transparent 30%),
-      radial-gradient(circle at 86% 86%,rgba(124,58,237,.2),transparent 34%),
-      linear-gradient(135deg,rgba(255,106,0,.1),rgba(124,58,237,.18)),
-      rgba(7,11,24,.72); border:1px solid rgba(255,255,255,.12); overflow:hidden; }
-    .device-scene.photo { min-height:160px; background-size:cover; background-position:center; }
-    .device-scene.photo:after { content:none; }
-    .device-scene:before { content:""; position:absolute; left:12px; right:12px; bottom:10px; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent); }
-    .device-art { position:absolute; inset:18px auto auto 18px; opacity:.92; }
-    .mobile-pair .phone { position:absolute; left:6px; top:26px; width:30px; height:58px; border:3px solid rgba(255,255,255,.88); border-radius:10px; background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.03)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
-    .mobile-pair .tablet { position:absolute; left:40px; top:14px; width:68px; height:78px; border:3px solid rgba(255,255,255,.88); border-radius:14px; background:linear-gradient(135deg,rgba(255,106,0,.18),rgba(124,58,237,.18)); box-shadow:0 16px 30px rgba(0,0,0,.25); }
-    .tv-art { left:18px; top:24px; width:106px; height:66px; border:4px solid rgba(255,255,255,.86); border-radius:12px; background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.02)); box-shadow:0 18px 32px rgba(0,0,0,.28); }
-    .tv-art:after { content:""; position:absolute; left:40px; right:40px; bottom:-13px; height:4px; background:rgba(255,255,255,.78); border-radius:999px; box-shadow:0 10px 0 8px rgba(255,255,255,.16); }
-    .computer-art { left:18px; top:23px; width:106px; height:66px; border:4px solid rgba(255,255,255,.84); border-radius:10px; background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(37,99,235,.15)); }
-    .computer-art:after { content:""; position:absolute; left:18px; right:18px; bottom:-17px; height:6px; border-radius:999px; background:rgba(255,255,255,.78); }
-    .stick-art { left:18px; top:46px; width:96px; height:34px; border-radius:999px; background:linear-gradient(135deg,#222,#0b1020); border:1px solid rgba(255,255,255,.22); box-shadow:0 15px 28px rgba(0,0,0,.3); }
-    .stick-art:after { content:""; position:absolute; right:-18px; top:9px; width:26px; height:16px; border-radius:5px; background:#151925; border:1px solid rgba(255,255,255,.15); }
-    .brand-strip { position:absolute; right:10px; top:10px; bottom:10px; width:74px; display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:7px; }
-    .brand-logo { width:74px; height:42px; object-fit:contain; padding:6px 7px; border-radius:12px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.12); box-shadow:0 10px 22px rgba(0,0,0,.16); }
-    .brand-logo.single { width:122px; height:56px; }
-    .brand-strip.single-center { inset:0; width:auto; align-items:center; justify-content:center; }
-    .brand-strip.single-right { inset:0 14px 0 auto; width:126px; align-items:center; justify-content:center; }
-    .support-icons { height:100%; display:flex; align-items:center; justify-content:center; gap:14px; }
-    .support-logo { width:86px; height:86px; object-fit:contain; padding:9px; border-radius:24px; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.12); box-shadow:0 14px 30px rgba(0,0,0,.24); }
-    .support-logo.round { border-radius:50%; }
-    .demo-card { display:grid; place-items:center; text-align:center; width:148px; min-height:76px; border-radius:20px; background:linear-gradient(135deg,rgba(255,106,0,.92),rgba(255,200,87,.94)); color:#170B02; font-weight:950; box-shadow:0 16px 34px rgba(0,0,0,.26); }
-    .demo-card b { display:block; color:#170B02; font-size:28px; line-height:1; margin:0; }
-    .demo-card small { color:#3B1900; font-size:12px; font-weight:900; }
-    .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; counter-reset:steps; }
-    .step { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:22px; padding:18px; position:relative; }
-    .step:before { counter-increment:steps; content:counter(steps); display:inline-grid; place-items:center; width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,var(--orange),var(--gold)); color:#190C02; font-weight:900; margin-bottom:14px; }
-    .step h3 { margin:0 0 8px; }
-    .step p { color:var(--muted); line-height:1.5; margin:0; }
-    .sports-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:18px; align-items:stretch; }
-    .sports-card { background:linear-gradient(135deg,rgba(255,106,0,.14),rgba(124,58,237,.14)); border:1px solid var(--border); border-radius:28px; padding:24px; overflow:hidden; position:relative; }
-    .sports-image { min-height:360px; background-position:center; background-size:cover; border-radius:28px; border:1px solid var(--border); position:relative; overflow:hidden; }
-    .sports-image:after { content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(7,11,24,.82),rgba(7,11,24,.18)); }
-    .sports-image-content { position:absolute; z-index:1; left:24px; bottom:24px; right:24px; max-width:520px; }
-    .sports-card:after { content:""; position:absolute; right:-60px; bottom:-70px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle,rgba(255,200,87,.35),transparent 70%); }
-    .event-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
-    .event { background:rgba(0,0,0,.2); border:1px solid var(--border); border-radius:16px; padding:13px; color:var(--muted); }
-    .event b { color:var(--text); display:block; margin-bottom:4px; }
-    .showcase { overflow:hidden; border:1px solid var(--border); border-radius:28px; background:rgba(255,255,255,.035); padding:18px; }
-    .showcase-image { margin-bottom:14px; max-height:360px; object-position:center; }
-    .rail { display:grid; grid-template-columns:repeat(8, minmax(120px,1fr)); gap:12px; min-width:980px; }
-    .tile { min-height:170px; border-radius:18px; border:1px solid rgba(255,255,255,.15); padding:14px; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(135deg,rgba(255,106,0,.6),rgba(124,58,237,.5)); position:relative; overflow:hidden; }
-    .tile:before { content:""; position:absolute; width:90px; height:90px; border-radius:50%; top:-28px; right:-26px; background:radial-gradient(circle,rgba(255,255,255,.28),transparent 68%); }
-    .tile:after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.72)); }
-    .tile b, .tile small, .tile .tile-icon { position:relative; z-index:1; }
-    .tile b { display:block; font-size:14px; margin-bottom:6px; }
-    .tile small { display:block; color:rgba(255,255,255,.78); line-height:1.35; font-weight:600; }
-    .tile-icon { width:48px; height:48px; display:grid; place-items:center; border-radius:16px; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.18); font-size:25px; box-shadow:0 10px 22px rgba(0,0,0,.22); }
-    .tile:nth-child(2n) { background:linear-gradient(135deg,rgba(16,185,129,.65),rgba(37,99,235,.45)); }
-    .tile:nth-child(3n) { background:linear-gradient(135deg,rgba(239,68,68,.65),rgba(245,158,11,.45)); }
-    .premium-list { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:16px; }
-    .premium-list div { background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:16px; padding:13px; color:var(--muted); }
-    .premium-list strong { color:var(--text); display:block; margin-bottom:4px; }
-    .reseller { background:
-      radial-gradient(circle at 20% 10%, rgba(255,200,87,.18), transparent 34%),
-      linear-gradient(135deg,rgba(255,106,0,.12),rgba(124,58,237,.16)); border:1px solid var(--border); border-radius:30px; padding:28px; }
-    .reseller-head { display:grid; grid-template-columns:1fr .8fr; gap:24px; align-items:center; margin-bottom:20px; }
-    .reseller-pill { display:inline-flex; width:max-content; color:#160B02; background:linear-gradient(135deg,var(--gold),#fff3b0); border-radius:999px; padding:8px 12px; font-size:12px; font-weight:900; margin-bottom:12px; }
-    .reseller-packages { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:18px; }
-    .reseller-package { background:rgba(7,11,24,.72); border:1px solid var(--border); border-radius:22px; padding:18px; position:relative; }
-    .reseller-package.featured { border-color:rgba(255,200,87,.7); box-shadow:0 18px 46px rgba(255,106,0,.18); }
-    .reseller-package h3 { margin:0 0 8px; }
-    .reseller-price { font-size:28px; font-weight:900; color:var(--gold); margin:10px 0 4px; }
-    .reseller-package ul { list-style:none; padding:0; margin:14px 0; display:grid; gap:8px; color:var(--muted); font-size:14px; }
-    .reseller-package li:before { content:"✓"; color:var(--green); font-weight:900; margin-right:8px; }
-    .audience { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
-    .audience-card { background:rgba(255,255,255,.05); border:1px solid var(--border); border-radius:18px; padding:15px; color:var(--muted); }
-    .audience-card b { display:block; color:var(--text); margin-bottom:5px; }
-    .cta-band { display:flex; align-items:center; justify-content:space-between; gap:18px; background:linear-gradient(135deg,var(--orange),var(--purple)); border-radius:28px; padding:26px; box-shadow:0 22px 60px rgba(255,106,0,.22); }
-    .cta-band h2 { margin:0 0 6px; font-size:clamp(26px,4vw,42px); }
-    .cta-band p { margin:0; color:rgba(255,255,255,.82); }
-    .formbox { display:grid; grid-template-columns:1fr 1fr; gap:24px; background:linear-gradient(135deg,rgba(255,106,0,.12),rgba(124,58,237,.12)); border:1px solid var(--border); border-radius:28px; padding:24px; }
-    .form { display:grid; gap:10px; }
-    input, select, textarea { width:100%; border:1px solid var(--border); background:rgba(7,11,24,.78); color:var(--text); border-radius:13px; padding:13px; font:inherit; }
-    textarea { min-height:86px; resize:vertical; }
-    footer { border-top:1px solid var(--border); color:var(--muted); padding:28px 0 40px; font-size:13px; }
-    .faq { display:grid; gap:10px; }
-    details { background:rgba(255,255,255,.045); border:1px solid var(--border); border-radius:16px; padding:14px 16px; }
-    summary { cursor:pointer; font-weight:800; }
-    details p { color:var(--muted); line-height:1.5; }
-    @media (max-width:900px) {
-      .hero, .formbox { grid-template-columns:1fr; }
-      .cards, .plans { grid-template-columns:1fr 1fr; }
-      .plan-modes { grid-template-columns:1fr; }
-      .devices-head { align-items:flex-start; flex-direction:column; }
-      .device-chips { justify-content:flex-start; min-width:0; }
-      .app-video-card { grid-template-columns:1fr; }
-      .devices { grid-template-columns:1fr 1fr; }
-      .stats, .steps { grid-template-columns:1fr 1fr; }
-      .sports-grid { grid-template-columns:1fr; }
-      .nav-links { display:none; }
-      .premium-list { grid-template-columns:1fr; }
-      .reseller-head, .reseller-packages, .audience { grid-template-columns:1fr; }
-    }
-    @media (max-width:560px) {
-      .wrap { width:min(100% - 24px,1120px); }
-      .nav { align-items:flex-start; flex-direction:column; padding:12px 0; }
-      .logo img { width:104px; }
-      .nav-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-      .nav-actions .link { display:none; }
-      .devices-shell { padding:16px; border-radius:24px; }
-      .cards, .plans, .devices, .mini-grid { grid-template-columns:1fr; }
-      .payment-head { display:block; }
-      .payment-row { grid-template-columns:1fr; }
-      .payment-buttons { justify-content:stretch; }
-      .paypal-plan-buttons { grid-template-columns:1fr; }
-      .stats, .steps, .event-grid { grid-template-columns:1fr; }
-      .cta-band { flex-direction:column; align-items:flex-start; }
-      .hero { padding:36px 0 28px; gap:22px; }
-      h1 { font-size:clamp(36px,12vw,52px); }
-      .lead { font-size:16px; }
-      .nav-actions { width:100%; justify-content:space-between; }
-      .btn { width:100%; min-height:44px; padding:12px 14px; }
-      .hero-actions .btn { width:100%; }
-      .hero-card, .image-card, .sports-card, .reseller, .formbox { border-radius:22px; padding:16px; }
-      .image-card .landing-img, .sports-image { min-height:260px; border-radius:20px; }
-      .image-overlay { left:12px; right:12px; bottom:12px; padding:14px; }
-      .image-overlay h3 { font-size:20px; }
-      .poster-wall { grid-template-columns:repeat(2,1fr); }
-      .poster { min-height:96px; }
-      section { padding:30px 0; }
-      .section-title { font-size:30px; }
-      .currency-box { display:grid; }
-      .currency-box select { min-width:0; width:100%; }
-      .plan { padding:18px; }
-      .price { font-size:32px; }
-      .devices-head { gap:8px; }
-      .device { min-height:220px; }
-      .device-scene { min-height:112px; }
-      .brand-logo { width:68px; height:38px; }
-      .support-logo { width:72px; height:72px; }
-      .demo-card { width:130px; min-height:68px; }
-      .rail-wrap, .showcase { overflow-x:auto; }
-      .rail { min-width:860px; }
-      .reseller-package { padding:16px; }
-      .cta-band { padding:20px; border-radius:22px; }
-      .formbox { grid-template-columns:1fr; gap:16px; }
-      input, select, textarea { font-size:16px; }
-    }
-    @media (max-width:380px) {
-      .nav-actions { grid-template-columns:1fr; }
-      .poster-wall { grid-template-columns:1fr; }
-      .device-chip { font-size:11px; }
-    }
-  </style>
-  <style>
-    :root {
-      --bg:#F7F8FC;
-      --card:#FFFFFF;
-      --card2:#F2F5FA;
-      --text:#111827;
-      --muted:#5F6B7A;
-      --orange:#FF6A00;
-      --gold:#F6B73C;
-      --purple:#6D28D9;
-      --green:#059669;
-      --border:rgba(17,24,39,.12);
-      --soft-shadow:0 18px 45px rgba(15,23,42,.08);
-      --deep-shadow:0 24px 70px rgba(15,23,42,.12);
-    }
-    body {
-      background:
-        radial-gradient(circle at top left, rgba(255,106,0,.12), transparent 34%),
-        radial-gradient(circle at 88% 8%, rgba(109,40,217,.10), transparent 30%),
-        linear-gradient(180deg,#FFFFFF 0%,#F7F8FC 48%,#FFFFFF 100%);
-      color:var(--text);
-    }
-    header {
-      background:linear-gradient(135deg,#071426,#0B1B34 62%,#0E2446);
-      border-bottom:1px solid rgba(255,255,255,.10);
-      box-shadow:0 12px 30px rgba(15,23,42,.16);
-    }
-    header .logo img {
-      filter:none;
-    }
-    header .nav-links,
-    header .link {
-      color:#C8D6EA;
-    }
-    header .nav-links a:hover,
-    header .link:hover {
-      color:#FFFFFF;
-    }
-    .link, .nav-links, .lead, .section-sub, .card p, .feature, .usd, .plan ul, .device, .step p, .event, .premium-list div, .audience-card, details p, footer, .payment-head p, .payment-row small, .paypal-public p {
-      color:var(--muted);
-    }
-    .nav-links a:hover, .device span, .local-price, .reseller-price, .tile-icon {
-      color:var(--orange);
-    }
-    .gradient {
-      background:linear-gradient(135deg,#111827,var(--orange),var(--purple));
-      -webkit-background-clip:text;
-      color:transparent;
-    }
-    .eyebrow {
-      color:#9A4A00;
-      border-color:rgba(255,106,0,.22);
-      background:#FFF4E8;
-    }
-    .btn-primary {
-      background:linear-gradient(135deg,var(--orange),var(--gold));
-      color:#160B02;
-      box-shadow:0 14px 32px rgba(255,106,0,.22);
-    }
-    .btn-ghost {
-      color:var(--text);
-      background:#FFFFFF;
-      border:1px solid rgba(17,24,39,.14);
-      box-shadow:0 8px 18px rgba(15,23,42,.05);
-    }
-    .chip, .stat, .card, .plan-mode, .plan, .device, .step, details, .premium-list div, .audience-card, .event, .currency-box, .payment-row, .paypal-public {
-      background:#FFFFFF;
-      border-color:rgba(17,24,39,.12);
-      box-shadow:var(--soft-shadow);
-    }
-    .hero-card, .devices-shell, .showcase, .reseller, .formbox, .payment-shell {
-      background:linear-gradient(180deg,#FFFFFF,#F8FAFC);
-      border-color:rgba(17,24,39,.12);
-      box-shadow:var(--deep-shadow);
-    }
-    .image-card, .sports-image {
-      border-color:rgba(17,24,39,.10);
-      box-shadow:var(--soft-shadow);
-    }
-    .screen {
-      background:
-        radial-gradient(circle at 82% 80%, rgba(255,106,0,.14), transparent 35%),
-        linear-gradient(135deg,#FFFFFF,#F3F6FC);
-      border-color:rgba(17,24,39,.12);
-    }
-    .screen h2, .screen p { color:var(--text); }
-    .mini {
-      background:#FFFFFF;
-      border-color:rgba(17,24,39,.10);
-      color:var(--muted);
-      box-shadow:0 10px 22px rgba(15,23,42,.06);
-    }
-    .mini b, .stat b {
-      color:var(--orange);
-    }
-    .cards .card, .plan, .device, .step {
-      transition:.18s ease;
-    }
-    .cards .card:hover, .plan:hover, .step:hover {
-      transform:translateY(-3px);
-      box-shadow:0 24px 55px rgba(15,23,42,.11);
-    }
-    .plan {
-      background:linear-gradient(180deg,#FFFFFF,#F8FAFC);
-    }
-    .plan.featured {
-      border-color:rgba(255,106,0,.46);
-      box-shadow:0 22px 60px rgba(255,106,0,.12);
-    }
-    .badge {
-      background:linear-gradient(135deg,var(--orange),var(--gold));
-    }
-    .currency-box select, input, select, textarea {
-      background:#FFFFFF;
-      color:var(--text);
-      border-color:rgba(17,24,39,.14);
-    }
-    .devices-shell {
-      background:
-        radial-gradient(circle at 8% 0%,rgba(255,106,0,.10),transparent 30%),
-        radial-gradient(circle at 92% 10%,rgba(109,40,217,.10),transparent 34%),
-        #FFFFFF;
-    }
-    .device {
-      background:linear-gradient(180deg,#FFFFFF,#F8FAFC);
-      border-color:rgba(17,24,39,.12);
-      box-shadow:var(--soft-shadow);
-    }
-    .device:hover {
-      border-color:rgba(255,106,0,.38);
-      background:#FFFFFF;
-      box-shadow:0 22px 52px rgba(15,23,42,.12);
-    }
-    .device b, .plan-mode b, .audience-card b, .premium-list strong, .event b, summary {
-      color:var(--text);
-    }
-    .device small {
-      color:#0B1B34;
-      background:#EAF2FF;
-      border-color:#C9DDF6;
-    }
-    .device span {
-      color:#FF6A00;
-    }
-    .device-scene {
-      background:
-        radial-gradient(circle at 16% 16%,rgba(255,183,60,.22),transparent 30%),
-        radial-gradient(circle at 86% 86%,rgba(109,40,217,.16),transparent 34%),
-        linear-gradient(135deg,#FFF7ED,#EEF2FF);
-      border-color:rgba(17,24,39,.10);
-    }
-    .device-scene.photo {
-      border-color:rgba(17,24,39,.12);
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.34);
-    }
-    .brand-logo, .support-logo {
-      background:rgba(255,255,255,.82);
-      border-color:rgba(17,24,39,.10);
-    }
-    .tile {
-      box-shadow:0 16px 36px rgba(15,23,42,.12);
-    }
-    .sports-card, .reseller {
-      background:
-        radial-gradient(circle at 20% 10%, rgba(255,183,60,.16), transparent 34%),
-        linear-gradient(135deg,#FFFFFF,#F8FAFC);
-    }
-    .sports-image:after {
-      background:linear-gradient(90deg,rgba(255,255,255,.94),rgba(255,255,255,.36));
-    }
-    .sports-image-content .section-title,
-    .sports-image-content .section-sub {
-      color:var(--text);
-      text-shadow:none;
-    }
-    .reseller-package {
-      background:#FFFFFF;
-      border-color:rgba(17,24,39,.12);
-      box-shadow:var(--soft-shadow);
-    }
-    .reseller-package.featured {
-      border-color:rgba(255,106,0,.46);
-      box-shadow:0 22px 60px rgba(255,106,0,.12);
-    }
-    .cta-band {
-      color:#FFFFFF;
-    }
-    .cta-band p, .cta-band a {
-      color:rgba(255,255,255,.9);
-    }
-    .cta-band .btn-primary {
-      background:#FFFFFF;
-      color:#7C2D12;
-    }
-    footer {
-      background:#FFFFFF;
-      border-top-color:rgba(17,24,39,.10);
-    }
-    @media (max-width:560px) {
-      header { position:relative; }
-      .hero-card { padding:12px; }
-      .stats { gap:10px; }
-      .stat { padding:14px 10px; }
-      .section-sub { line-height:1.6; }
-      .cards .card, .plan, .device, .step, details { box-shadow:0 12px 28px rgba(15,23,42,.07); }
-      .nav-actions {
-        grid-template-columns:1fr;
-      }
-      .nav-actions .btn {
-        width:100%;
-      }
-    }
-  </style>
+  <title>Fénix Digital TV | Deportes, películas y series</title>
+  <meta name="description" content="Prueba Fénix Digital TV durante 3 horas. Consulta planes de hasta 3 o 6 dispositivos simultáneos y encuentra la guía para tu equipo.">
+  <link rel="stylesheet" href="{{ url_for('static', filename='public-home.css') }}">
+  <script defer src="{{ url_for('static', filename='public-home.js') }}"></script>
 </head>
-<body>
-  <header>
-    <div class="wrap nav">
-      <a class="logo" href="/inicio"><img src="{{ url_for('static', filename='logo.png') }}" alt="Fénix Digital TV"></a>
-      <nav class="nav-links">
-        <a href="#planes">Planes</a>
-        <a href="#deportes">Deportes</a>
-        <a href="#dispositivos">Dispositivos</a>
-        <a href="#revendedores">Revendedores</a>
-        <a href="#como-funciona">Cómo funciona</a>
-        <a href="#faq">FAQ</a>
-      </nav>
-      <div class="nav-actions">
-        <a class="link" href="/cliente/login">Portal clientes</a>
-        <a class="link" href="/login">Equipo</a>
-        <a class="link" href="mailto:soporte@fenixdigitaltv.net">soporte@fenixdigitaltv.net</a>
-        <a class="btn btn-primary" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%20Digital%20TV%2C%20quiero%20informaci%C3%B3n%20del%20servicio" target="_blank" rel="noopener">WhatsApp</a>
-      </div>
+<body data-whatsapp="https://wa.me/50241562336"{% if paypal_client_id %} data-paypal-client="{{ paypal_client_id }}"{% endif %}{% if preview %} data-preview{% endif %}>
+  {% set whatsapp = 'https://wa.me/50241562336' %}
+  {% set support = whatsapp ~ '?text=Hola%20F%C3%A9nix%20Digital%20TV%2C%20necesito%20ayuda' %}
+  {% set site = 'https://www.fenixdigitaltv.net' if preview else '' %}
+  {% set contact = '#faq' if preview else support %}
+  {% set first = payment_plans[0] %}
+  {% macro links() %}
+    <a href="#planes">Planes</a>
+    <a href="#dispositivos">Dispositivos</a>
+    <a href="#faq">Ayuda</a>
+    <a href="#revendedores">Revendedores</a>
+  {% endmacro %}
+  {% if preview %}<div class="preview-banner">Vista previa local · Los pagos y los mensajes no se envían.</div>{% endif %}
+  <a class="skip" href="#contenido">Saltar al contenido</a>
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a class="brand" href="{{ '#contenido' if preview else '/inicio' }}"><img src="{{ url_for('static', filename='logo.png') }}" alt="Fénix Digital TV" width="104" height="54"></a>
+      <nav class="desktop-nav" aria-label="Menú principal">{{ links() }}</nav>
+      <a class="account-link" href="{{ site }}/cliente/login">Mi cuenta <span aria-hidden="true">↗</span></a>
+      <details class="mobile-nav">
+        <summary>Menú <span aria-hidden="true">☰</span></summary>
+        <nav aria-label="Menú principal">{{ links() }}<a href="{{ site }}/cliente/login">Mi cuenta ↗</a></nav>
+      </details>
     </div>
   </header>
 
-  <main>
-    <section class="wrap hero">
-      <div>
-        <div class="eyebrow">🔥 Demo gratis de 3 horas</div>
-        <h1>Tu entretenimiento, <span class="gradient">sin fronteras.</span></h1>
-        <p class="lead">Fénix Digital TV reúne deportes, películas, series y contenido internacional para disfrutar desde celular, Smart TV, Firestick, Roku, computadora y más.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="#solicitar">Solicitar demo</a>
-          <a class="btn btn-ghost" href="#planes">Ver planes</a>
+  <main id="contenido">
+    <section class="hero">
+      <div class="shell hero-layout">
+        <div class="hero-copy">
+          <p class="eyebrow"><span></span> DEPORTES EN VIVO · PELÍCULAS · SERIES</p>
+          <h1>Tu entretenimiento,<br><em>sin fronteras.</em></h1>
+          <p class="intro">Disfruta tus partidos, películas y series en tu televisor, celular o computadora. Te ayudamos a instalar la app para tu equipo.</p>
+          <div class="actions">
+            <a class="button primary" href="#solicitar" data-demo>Probar gratis 3 horas <span aria-hidden="true">↗</span></a>
+            <a class="button on-dark" href="#planes">Ver planes</a>
+          </div>
+          <p class="hero-note">Desde <b>Q{{ first.individual_gtq }} al mes</b> en Guatemala · Planes de 3 o 6 dispositivos simultáneos</p>
         </div>
-        <div class="trust">
-          <span class="chip">⚽ Todos los deportes</span>
-          <span class="chip">🎬 Películas y series</span>
-          <span class="chip">📱 Planes hasta 6 dispositivos</span>
-          <span class="chip">🌎 Atención internacional</span>
-        </div>
-        <div class="stats">
-          <div class="stat"><b>1,500+</b><span>clientes activos</span></div>
-          <div class="stat"><b>3</b><span>pantallas simultáneas</span></div>
-          <div class="stat"><b>3h</b><span>demo sin costo</span></div>
-          <div class="stat"><b>7+</b><span>países objetivo</span></div>
-        </div>
+        <figure class="hero-media">
+          <img src="{{ url_for('static', filename='landing/catalog-premium.webp') }}" alt="" fetchpriority="high" width="900" height="650">
+          <figcaption><span class="signal" aria-hidden="true"></span> En tus pantallas favoritas</figcaption>
+        </figure>
       </div>
-      <div class="hero-card">
-        <div class="image-card">
-          <img class="landing-img" src="{{ url_for('static', filename='landing/catalog-premium.webp') }}" alt="Catálogo premium de entretenimiento Fénix Digital TV">
-          <div class="image-overlay">
-            <span class="live">● EN VIVO</span>
-            <h3>Una experiencia completa para casa, móvil y Smart TV.</h3>
-            <p>Canales en vivo, deportes, películas, series y contenido familiar con instalación guiada.</p>
-          </div>
-        </div>
-        <div class="screen" style="margin-top:14px;min-height:auto;">
-          <div class="mini-grid">
-            <div class="mini"><b>3h</b><span>Demo gratis</span></div>
-            <div class="mini"><b>3</b><span>conexiones</span></div>
-            <div class="mini"><b>24/7</b><span>contenido</span></div>
-          </div>
+      <div class="hero-bottom">
+        <div class="shell hero-shortcuts">
+          <a href="#deportes"><span class="shortcut-index">01</span><span>Qué puedes ver</span><span aria-hidden="true">↓</span></a>
+          <a href="#dispositivos"><span class="shortcut-index">02</span><span>Comprueba tu equipo</span><span aria-hidden="true">↓</span></a>
+          <a href="#como-funciona"><span class="shortcut-index">03</span><span>Cómo empezar</span><span aria-hidden="true">↓</span></a>
         </div>
       </div>
     </section>
 
-    <section class="wrap">
-      <h2 class="section-title">¿Qué incluye?</h2>
-      <p class="section-sub">Una experiencia pensada para quienes quieren variedad, estabilidad y acompañamiento al instalar.</p>
-      <div class="cards">
-        <div class="card"><h3>🏆 Deportes</h3><p>Eventos, ligas, fútbol y contenido deportivo para seguir tus partidos favoritos.</p><div class="feature-list"><div class="feature"><span>✓</span><div><strong>Eventos en vivo</strong><br>Ideal para fines de semana deportivos, torneos y partidos importantes.</div></div><div class="feature"><span>✓</span><div><strong>Variedad internacional</strong><br>Contenido para audiencias de Guatemala, Centroamérica, México y Latinoamérica.</div></div></div></div>
-        <div class="card"><h3>🎥 Películas y series</h3><p>Entretenimiento para toda la familia desde tus pantallas favoritas.</p><div class="feature-list"><div class="feature"><span>✓</span><div><strong>Contenido OnDemand</strong><br>Opciones para ver en casa desde Smart TV, móvil o computadora.</div></div><div class="feature"><span>✓</span><div><strong>Actualización frecuente</strong><br>Una experiencia pensada para encontrar algo nuevo para ver.</div></div></div></div>
-        <div class="card"><h3>🛟 Soporte por WhatsApp</h3><p>Te indicamos qué app descargar y cómo ingresar según tu dispositivo.</p><div class="feature-list"><div class="feature"><span>✓</span><div><strong>Instalación guiada</strong><br>Te damos los pasos exactos según tu equipo.</div></div><div class="feature"><span>✓</span><div><strong>Activación manual</strong><br>Nuestro equipo valida tu pago y te entrega acceso.</div></div></div></div>
+    <section class="section shell" id="planes" aria-labelledby="planes-title">
+      <div class="section-head">
+        <div><p class="eyebrow">01 / PLANES</p><h2 id="planes-title">Elige cómo quieres ver Fénix</h2></div>
+        <p>Selecciona cuántos dispositivos usarás al mismo tiempo y por cuánto tiempo quieres contratar.</p>
       </div>
-    </section>
 
-    <section class="wrap" id="deportes">
-      <div class="sports-grid">
-        <div class="sports-image" style="background-image:url('{{ url_for('static', filename='landing/sports-live.webp') }}');">
-          <div class="sports-image-content">
-            <div class="eyebrow">⚽ Deportes todo el año</div>
-            <h2 class="section-title">Partidos, ligas y eventos para no perderte la acción.</h2>
-            <p class="section-sub">Fénix está pensado para quienes viven el deporte: fútbol, torneos internacionales, ligas regionales y eventos destacados, junto con entretenimiento para el resto de la familia.</p>
-            <a class="btn btn-primary" href="#solicitar">Quiero probar deportes</a>
+      <div class="planner">
+        <div class="planner-options">
+          <fieldset class="choices modes">
+            <legend>1. Tipo de plan</legend>
+            <label class="choice">
+              <input type="radio" name="plan-mode" value="individual" checked>
+              <span><b>Individual</b><small>Hasta 3 dispositivos simultáneos</small></span>
+            </label>
+            <label class="choice">
+              <input type="radio" name="plan-mode" value="family">
+              <span><b>Familiar</b><small>Hasta 6 dispositivos simultáneos</small></span>
+            </label>
+          </fieldset>
+          <div class="currency">
+            <label for="currency-country">Ver precios en</label>
+            <select id="currency-country" aria-describedby="currency-note">
+              <option value="GT">Guatemala · Quetzales</option>
+              <option value="US">Dólares (USD)</option>
+              <option value="HN">Honduras · Lempiras</option>
+              <option value="NI">Nicaragua · Córdobas</option>
+              <option value="CR">Costa Rica · Colones</option>
+              <option value="MX">México · Pesos</option>
+            </select>
           </div>
+          <fieldset class="choices terms">
+            <legend>2. Duración</legend>
+            {% for plan in payment_plans %}
+              <label class="choice term" data-months="{{ plan.months }}">
+                <input type="radio" name="plan-term" value="{{ plan.months }}"{% if loop.first %} checked{% endif %}>
+                <span><b>{{ plan.label }}</b><small data-term-price>{% if plan.individual_gtq %}Q{{ '{:,}'.format(plan.individual_gtq) }}{% else %}Consultar{% endif %}</small></span>
+              </label>
+            {% endfor %}
+          </fieldset>
+          <p id="currency-note" class="small">Precios en quetzales para Guatemala.</p>
+          <a class="selection-jump text-link" href="#pagos">Ver mi elección ↓</a>
         </div>
-        <div class="card">
-          <h3>Eventos que suelen buscar nuestros clientes</h3>
-          <div class="event-grid">
-            <div class="event"><b>Fútbol</b>Ligas, clásicos y torneos internacionales.</div>
-            <div class="event"><b>Centroamérica</b>Contenido de interés para Guatemala y la región.</div>
-            <div class="event"><b>México y LatAm</b>Opciones deportivas y entretenimiento regional.</div>
-            <div class="event"><b>Familia</b>Películas, series, canales y contenido variado.</div>
-          </div>
-        </div>
-      </div>
-    </section>
 
-    <section class="wrap">
-      <h2 class="section-title">Entretenimiento para todos los gustos</h2>
-      <p class="section-sub">Una landing más visual ayuda a que el cliente entienda rápido el valor: no solo compra acceso, compra una experiencia completa para ver deportes, películas, series y contenido en vivo desde sus pantallas favoritas.</p>
-      <div class="showcase">
-        <img class="landing-img showcase-image" src="{{ url_for('static', filename='landing/catalog-premium.webp') }}" alt="Películas, series y entretenimiento en Fénix Digital TV">
-        <div class="rail">
-          <div class="tile"><span class="tile-icon">💥</span><div><b>Acción</b><small>Películas intensas y aventuras</small></div></div>
-          <div class="tile"><span class="tile-icon">🎬</span><div><b>Estrenos</b><small>Novedades para ver en casa</small></div></div>
-          <div class="tile"><span class="tile-icon">📺</span><div><b>Series</b><small>Historias para maratonear</small></div></div>
-          <div class="tile"><span class="tile-icon">🧸</span><div><b>Infantil</b><small>Opciones para los pequeños</small></div></div>
-          <div class="tile"><span class="tile-icon">⚽</span><div><b>Deportes</b><small>Partidos y eventos en vivo</small></div></div>
-          <div class="tile"><span class="tile-icon">📰</span><div><b>Noticias</b><small>Actualidad y señal en vivo</small></div></div>
-          <div class="tile"><span class="tile-icon">🌎</span><div><b>Latinoamérica</b><small>Contenido de la región</small></div></div>
-          <div class="tile"><span class="tile-icon">🔥</span><div><b>Eventos</b><small>Momentos especiales y torneos</small></div></div>
-        </div>
-      </div>
-      <div class="premium-list">
-        <div><strong>Sin instalaciones complicadas</strong>Te guiamos con la app correcta según tu dispositivo.</div>
-        <div><strong>Demo antes de contratar</strong>Prueba durante 3 horas para confirmar compatibilidad y experiencia.</div>
-        <div><strong>Planes flexibles</strong>Elige mensual, trimestral, semestral o anual según tu necesidad.</div>
-        <div><strong>Atención humana</strong>Soporte directo por WhatsApp para activación y dudas básicas.</div>
-      </div>
-    </section>
-
-    <section class="wrap" id="planes">
-      <h2 class="section-title">Planes Fénix</h2>
-      <p class="section-sub">Elige el tiempo que prefieras. El plan individual permite hasta 3 dispositivos simultáneos; el plan familiar permite hasta 6 dispositivos simultáneos, con soporte de instalación y acceso al ecosistema Fénix.</p>
-      <div class="plan-modes">
-        <div class="plan-mode">
-          <b>Plan individual</b>
-          Hasta 3 dispositivos simultáneos con los precios publicados abajo.
-          <small>Desde Q90 / US$11.99</small>
-        </div>
-        <div class="plan-mode active">
-          <b>Plan familiar</b>
-          Hasta 6 dispositivos simultáneos. Se calcula sumando el adicional familiar al plan individual.
-          <small>Desde Q150 / US$19.99</small>
-        </div>
-      </div>
-      <div class="currency-box">
-        <span>Conversión local aproximada:</span>
-        <select id="currency-country" onchange="updateLocalPrices()">
-          <option value="GT">Guatemala — Quetzal</option>
-          <option value="HN">Honduras — Lempira</option>
-          <option value="SV">El Salvador — Dólar</option>
-          <option value="NI">Nicaragua — Córdoba</option>
-          <option value="CR">Costa Rica — Colón</option>
-          <option value="PA">Panamá — Dólar</option>
-          <option value="MX">México — Peso</option>
-          <option value="US">Otro país — Dólar</option>
-        </select>
-        <span id="currency-note">Valores referenciales sujetos a tipo de cambio.</span>
-      </div>
-      <div class="plans">
-        <div class="plan" data-usd="11.99" data-gtq="90" data-family-usd="19.99" data-family-gtq="150">
-          <h3>1 mes</h3>
-          <div class="price">US$11.99</div>
-          <div class="local-price"></div>
-          <div class="family-price"><span>Plan familiar · hasta 6 dispositivos</span><b>US$19.99</b><small class="family-local-price"></small></div>
-          <ul><li>Plan individual</li><li>Hasta 3 dispositivos simultáneos</li><li>Soporte de instalación</li><li>Ideal para probar</li><li>Activación guiada por WhatsApp</li></ul>
-          <a class="btn btn-ghost" href="#solicitar">Elegir</a>
-        </div>
-        <div class="plan" data-usd="28.99" data-gtq="225" data-family-usd="47.99" data-family-gtq="375">
-          <h3>3 meses</h3>
-          <div class="price">US$28.99</div>
-          <div class="local-price"></div>
-          <div class="family-price"><span>Plan familiar · hasta 6 dispositivos</span><b>US$47.99</b><small class="family-local-price"></small></div>
-          <ul><li>Plan individual</li><li>Mejor precio mensual</li><li>Hasta 3 dispositivos simultáneos</li><li>Activación guiada</li><li>Buena opción para renovar menos seguido</li></ul>
-          <a class="btn btn-ghost" href="#solicitar">Elegir</a>
-        </div>
-        <div class="plan featured" data-usd="50.99" data-gtq="400" data-family-usd="82.99" data-family-gtq="650">
-          <span class="badge">Popular</span>
-          <h3>6 meses</h3>
-          <div class="price">US$50.99</div>
-          <div class="local-price"></div>
-          <div class="family-price"><span>Plan familiar · hasta 6 dispositivos</span><b>US$82.99</b><small class="family-local-price"></small></div>
-          <ul><li>Plan individual</li><li>Excelente ahorro</li><li>Hasta 3 dispositivos simultáneos</li><li>Soporte por WhatsApp</li><li>Recomendado para clientes frecuentes</li></ul>
-          <a class="btn btn-primary" href="#solicitar">Elegir</a>
-        </div>
-        <div class="plan" data-usd="89.99" data-gtq="700" data-family-usd="147.99" data-family-gtq="1150">
-          <h3>12 meses</h3>
-          <div class="price">US$89.99</div>
-          <div class="local-price"></div>
-          <div class="family-price"><span>Plan familiar · hasta 6 dispositivos</span><b>US$147.99</b><small class="family-local-price"></small></div>
-          <ul><li>Plan individual</li><li>Máximo ahorro anual</li><li>Hasta 3 dispositivos simultáneos</li><li>Renovación sencilla</li><li>Menor preocupación mes a mes</li></ul>
-          <a class="btn btn-ghost" href="#solicitar">Elegir</a>
-        </div>
-      </div>
-      <p class="section-sub" style="margin-top:16px;font-size:14px;">La activación se realiza manualmente después de validar datos y pago. Durante horario de atención, el equipo te guía para que empieces lo antes posible.</p>
-      <div class="payment-shell" id="pagos">
-        <div class="payment-head">
-          <div>
-            <h3>Paga en línea</h3>
-            <p>Elige Recurrente para pagar con tarjeta o transferencia según disponibilidad. Para pagos internacionales, también tenemos PayPal.</p>
-          </div>
-          <a class="btn btn-ghost" href="/cliente/login">Ya soy cliente</a>
-        </div>
-        <div class="payment-table">
+        <div class="checkout" id="pagos">
+          <p class="eyebrow">3. REVISA TU ELECCIÓN</p>
           {% for plan in payment_plans %}
-          <div class="payment-row">
-            <div>
-              <b>{{ plan.label }}</b>
-              <small>Activación manual después de validar pago</small>
-            </div>
-            <div>
-              <b>Individual{% if plan.individual_gtq %} · Q{{ plan.individual_gtq }}{% endif %}</b>
-              <small>Hasta 3 dispositivos simultáneos</small>
-              <b style="margin-top:6px;">Familiar{% if plan.family_gtq %} · Q{{ plan.family_gtq }}{% else %} · consultar{% endif %}</b>
-              <small>Hasta 6 dispositivos simultáneos</small>
-            </div>
-            <div class="payment-buttons">
-              <a class="btn btn-ghost" target="_blank" rel="noopener" href="{{ plan.recurrente_individual }}">Recurrente individual</a>
-              <a class="btn btn-ghost {% if not plan.recurrente_family %}disabled{% endif %}" target="_blank" rel="noopener" href="{{ plan.recurrente_family or '#' }}">Recurrente familiar</a>
-            </div>
-            {% if plan.paypal_individual or plan.paypal_family %}
-            <div class="paypal-plan-buttons">
-              {% if plan.paypal_individual %}<div id="paypal-public-{{ plan.paypal_individual }}"></div>{% endif %}
-              {% if plan.paypal_family %}<div id="paypal-public-{{ plan.paypal_family }}"></div>{% endif %}
-            </div>
-            {% endif %}
-          </div>
+            {% for mode, label, devices in [('individual', 'Individual', 3), ('family', 'Familiar', 6)] %}
+              {% set gtq = plan[mode ~ '_gtq'] %}
+              {% set usd = plan[mode ~ '_usd'] %}
+              {% set recurrente = plan['recurrente_' ~ mode] %}
+              {% set hosted = plan['paypal_' ~ mode] %}
+              <div class="payment-option" data-option="{{ mode }}-{{ plan.months }}" data-label="{{ label }} · {{ plan.label }} · hasta {{ devices }} dispositivos" data-gtq="{{ gtq or '' }}" data-usd="{{ usd|replace('US$', '') }}"{% if not (loop.first and plan.months == first.months) %} hidden{% endif %}>
+                <h3>{{ label }} · {{ plan.label }}</h3>
+                <p class="checkout-devices">Hasta {{ devices }} dispositivos simultáneos</p>
+                <p class="checkout-price" data-checkout-price>{{ 'Q' ~ '{:,}'.format(gtq) if gtq else 'Precio a consultar' }}</p>
+                {% if not gtq %}<p class="small">Consulta el importe o revísalo en la plataforma de pago antes de continuar.</p>{% endif %}
+                <div class="payment-actions">
+                  {% if recurrente %}
+                    <a class="button outline" href="{{ '#pagos' if preview else recurrente }}" data-external-action target="_blank" rel="noopener">Pagar con Recurrente <span aria-hidden="true">↗</span></a>
+                  {% endif %}
+                  {% if hosted and paypal_client_id %}
+                    <button class="button outline" type="button" data-paypal-button aria-expanded="false" aria-controls="paypal-{{ mode }}-{{ plan.months }}">Mostrar PayPal (USD)</button>
+                    <div class="paypal" id="paypal-{{ mode }}-{{ plan.months }}" data-hosted-id="{{ hosted }}" hidden>
+                      <p class="small" role="status"></p>
+                      <div data-paypal-host id="paypal-host-{{ mode }}-{{ plan.months }}"></div>
+                    </div>
+                  {% endif %}
+                  <a class="button primary" href="#solicitar" data-plan-inquiry="{{ label }} · {{ plan.label }} · hasta {{ devices }} dispositivos">Consultar por WhatsApp <span aria-hidden="true">↗</span></a>
+                </div>
+              </div>
+            {% endfor %}
           {% endfor %}
-        </div>
-        <div class="paypal-public">
-          <h4>PayPal internacional</h4>
-          <p>Los botones de PayPal aparecen por plan cuando están disponibles. Si tu plan todavía no tiene botón PayPal, puedes pagar por Recurrente o escribirnos por WhatsApp.</p>
+          <p class="small checkout-note">El equipo activa tu acceso después de validar el pago, durante el horario de atención.</p>
+          <p class="sr-only" id="plan-announcement" aria-live="polite"></p>
+          <noscript><p>Para elegir otro plan, <a href="{{ contact }}">consulta por WhatsApp</a>.</p></noscript>
         </div>
       </div>
     </section>
 
-    <section class="wrap" id="dispositivos">
-      <div class="devices-shell">
-        <div class="devices-head">
-          <div>
-            <h2 class="section-title">Compatible con tus dispositivos</h2>
-            <p class="section-sub">Selecciona tu dispositivo y revisa las apps disponibles e instrucciones de instalación para empezar sin complicarte.</p>
-          </div>
+    <section class="section device-band" id="dispositivos" aria-labelledby="devices-title">
+      <div class="shell">
+        <div class="section-head">
+          <div><p class="eyebrow">02 / COMPATIBILIDAD</p><h2 id="devices-title">Encuentra la guía para tu equipo</h2></div>
+          <p>La app depende del modelo. Consulta la guía y confirma la compatibilidad con una demo antes de pagar.</p>
         </div>
         <div class="devices">
-        <a class="device" href="/dispositivo/android-ios">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-android-ios.webp') }}');"></div>
-          <b>Celulares/Tablets Android / iOS</b><span>Ver apps →</span>
-        </a>
-        <a class="device" href="/dispositivo/firestick">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-firestick.webp') }}');"></div>
-          <b>Amazon Firestick / Android Stick / TV Box Android</b><span>Ver apps →</span>
-        </a>
-        <a class="device" href="/dispositivo/samsung-lg">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-samsung-lg.webp') }}');"></div>
-          <b>Samsung / LG Smart TV</b><span>Ver apps →</span>
-        </a>
-        <a class="device" href="/dispositivo/windows-mac">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-windows-mac.webp') }}');"></div>
-          <b>Windows / Mac</b><span>Ver apps →</span>
-        </a>
-        <a class="device" href="/dispositivo/hisense">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-hisense.webp') }}');"></div>
-          <b>Hisense Smart TV</b><span>Ver apps →</span>
-        </a>
-        <a class="device" href="/dispositivo/roku">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-roku.webp') }}');"></div>
-          <b>Roku TV</b><span>Ver apps →</span>
-        </a>
-        <a class="device" href="/dispositivo/whatsapp">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-support.webp') }}');"></div>
-          <b>Atención</b><span>Contactar →</span>
-        </a>
-        <a class="device" href="/dispositivo/demo">
-          <div class="device-scene photo" style="background-image:url('{{ url_for('static', filename='landing/device-demo.webp') }}');"></div>
-          <b>Demo</b><span>Solicitar demo →</span>
-        </a>
+          {% for slug, label in [
+            ('samsung-lg', 'Samsung / LG Smart TV'),
+            ('android-ios', 'Android / iPhone / iPad'),
+            ('firestick', 'Firestick / TV Box Android'),
+            ('roku', 'Roku TV'),
+            ('hisense', 'Hisense Smart TV'),
+            ('windows-mac', 'Windows / Mac')
+          ] %}
+            <a class="device" href="{{ site }}/dispositivo/{{ slug }}">
+              <img src="{{ url_for('static', filename='landing/device-' ~ slug ~ '.webp') }}" alt="" width="480" height="270" loading="lazy" decoding="async">
+              <span><b>{{ label }}</b><span class="device-arrow" aria-hidden="true">↗</span></span>
+            </a>
+          {% endfor %}
         </div>
+        <p class="devices-help">¿No encuentras tu modelo? <a href="{{ site }}/dispositivo/whatsapp">Pide ayuda para elegir la app ↗</a></p>
       </div>
     </section>
 
-    <section class="wrap" id="como-funciona">
-      <h2 class="section-title">Cómo funciona la activación</h2>
-      <p class="section-sub">No necesitas ser técnico. Nuestro equipo te acompaña desde la prueba hasta la contratación.</p>
-      <div class="steps">
-        <div class="step"><h3>Solicita demo</h3><p>Nos escribes por WhatsApp con tu país y dispositivo principal.</p></div>
-        <div class="step"><h3>Instala la app</h3><p>Te indicamos si usar Max Player, Smart One o Premium Player.</p></div>
-        <div class="step"><h3>Prueba 3 horas</h3><p>Validas calidad, contenido y compatibilidad antes de contratar.</p></div>
-        <div class="step"><h3>Activa tu plan</h3><p>Confirmamos pago, cargamos acceso y te enviamos usuario/contraseña.</p></div>
+    <section class="section shell" id="como-funciona" aria-labelledby="steps-title">
+      <div class="section-head">
+        <div><p class="eyebrow">03 / PRIMEROS PASOS</p><h2 id="steps-title">De la prueba a tu plan</h2></div>
       </div>
+      <ol class="steps">
+        <li><span>01</span><h3>Pide tu demo</h3><p>Indícanos tu país y dispositivo. Te orientamos por WhatsApp.</p></li>
+        <li><span>02</span><h3>Instala y prueba</h3><p>Te indicamos qué app usar. Prueba el servicio durante 3 horas sin costo.</p></li>
+        <li><span>03</span><h3>Contrata si te convence</h3><p>Elige tu plan. Una vez validado el pago, te enviamos los datos de acceso.</p></li>
+      </ol>
     </section>
 
-    <section class="wrap">
-      <h2 class="section-title">Por qué elegir Fénix</h2>
-      <p class="section-sub">Venimos de años operando como Full Fan Digital TV y estamos evolucionando a una marca más preparada para Latinoamérica.</p>
-      <div class="cards">
-        <div class="card"><h3>⚡ Activación guiada</h3><p>Recibes acompañamiento por WhatsApp, con instrucciones claras según tu dispositivo.</p></div>
-        <div class="card"><h3>📺 Calidad adaptable</h3><p>La experiencia puede variar según internet y equipo, pero te ayudamos a elegir la mejor configuración.</p></div>
-        <div class="card"><h3>🌎 Visión regional</h3><p>Atención para Guatemala, El Salvador, Honduras, Nicaragua, Costa Rica, Panamá, México y otros países.</p></div>
-      </div>
-    </section>
-
-    <section class="wrap" id="revendedores">
-      <div class="reseller">
-        <div class="reseller-head">
-          <div>
-            <span class="reseller-pill">Programa para revendedores</span>
-            <h2 class="section-title">Vende Fénix Digital TV con tu propia cartera de clientes.</h2>
-            <p class="section-sub">Si ya vendes servicios digitales, tienes una tienda de tecnología o atiendes clientes con Smart TV, puedes trabajar con paquetes de créditos y gestionar renovaciones con acompañamiento del equipo Fénix.</p>
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%20Digital%20TV%2C%20quiero%20informaci%C3%B3n%20del%20programa%20de%20revendedores" target="_blank" rel="noopener">Quiero ser revendedor</a>
-              <a class="btn btn-ghost" href="#reseller-paquetes">Ver paquetes</a>
-            </div>
-          </div>
-          <div class="image-card">
-            <img class="landing-img" src="{{ url_for('static', filename='landing/reseller-network.webp') }}" alt="Programa de revendedores Fénix Digital TV">
-            <div class="image-overlay">
-              <h3>Cómo funcionan los créditos</h3>
-              <p>1 crédito equivale a 1 mes de servicio. Compras inventario, activas según ventas y mantienes tu margen.</p>
-            </div>
-          </div>
+    <section class="shell" id="solicitar" aria-labelledby="lead-title">
+      <div class="lead-panel">
+        <div class="lead-copy">
+          <p class="eyebrow">ATENCIÓN POR WHATSAPP</p>
+          <h2 id="lead-title" tabindex="-1">Prueba Fénix durante 3 horas</h2>
+          <p id="lead-description">Cuéntanos desde dónde nos escribes y en qué equipo quieres probarlo. No necesitas pagar para solicitar la demo.</p>
+          <a href="{{ site }}/dispositivo/demo">Más sobre la demo ↗</a>
         </div>
-
-        <div class="reseller-packages" id="reseller-paquetes">
-          <div class="reseller-package">
-            <h3>Inicio</h3>
-            <div class="reseller-price">US$37.99</div>
-            <div class="usd">10 créditos · aprox. Q300</div>
-            <ul>
-              <li>Ideal para vendedores nuevos</li>
-              <li>Soporte por WhatsApp</li>
-              <li>Inversión inicial accesible</li>
-            </ul>
-            <a class="btn btn-ghost" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%2C%20quiero%20el%20paquete%20revendedor%20de%2010%20cr%C3%A9ditos%20por%20US%2437.99" target="_blank" rel="noopener">Consultar</a>
+        <form id="lead-form" class="lead-form" action="{{ '#solicitar' if preview else whatsapp }}" method="get">
+          <div class="lead-interest">
+            <span>Tu solicitud</span>
+            <strong id="lead-interest">Demo gratis de 3 horas</strong>
+            <a href="#solicitar" data-demo id="reset-demo" hidden>Volver a demo</a>
           </div>
-          <div class="reseller-package">
-            <h3>Crecimiento</h3>
-            <div class="reseller-price">US$105.99</div>
-            <div class="usd">30 créditos · aprox. Q825</div>
-            <ul>
-              <li>Mejor costo por volumen</li>
-              <li>Ideal para cartera en crecimiento</li>
-              <li>Material comercial base</li>
-            </ul>
-            <a class="btn btn-ghost" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%2C%20quiero%20el%20paquete%20revendedor%20de%2030%20cr%C3%A9ditos%20por%20US%24105.99" target="_blank" rel="noopener">Consultar</a>
-          </div>
-          <div class="reseller-package featured">
-            <span class="badge">Recomendado</span>
-            <h3>Pro</h3>
-            <div class="reseller-price">US$159.99</div>
-            <div class="usd">50 créditos · aprox. Q1,250</div>
-            <ul>
-              <li>Mejor costo por volumen</li>
-              <li>Ideal para renovaciones recurrentes</li>
-              <li>Material comercial base</li>
-              <li>Prioridad en soporte operativo</li>
-            </ul>
-            <a class="btn btn-primary" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%2C%20quiero%20el%20paquete%20revendedor%20de%2050%20cr%C3%A9ditos%20por%20US%24159.99" target="_blank" rel="noopener">Consultar</a>
-          </div>
-          <div class="reseller-package">
-            <h3>Mayorista</h3>
-            <div class="reseller-price">US$255.99</div>
-            <div class="usd">100 créditos · aprox. Q2,000</div>
-            <ul>
-              <li>Enfoque para tiendas o equipos</li>
-              <li>Mejor margen por volumen</li>
-              <li>Acompañamiento comercial</li>
-            </ul>
-            <a class="btn btn-ghost" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%2C%20quiero%20el%20paquete%20revendedor%20de%20100%20cr%C3%A9ditos%20por%20US%24255.99" target="_blank" rel="noopener">Consultar</a>
-          </div>
-        </div>
-
-        <div class="audience">
-          <div class="audience-card"><b>Emprendedores digitales</b>Para quienes quieren vender suscripciones y construir ingresos recurrentes.</div>
-          <div class="audience-card"><b>Tiendas de tecnología</b>Ideal si configuras Smart TVs, Firesticks, Roku o dispositivos Android.</div>
-          <div class="audience-card"><b>Vendedores activos</b>Si ya tienes cartera, puedes migrar clientes gradualmente y ordenar renovaciones.</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="wrap" id="solicitar">
-      <div class="formbox">
-        <div>
-          <h2 class="section-title">Solicita tu demo o contratación</h2>
-          <p class="section-sub">Completa los datos y te abriremos WhatsApp con el mensaje listo para enviarlo al equipo Fénix.</p>
-          <div class="faq" id="faq">
-            <details open><summary>¿Antes eran Full Fan Digital TV?</summary><p>Sí. Full Fan Digital TV ahora evoluciona a Fénix Digital TV, con nueva imagen y una operación pensada para llegar a más países.</p></details>
-            <details><summary>¿Puedo probar antes?</summary><p>Sí, contamos con demo de 3 horas para que pruebes el servicio.</p></details>
-            <details><summary>¿Cuántos dispositivos incluye?</summary><p>El plan individual incluye hasta 3 dispositivos simultáneos. El plan familiar permite hasta 6 dispositivos simultáneos y se coordina por WhatsApp.</p></details>
-            <details><summary>¿Qué velocidad de internet necesito?</summary><p>Recomendamos una conexión estable de al menos 10 Mbps para una mejor experiencia. La calidad final depende de tu internet, dispositivo y red WiFi.</p></details>
-            <details><summary>¿Cuánto tarda la activación?</summary><p>La activación se realiza manualmente después de validar datos y pago. Normalmente es rápida durante horario de atención.</p></details>
-            <details><summary>¿Qué métodos de pago aceptan?</summary><p>En Guatemala manejamos transferencia bancaria. Para otros países podemos coordinar opciones disponibles por WhatsApp.</p></details>
-            <details><summary>¿Funciona en Roku?</summary><p>Sí. Para Roku usamos Premium Player o SACNET Plus, según disponibilidad y compatibilidad. Te guiamos con los pasos al solicitar demo o contratación.</p></details>
-            <details><summary>¿Tienen programa para revendedores?</summary><p>Sí. Trabajamos con paquetes de créditos para personas o negocios que desean revender el servicio a su propia cartera de clientes. Escríbenos para evaluar volumen, país y condiciones.</p></details>
-            <details><summary>¿El revendedor tiene panel propio?</summary><p>Sí. El revendedor cuenta con panel propio para crear sus usuarios, gestionar créditos y activar accesos de Max Player, con acompañamiento del equipo Fénix cuando necesite soporte operativo.</p></details>
-          </div>
-        </div>
-        <form class="form" onsubmit="sendLead(event)">
-          <input id="lead-name" placeholder="Tu nombre" required>
-          <input id="lead-country" placeholder="País" required>
-          <input id="lead-phone" placeholder="WhatsApp" required>
+          <label for="lead-country">País</label>
+          <input id="lead-country" autocomplete="country-name" maxlength="80" placeholder="Ej. Guatemala" required>
+          <label for="lead-device">¿En qué dispositivo lo usarás?</label>
           <select id="lead-device" required>
-            <option value="">Dispositivo principal</option>
-            <option>Celular Android</option><option>iPhone / iPad</option><option>Firestick</option>
-            <option>Samsung Smart TV</option><option>LG Smart TV</option><option>Hisense Smart TV</option>
-            <option>Roku</option><option>Windows / Mac</option>
+            <option value="">Selecciona tu equipo</option>
+            {% for device in ['Celular o tablet Android', 'iPhone / iPad', 'Firestick / TV Box Android', 'Samsung Smart TV', 'LG Smart TV', 'Hisense Smart TV', 'Roku', 'Windows / Mac', 'Otro / No sé cuál'] %}
+              <option>{{ device }}</option>
+            {% endfor %}
           </select>
-          <select id="lead-plan" required>
-            <option value="">Qué deseas</option>
-            <option>Demo gratis de 3 horas</option><option>Plan individual 1 mes</option><option>Plan individual 3 meses</option>
-            <option>Plan individual 6 meses</option><option>Plan individual 12 meses</option><option>Plan familiar hasta 6 dispositivos</option><option>Programa de revendedores</option>
-          </select>
-          <textarea id="lead-notes" placeholder="Mensaje opcional"></textarea>
-          <button class="btn btn-primary" type="submit">Enviar por WhatsApp</button>
+          <label for="lead-notes">Mensaje adicional <span>(opcional)</span></label>
+          <textarea id="lead-notes" rows="2" maxlength="400" placeholder="Modelo del equipo, dudas o preferencias"></textarea>
+          <button class="button primary" type="submit">Continuar en WhatsApp <span aria-hidden="true">↗</span></button>
+          <p class="small">Se abre un mensaje preparado. Tú decides si lo envías.</p>
+          <p class="small" id="lead-preview" role="status" hidden></p>
         </form>
       </div>
     </section>
 
-    <section class="wrap">
-      <div class="cta-band">
+    <section class="section shell" id="deportes" aria-labelledby="sports-title">
+      <div class="sports">
+        <img src="{{ url_for('static', filename='landing/sports-live.webp') }}" alt="" width="900" height="590" loading="lazy" decoding="async">
         <div>
-          <h2>¿Listo para probar Fénix?</h2>
-          <p>Solicita tu demo de 3 horas por WhatsApp o escríbenos a <a href="mailto:soporte@fenixdigitaltv.net">soporte@fenixdigitaltv.net</a>.</p>
+          <p class="eyebrow">QUÉ PUEDES VER</p>
+          <h2 id="sports-title">Del partido a la noche de películas</h2>
+          <p>Encuentra deportes en vivo, series, películas y canales internacionales. Si buscas una liga o un evento en particular, consúltanos antes de contratar.</p>
+          <a class="text-link" href="#solicitar" data-demo>Probar en mi dispositivo ↗</a>
         </div>
-        <a class="btn btn-primary" href="https://wa.me/50241562336?text=Hola%20F%C3%A9nix%20Digital%20TV%2C%20quiero%20una%20demo%20gratis%20de%203%20horas" target="_blank" rel="noopener">Pedir demo ahora</a>
+      </div>
+    </section>
+
+    <section class="section faq-band" id="faq" aria-labelledby="faq-title">
+      <div class="shell faq-layout">
+        <div>
+          <p class="eyebrow">AYUDA</p><h2 id="faq-title">Preguntas frecuentes</h2>
+          <p>¿Tienes otra duda? <a href="{{ contact }}" data-external-action target="_blank" rel="noopener">Escríbenos por WhatsApp ↗</a></p>
+        </div>
+        <div class="faq-list">
+          <details><summary>¿Puedo probar el servicio antes de pagar?</summary><p>Sí. Pide una demo de 3 horas para comprobar el contenido y la compatibilidad con tu equipo.</p></details>
+          <details><summary>¿Cuántos dispositivos puedo usar a la vez?</summary><p>Hasta 3 en el plan Individual o hasta 6 en el plan Familiar. El límite se refiere a dispositivos reproduciendo al mismo tiempo.</p></details>
+          <details><summary>¿Qué métodos de pago aceptan?</summary><p>Puedes ver las opciones disponibles al seleccionar el plan. Recurrente ofrece tarjeta o transferencia según disponibilidad; para pagos internacionales, algunos planes tienen PayPal en dólares. Si no aparece la opción que necesitas, consúltanos por WhatsApp.</p></details>
+          <details><summary>¿Cuándo se activa mi plan?</summary><p>El equipo valida los datos y el pago durante el horario de atención y te envía los datos de acceso. La activación no es automática. Si necesitas saber cuándo quedará listo, consúltanos antes de pagar.</p></details>
+          <details><summary>¿Funciona con Roku o con mi Smart TV?</summary><p>Depende del modelo y de las apps disponibles. Revisa las <a href="#dispositivos">guías por dispositivo</a>. Antes de contratar, confirma con nosotros si la app que necesitas requiere una licencia aparte.</p></details>
+          <details><summary>¿Qué conexión a internet necesito?</summary><p>Recomendamos al menos 10 Mbps estables. La experiencia también depende del equipo y de la red Wi‑Fi.</p></details>
+          <details><summary>¿Antes se llamaban Full Fan Digital TV?</summary><p>Sí, ahora operamos con la marca Fénix Digital TV. Si ya eres cliente, puedes entrar a <a href="{{ site }}/cliente/login">Mi cuenta</a>.</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="section shell" id="revendedores" aria-labelledby="reseller-title">
+      <div class="reseller">
+        <div>
+          <p class="eyebrow">PARA NEGOCIOS</p><h2 id="reseller-title">Programa de revendedores</h2>
+          <p>Gestiona tus clientes y renovaciones con paquetes de créditos. Un crédito equivale a un mes de servicio.</p>
+        </div>
+        <a class="button outline" href="{{ '#revendedores' if preview else whatsapp ~ '?text=Hola%20F%C3%A9nix%2C%20me%20interesa%20el%20programa%20de%20revendedores' }}" data-external-action target="_blank" rel="noopener">Consultar el programa ↗</a>
+        <details id="reseller-paquetes">
+          <summary>Ver paquetes de créditos</summary>
+          <dl class="reseller-prices">
+            <div><dt>Inicio · 10 créditos</dt><dd>US$37.99 <small>· aprox. Q300</small></dd></div>
+            <div><dt>Crecimiento · 30 créditos</dt><dd>US$105.99 <small>· aprox. Q825</small></dd></div>
+            <div><dt>Pro · 50 créditos</dt><dd>US$159.99 <small>· aprox. Q1,250</small></dd></div>
+            <div><dt>Mayorista · 100 créditos</dt><dd>US$255.99 <small>· aprox. Q2,000</small></dd></div>
+          </dl>
+        </details>
       </div>
     </section>
   </main>
 
-  <footer>
-    <div class="wrap">© 2026 Fénix Digital TV. Tu entretenimiento, sin fronteras. Servicio sujeto a disponibilidad técnica por dispositivo y país.</div>
+  <footer class="site-footer">
+    <div class="shell footer-layout">
+      <a class="brand" href="{{ '#contenido' if preview else '/inicio' }}"><img src="{{ url_for('static', filename='logo.png') }}" alt="Fénix Digital TV" width="104" height="54" loading="lazy"></a>
+      <nav aria-label="Enlaces del pie de página">
+        <a href="{{ site }}/cliente/login">Portal de clientes</a>
+        <a href="{{ contact }}" data-external-action target="_blank" rel="noopener">WhatsApp</a>
+        <a href="{{ '#faq' if preview else 'mailto:soporte@fenixdigitaltv.net' }}" data-external-action>Correo de soporte</a>
+        <a href="{{ site }}/login">Acceso del equipo</a>
+      </nav>
+    </div>
   </footer>
-
-  {% if paypal_client_id and paypal_hosted_button_id %}
-  <script src="https://www.paypal.com/sdk/js?client-id={{ paypal_client_id }}&components=hosted-buttons&disable-funding=venmo&currency=USD"></script>
-  {% endif %}
-  <script>
-    const LOCAL_CURRENCIES = {
-      GT: { label: 'Quetzales', symbol: 'Q', rate: 7.8, locale: 'es-GT' },
-      HN: { label: 'Lempiras', symbol: 'L', rate: 26.2, locale: 'es-HN' },
-      SV: { label: 'Dólares', symbol: 'US$', rate: 1, locale: 'es-SV' },
-      NI: { label: 'Córdobas', symbol: 'C$', rate: 36.8, locale: 'es-NI' },
-      CR: { label: 'Colones', symbol: '₡', rate: 506, locale: 'es-CR' },
-      PA: { label: 'Dólares', symbol: 'US$', rate: 1, locale: 'es-PA' },
-      MX: { label: 'Pesos MXN', symbol: 'MX$', rate: 18.5, locale: 'es-MX' },
-      US: { label: 'Dólares', symbol: 'US$', rate: 1, locale: 'en-US' }
-    };
-
-    function guessCountry() {
-      const lang = (navigator.language || '').toUpperCase();
-      const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || '').toLowerCase();
-      if (lang.includes('-GT') || tz.includes('guatemala')) return 'GT';
-      if (lang.includes('-HN') || tz.includes('tegucigalpa')) return 'HN';
-      if (lang.includes('-SV') || tz.includes('el_salvador')) return 'SV';
-      if (lang.includes('-NI') || tz.includes('managua')) return 'NI';
-      if (lang.includes('-CR') || tz.includes('costa_rica')) return 'CR';
-      if (lang.includes('-PA') || tz.includes('panama')) return 'PA';
-      if (lang.includes('-MX') || tz.includes('mexico')) return 'MX';
-      return 'GT';
-    }
-
-    function formatLocal(amount, cfg) {
-      if (cfg.symbol === '₡') return cfg.symbol + Math.round(amount).toLocaleString(cfg.locale);
-      if (cfg.symbol === 'US$') return cfg.symbol + amount.toFixed(2);
-      return cfg.symbol + Math.round(amount).toLocaleString(cfg.locale);
-    }
-
-    function updateLocalPrices() {
-      const select = document.getElementById('currency-country');
-      if (!select) return;
-      const cfg = LOCAL_CURRENCIES[select.value] || LOCAL_CURRENCIES.GT;
-      document.querySelectorAll('.plan[data-usd]').forEach(plan => {
-        const usd = Number(plan.dataset.usd || 0);
-        const gtq = Number(plan.dataset.gtq || 0);
-        const local = cfg === LOCAL_CURRENCIES.GT && gtq ? gtq : usd * cfg.rate;
-        const el = plan.querySelector('.local-price');
-        if (el) el.textContent = `Individual: aprox. ${formatLocal(local, cfg)} ${cfg.label}`;
-        const familyUsd = Number(plan.dataset.familyUsd || 0);
-        const familyGtq = Number(plan.dataset.familyGtq || 0);
-        const familyLocal = cfg === LOCAL_CURRENCIES.GT && familyGtq ? familyGtq : familyUsd * cfg.rate;
-        const familyEl = plan.querySelector('.family-local-price');
-        if (familyEl) familyEl.textContent = `aprox. ${formatLocal(familyLocal, cfg)} ${cfg.label}`;
-      });
-      const note = document.getElementById('currency-note');
-      if (note) note.textContent = `Tipo de cambio referencial. Precio base en dólares.`;
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      const select = document.getElementById('currency-country');
-      if (select) select.value = guessCountry();
-      updateLocalPrices();
-      if (window.paypal?.HostedButtons) {
-        const hostedButtons = [
-          {% for plan in payment_plans %}
-            {% if plan.paypal_individual %}"{{ plan.paypal_individual }}",{% endif %}
-            {% if plan.paypal_family %}"{{ plan.paypal_family }}",{% endif %}
-          {% endfor %}
-        ];
-        hostedButtons.forEach((id) => {
-          const selector = `#paypal-public-${id}`;
-          if (document.querySelector(selector)) {
-            paypal.HostedButtons({ hostedButtonId: id }).render(selector);
-          }
-        });
-      }
-    });
-
-    function sendLead(e) {
-      e.preventDefault();
-      const data = {
-        nombre: document.getElementById('lead-name').value.trim(),
-        pais: document.getElementById('lead-country').value.trim(),
-        whatsapp: document.getElementById('lead-phone').value.trim(),
-        dispositivo: document.getElementById('lead-device').value,
-        plan: document.getElementById('lead-plan').value,
-        notas: document.getElementById('lead-notes').value.trim()
-      };
-      const msg = `Hola Fénix Digital TV, quiero información.\n\nNombre: ${data.nombre}\nPaís: ${data.pais}\nWhatsApp: ${data.whatsapp}\nDispositivo: ${data.dispositivo}\nInterés: ${data.plan}\nNotas: ${data.notas || 'N/A'}`;
-      window.open(`https://wa.me/50241562336?text=${encodeURIComponent(msg)}`, '_blank');
-    }
-  </script>
 </body>
 </html>
