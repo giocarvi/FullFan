@@ -1308,6 +1308,38 @@ function normalizeWhatsAppPhone(value, defaultPrefix='502') {
   return '';
 }
 
+function openWhatsAppBusiness(url) {
+  if (!url) return false;
+  let parsed;
+  try {
+    parsed = new URL(url, window.location.origin);
+  } catch (e) {
+    window.open(url, '_blank', 'noopener');
+    return false;
+  }
+
+  const phone = parsed.pathname.replace(/\D/g, '');
+  const text = parsed.searchParams.get('text') || '';
+  const waUrl = `https://wa.me/${phone}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+  const userAgent = navigator.userAgent || '';
+
+  if (/Android/i.test(userAgent)) {
+    const query = `phone=${encodeURIComponent(phone)}${text ? `&text=${encodeURIComponent(text)}` : ''}`;
+    const fallback = encodeURIComponent(waUrl);
+    window.location.href = `intent://send?${query}#Intent;scheme=whatsapp;package=com.whatsapp.w4b;S.browser_fallback_url=${fallback};end`;
+    return false;
+  }
+
+  if (/iPhone|iPad|iPod/i.test(userAgent)) {
+    window.location.href = waUrl;
+    return false;
+  }
+
+  const webUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}${text ? `&text=${encodeURIComponent(text)}` : ''}`;
+  window.open(webUrl, '_blank', 'noopener');
+  return false;
+}
+
 // ── STATE ──────────────────────────────────────────────────────────────────
 let currentPage = 1, currentEstado = '', currentQ = '', currentFecha = '', currentArchivados = '', loadingClientes = false, totalClientes = 0;
 let searchTimeout;
@@ -2040,12 +2072,12 @@ async function openModal(username) {
       <div class="wa-section-title">💬 WhatsApp</div>
       <div class="wa-buttons">
         ${waBase ? `
-          <a class="wa-btn primary" href="${waBase}" target="_blank" rel="noopener">📞 Abrir chat</a>
-          <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_saludo || 'Hola {nombre}, te saludamos de Fénix Digital TV 👋 Tu entretenimiento, sin fronteras.'))}" target="_blank" rel="noopener">👋 Saludo</a>
-          <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_recordatorio || 'Hola {nombre}, tu servicio vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'))}" target="_blank" rel="noopener">⚠️ Recordatorio</a>
-          <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'))}" target="_blank" rel="noopener">✅ Confirmar pago</a>
-          <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_vencido || 'Hola {nombre}, tu servicio ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'))}" target="_blank" rel="noopener">❌ Servicio vencido</a>
-          ${cfg.wa_nuevo_numero ? '<a class="wa-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border-color:rgba(245,158,11,0.35);" href="' + waBase + '?text=' + encMsg(waFill(cfg.wa_nuevo_numero)) + '" target="_blank" rel="noopener">📲 Nuevo número</a>' : ''}
+          <a class="wa-btn primary" href="${waBase}" onclick="return openWhatsAppBusiness(this.href)" target="_blank" rel="noopener">📞 Abrir en WhatsApp Business</a>
+          <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_saludo || 'Hola {nombre}, te saludamos de Fénix Digital TV 👋 Tu entretenimiento, sin fronteras.'))}" onclick="return openWhatsAppBusiness(this.href)" target="_blank" rel="noopener">👋 Saludo</a>
+          <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_recordatorio || 'Hola {nombre}, tu servicio vence el {fecha}. Para renovar escríbenos o realiza tu pago. ¡Gracias! 📺'))}" onclick="return openWhatsAppBusiness(this.href)" target="_blank" rel="noopener">⚠️ Recordatorio</a>
+          <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_confirmar_pago || 'Hola {nombre}, hemos recibido tu pago ✅. Tu servicio Fénix Digital TV ha sido renovado hasta el {fecha}. ¡Gracias por preferirnos! 🔥'))}" onclick="return openWhatsAppBusiness(this.href)" target="_blank" rel="noopener">✅ Confirmar pago</a>
+          <a class="wa-btn" href="${waBase}?text=${encMsg(waFill(cfg.wa_vencido || 'Hola {nombre}, tu servicio ha vencido 📅. Para reactivarlo realiza tu pago y envíanos el comprobante. ¡Te esperamos! 💜'))}" onclick="return openWhatsAppBusiness(this.href)" target="_blank" rel="noopener">❌ Servicio vencido</a>
+          ${cfg.wa_nuevo_numero ? '<a class="wa-btn" style="background:rgba(245,158,11,0.15);color:#f59e0b;border-color:rgba(245,158,11,0.35);" href="' + waBase + '?text=' + encMsg(waFill(cfg.wa_nuevo_numero)) + '" onclick="return openWhatsAppBusiness(this.href)" target="_blank" rel="noopener">📲 Nuevo número</a>' : ''}
         ` : `
           <button class="wa-btn" style="opacity:.65;cursor:not-allowed;" disabled>✅ Confirmar pago</button>
           <span style="font-size:12px;color:var(--muted);align-self:center;">Agrega un teléfono válido para habilitar WhatsApp.</span>
@@ -2383,7 +2415,7 @@ async function migrarFenixConMaxPlayer(username, hasSavedPassword = false) {
   const detailR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
   const detail = await detailR.json();
   const url = detailR.ok ? buildMigrationUrlFromDetail(detail) : (window._migrationWaUrls && window._migrationWaUrls[username]);
-  if (url) window.open(url, '_blank', 'noopener');
+  if (url) openWhatsAppBusiness(url);
   openModal(username);
 }
 
@@ -2915,7 +2947,7 @@ async function migrarClienteDesdeLista(username, hasSavedPassword = false) {
   const refreshedR = await fetch(`/api/clientes/${encodeURIComponent(username)}`);
   const refreshed = await refreshedR.json();
   const url = buildMigrationUrlFromDetail(refreshedR.ok ? refreshed : detail);
-  if (url) window.open(url, '_blank', 'noopener');
+  if (url) openWhatsAppBusiness(url);
   else alert('Max Player listo, pero este cliente no tiene teléfono válido para WhatsApp.');
   loadMigrationClients();
 }
@@ -2980,7 +3012,7 @@ async function migrarGrupoFenix(username) {
     alert('Usuarios pendientes:\n\n' + pendientes.join('\n'));
   }
   const url = buildMigrationUrlFromDetail(detail);
-  if (url) window.open(url, '_blank', 'noopener');
+  if (url) openWhatsAppBusiness(url);
   openModal(username);
 }
 
